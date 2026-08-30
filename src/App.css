@@ -1,0 +1,3127 @@
+/* =========================================================
+   OILTRACE — APPLICATION / GIS EXPERIENCE
+   Works with the updated App.jsx
+========================================================= */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  --app-bg: #e9eef4;
+  --surface: #ffffff;
+  --surface-soft: #f6f8fb;
+  --surface-muted: #edf2f7;
+
+  --border: #d3dce7;
+  --border-soft: #e4e9ef;
+
+  --text: #172235;
+  --text-secondary: #40516a;
+  --text-muted: #6b7b91;
+  --text-faint: #9aa8b9;
+
+  --primary: #1769d3;
+  --primary-dark: #0f4fa7;
+  --primary-soft: #eaf3ff;
+
+  --success: #15966b;
+  --warning: #d89009;
+  --danger: #df3c42;
+
+  --spill: #ef4444;
+  --source: #1769d3;
+  --candidate: #d97706;
+  --trajectory-muted: #94a3b8;
+
+  --toolbar-bg: rgba(255, 255, 255, 0.94);
+  --toolbar-hover: #edf4fc;
+
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #edf3f9;
+  --sidebar-text: #34455d;
+  --sidebar-muted: #708096;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.app.app-dark {
+  --app-bg: #0b1422;
+  --surface: #131f30;
+  --surface-soft: #19283a;
+  --surface-muted: #223247;
+
+  --border: #314257;
+  --border-soft: #27384c;
+
+  --text: #f3f7fb;
+  --text-secondary: #c7d2df;
+  --text-muted: #91a1b5;
+  --text-faint: #617289;
+
+  --primary: #4d9cff;
+  --primary-dark: #2f7fe1;
+  --primary-soft: #162f50;
+
+  --success: #35c895;
+  --warning: #eab308;
+  --danger: #f05b61;
+
+  --toolbar-bg: rgba(19, 31, 48, 0.96);
+  --toolbar-hover: #223247;
+
+  --sidebar-bg: #121e2d;
+  --sidebar-hover: #223247;
+  --sidebar-text: #dbe5f0;
+  --sidebar-muted: #8fa0b5;
+}
+
+/* =========================================================
+   MAP
+========================================================= */
+
+.map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #dce5ed;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.app-dark .leaflet-container {
+  background: #0b1422;
+}
+
+.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile-pane {
+  pointer-events: none;
+}
+
+.leaflet-control-container {
+  z-index: 900;
+}
+
+/* Oil particle canvas:
+   above tiles, below Leaflet interaction layers */
+.oiltrace-oil-canvas {
+  position: absolute !important;
+  inset: 0;
+  z-index: 450;
+  display: block;
+  pointer-events: none !important;
+}
+
+/* Keep geographic Leaflet overlays interactive */
+.leaflet-overlay-pane {
+  z-index: 400;
+}
+
+.leaflet-marker-pane {
+  z-index: 650;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 700;
+}
+
+/* =========================================================
+   MAP POLYGON / SOURCE REGION
+========================================================= */
+
+path.leaflet-interactive {
+  /* Leaflet owns these SVG paths. Avoid CSS transitions here: a vessel
+     selection can change one trajectory's stroke width, and animating all
+     interactive SVG paths at the same time makes the spill geometry appear
+     to shimmer/jitter. */
+  transition: none !important;
+}
+
+.leaflet-overlay-pane path {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Spill boundary should remain visually dominant */
+.leaflet-overlay-pane path[fill-opacity="0.16"] {
+  filter: drop-shadow(
+    0 2px 3px rgba(15, 23, 42, 0.12)
+  );
+}
+
+/* =========================================================
+   POPUPS
+========================================================= */
+
+.leaflet-popup {
+  z-index: 6000 !important;
+}
+
+.leaflet-popup-content-wrapper {
+  min-width: 180px;
+  border: 1px solid #d7e0ea;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow:
+    0 14px 35px rgba(15, 23, 42, 0.17),
+    0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  color: #46566c;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.leaflet-popup-content strong {
+  color: #172235;
+  font-weight: 800;
+}
+
+.leaflet-popup-tip {
+  background: #ffffff;
+}
+
+.leaflet-popup-close-button {
+  color: #64748b !important;
+}
+
+.app-dark .leaflet-popup-content-wrapper {
+  background: #142235;
+  border-color: #33465d;
+}
+
+.app-dark .leaflet-popup-content {
+  color: #b9c7d7;
+}
+
+.app-dark .leaflet-popup-content strong {
+  color: #ffffff;
+}
+
+.app-dark .leaflet-popup-tip {
+  background: #142235;
+}
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+.oiltrace-map-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  z-index: 2000;
+
+  display: flex;
+  align-items: center;
+  gap: 3px;
+
+  padding: 6px;
+
+  background: var(--toolbar-bg);
+  border: 1px solid rgba(193, 205, 219, 0.95);
+  border-radius: 12px;
+
+  box-shadow:
+    0 16px 38px rgba(15, 23, 42, 0.14),
+    0 3px 9px rgba(15, 23, 42, 0.07);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.map-tool-button {
+  position: relative;
+
+  width: 43px;
+  height: 43px;
+  flex: 0 0 43px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #53657b;
+
+  font-size: 20px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 120ms ease;
+}
+
+.map-tool-button:hover {
+  background: var(--toolbar-hover);
+  color: var(--primary);
+}
+
+.map-tool-button:active {
+  transform: scale(0.91);
+}
+
+.map-tool-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.map-tool-button svg {
+  width: 19px;
+  height: 19px;
+
+  display: block;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.zoom-button {
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.map-tool-button.backtrack-tool-button {
+  width: auto !important;
+  flex: 0 0 auto !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  white-space: nowrap !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.03em;
+}
+
+.theme-tool-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.map-tool-divider {
+  width: 1px;
+  height: 25px;
+  flex: 0 0 1px;
+
+  margin: 0 3px;
+
+  background: #d8e0e9;
+}
+
+.app-dark .map-tool-button {
+  color: #bdcad8;
+}
+
+.app-dark .map-tool-button:hover {
+  background: #223247;
+  color: #ffffff;
+}
+
+.app-dark .map-tool-divider {
+  background: #3b4b5d;
+}
+
+/* =========================================================
+   CONTEXT PANELS
+========================================================= */
+
+.oiltrace-context-panel,
+.oiltrace-replay-panel,
+.oiltrace-vessel-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+
+  z-index: 2500;
+
+  width: 410px;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  background: rgba(247, 249, 252, 0.98);
+
+  border-left: 1px solid #d1dbe6;
+  border-top-left-radius: 16px;
+
+  box-shadow:
+    -20px 0 50px rgba(15, 23, 42, 0.16);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  animation:
+    context-panel-enter
+    280ms
+    cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes context-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.app-dark .oiltrace-context-panel,
+.app-dark .oiltrace-replay-panel,
+.app-dark .oiltrace-vessel-panel {
+  background: rgba(14, 24, 38, 0.98);
+  border-color: #314257;
+
+  box-shadow:
+    -20px 0 50px rgba(0, 0, 0, 0.38);
+}
+
+.context-panel-header {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  padding: 24px;
+
+  background: #ffffff;
+  border-bottom: 1px solid #dfe5ec;
+}
+
+.app-dark .context-panel-header {
+  background: #131f30;
+  border-color: #314257;
+}
+
+.context-kicker {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: #77879b;
+
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.context-panel-header h2 {
+  margin: 0;
+
+  color: #172235;
+
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.app-dark .context-panel-header h2 {
+  color: #f5f8fb;
+}
+
+.context-close-button {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #d4dde7;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #6b7b91;
+
+  font-size: 21px;
+
+  cursor: pointer;
+
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.context-close-button:hover {
+  background: #edf3f9;
+  border-color: #b9c7d6;
+  color: #172235;
+}
+
+.app-dark .context-close-button {
+  background: #19283a;
+  border-color: #3b4d63;
+  color: #c5d0dc;
+}
+
+/* =========================================================
+   INCIDENT
+========================================================= */
+
+.incident-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 11px 24px;
+
+  background: #f5f7fa;
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.incident-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #607086;
+
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+
+.incident-status::before {
+  content: "";
+
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: var(--warning);
+
+  box-shadow:
+    0 0 0 4px rgba(216, 144, 9, 0.11);
+}
+
+.incident-severity {
+  padding: 5px 9px;
+
+  border: 1px solid #f4c2c7;
+  border-radius: 5px;
+
+  background: #fff3f4;
+  color: #c52f39;
+
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.context-section {
+  flex-shrink: 0;
+
+  padding: 19px 24px;
+
+  border-bottom: 1px solid #e1e7ee;
+}
+
+.context-section-label {
+  display: block;
+
+  margin-bottom: 10px;
+
+  color: #8492a4;
+
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.context-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.incident-title {
+  margin: 0;
+
+  color: #26344a;
+
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 750;
+}
+
+.incident-time {
+  margin: 6px 0 0;
+
+  color: #8491a1;
+
+  font-size: 9px;
+}
+
+.incident-metrics {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 7px;
+}
+
+.incident-metric {
+  min-width: 0;
+  min-height: 76px;
+
+  padding: 11px;
+
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-radius: 9px;
+}
+
+.incident-metric strong {
+  display: block;
+
+  overflow: hidden;
+
+  color: #26344a;
+
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.incident-metric span {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #68788e;
+
+  font-size: 8px;
+
+  white-space: nowrap;
+}
+
+.incident-metric small {
+  display: block;
+
+  margin-top: 10px;
+
+  color: #a0adbc;
+
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+}
+
+.candidate-count {
+  min-width: 26px;
+  height: 26px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #d4dfe9;
+  border-radius: 7px;
+
+  background: #edf3f8;
+  color: #49657e;
+
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.incident-candidate-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 13px;
+
+  background: #ffffff;
+  border: 1px solid #dce4ed;
+  border-radius: 10px;
+}
+
+.candidate-summary-label {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #91a0b0;
+
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 1px;
+}
+
+.incident-candidate-summary strong {
+  display: block;
+
+  max-width: 190px;
+  overflow: hidden;
+
+  color: #2d3c51;
+
+  font-size: 13px;
+  font-weight: 750;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.candidate-confidence {
+  text-align: right;
+}
+
+.candidate-confidence strong {
+  color: var(--primary);
+
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.candidate-confidence span {
+  display: block;
+
+  margin-top: 2px;
+
+  color: #8998a9;
+
+  font-size: 7px;
+}
+
+.inspect-candidate-button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 8px;
+  padding: 10px 12px;
+
+  border: 1px solid #cbd8e5;
+  border-radius: 8px;
+
+  background: #f8fafc;
+  color: #48647e;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 120ms ease;
+}
+
+.inspect-candidate-button:hover {
+  background: #edf5fc;
+  border-color: #aac1d8;
+  color: #205c93;
+}
+
+.inspect-candidate-button:active {
+  transform: scale(0.985);
+}
+
+/* =========================================================
+   TIMELINE
+========================================================= */
+
+.incident-timeline-item {
+  position: relative;
+
+  display: flex;
+
+  gap: 12px;
+
+  min-height: 45px;
+}
+
+.timeline-marker {
+  position: relative;
+
+  width: 12px;
+  flex: 0 0 12px;
+
+  display: flex;
+  justify-content: center;
+}
+
+.timeline-marker::before {
+  content: "";
+
+  position: absolute;
+
+  top: 8px;
+  bottom: -8px;
+
+  width: 1px;
+
+  background: #ccd7e2;
+}
+
+.timeline-final .timeline-marker::before {
+  display: none;
+}
+
+.timeline-marker span {
+  position: relative;
+
+  width: 7px;
+  height: 7px;
+
+  margin-top: 5px;
+
+  border: 2px solid #688099;
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  z-index: 2;
+}
+
+.timeline-content {
+  display: flex;
+  align-items: baseline;
+
+  gap: 9px;
+
+  min-width: 0;
+}
+
+.incident-timeline-item strong {
+  width: 40px;
+  flex-shrink: 0;
+
+  color: #34465d;
+
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.incident-timeline-item span {
+  color: #7c8a9b;
+
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+/* =========================================================
+   LEGEND — EXACT MAP VISUAL LANGUAGE
+========================================================= */
+
+.legend-context-panel {
+  width: 410px;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  color: #26364a;
+}
+
+.legend-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 22px 24px 18px;
+}
+
+.legend-panel-subtitle {
+  margin: 4px 0 0;
+  color: #7a8899;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.legend-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 18px;
+}
+
+.legend-group {
+  padding: 18px 0 0;
+}
+
+.legend-group-title {
+  padding: 0 24px 8px;
+  color: #758398;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.legend-items {
+  padding: 0 24px;
+}
+
+.legend-item {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-bottom: 1px solid #e8edf2;
+  color: #40516a;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.legend-item:last-child {
+  border-bottom: 0;
+}
+
+/* Oil particles: exact simulation colors from oilSimulation/DeckOilOverlay. */
+.legend-particle {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.03);
+}
+
+.legend-particle-initial { background: #10b981; }
+.legend-particle-active { background: #2563eb; }
+.legend-particle-stranded { background: #ef4444; }
+
+/* Particle history is a very thin, low-opacity blue line. */
+.legend-drift-trail {
+  width: 30px;
+  height: 2px;
+  flex: 0 0 30px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.35);
+}
+
+/* Oil centerline: dark slate, dashed, 3px — matches the map Polyline. */
+.legend-oil-centerline {
+  width: 30px;
+  height: 0;
+  flex: 0 0 30px;
+  border-top: 3px dashed #1e293b;
+}
+
+/* Backtrack: cyan, dashed, 3.5px — matches the map Polyline. */
+.legend-backtrack-path {
+  width: 30px;
+  height: 0;
+  flex: 0 0 30px;
+  border-top: 3px dashed #06b6d4;
+}
+
+/* Spill polygon: transparent red fill + red outline. */
+.legend-spill-boundary {
+  width: 30px;
+  height: 18px;
+  flex: 0 0 30px;
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Spill centroid: red outer point with white centre, matching CircleMarker pair. */
+.legend-spill-centroid {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid #b91c1c;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.legend-spill-centroid::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* Source region: blue dashed circle. */
+.legend-source-region {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 2px dashed #2563eb;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.04);
+}
+
+/* Vessel sample mirrors the actual Leaflet marker: white body + probability ring. */
+.legend-vessel {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #64758a;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+}
+
+.legend-vessel::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 50%;
+}
+
+.legend-vessel > span {
+  position: relative;
+  z-index: 1;
+}
+
+.legend-top-vessel {
+  border-color: #eab308;
+  color: #334155;
+}
+
+.legend-top-vessel::before {
+  border-color: rgba(217, 119, 6, 0.35);
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.08);
+}
+
+.legend-line {
+  width: 30px;
+  height: 0;
+  flex: 0 0 30px;
+  border-radius: 999px;
+}
+
+.legend-selected {
+  border-top: 5px solid #2563eb;
+}
+
+.legend-candidate {
+  border-top: 4px solid #d97706;
+}
+
+.legend-muted-trajectory {
+  border-top: 3px solid #94a3b8;
+}
+
+/* Attribution dots match the probability colors used by vessel markers. */
+.legend-probability-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+}
+
+.probability-high-dot { background: #dc2626; }
+.probability-medium-dot { background: #eab308; }
+.probability-low-dot { background: #16a34a; }
+
+.legend-note {
+  margin: 20px 24px 6px;
+  padding: 13px 14px;
+  border: 1px solid #dbe3eb;
+  border-radius: 10px;
+  background: #edf2f7;
+  color: #708096;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.legend-note strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #52657b;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.legend-note p { margin: 0 0 7px; }
+.legend-note p:last-child { margin-bottom: 0; }
+
+.app-dark .legend-context-panel {
+  background: #0e1826;
+  color: #dbe5f0;
+}
+
+.app-dark .legend-panel-subtitle,
+.app-dark .legend-group-title { color: #91a0b3; }
+.app-dark .legend-item {
+  color: #c5d0dd;
+  border-color: #26384d;
+}
+
+.app-dark .legend-vessel {
+  background: #172334;
+  color: #e2e8f0;
+  border-color: #53657a;
+}
+
+.app-dark .legend-spill-boundary { background: rgba(239, 68, 68, 0.10); }
+.app-dark .legend-note {
+  background: #172334;
+  border-color: #2c4057;
+  color: #9cacbf;
+}
+.app-dark .legend-note strong { color: #c9d5e2; }
+
+/* =========================================================
+   VESSEL MARKERS
+========================================================= */
+
+.oiltrace-vessel-icon-wrapper {
+  background: transparent !important;
+  border: 0 !important;
+
+  overflow: visible !important;
+
+  pointer-events: auto !important;
+}
+
+.oiltrace-vessel-marker {
+  position: relative;
+
+  width: 52px;
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+
+  cursor: pointer;
+  pointer-events: auto;
+
+  transform: scale(1);
+  transform-origin: center center;
+
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 160ms ease;
+}
+
+.oiltrace-vessel-marker:hover {
+  transform: scale(1.08);
+  filter:
+    drop-shadow(
+      0 4px 7px rgba(15, 23, 42, 0.20)
+    );
+}
+
+.vessel-probability-label {
+  position: absolute;
+
+  left: 50%;
+  top: 1px;
+
+  transform: translateX(-50%);
+
+  z-index: 10;
+
+  min-width: 30px;
+
+  padding: 3px 5px;
+
+  border-radius: 5px;
+
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 900;
+
+  text-align: center;
+  white-space: nowrap;
+
+  pointer-events: none;
+
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.16);
+}
+
+.probability-high .vessel-probability-label {
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+  background: #fff5f5;
+}
+
+.probability-medium .vessel-probability-label {
+  color: #9a6700;
+  border: 1px solid #f0c36d;
+  background: #fff9e8;
+}
+
+.probability-low .vessel-probability-label {
+  color: #147a45;
+  border: 1px solid #8bd3aa;
+  background: #f0fff6;
+}
+
+.vessel-probability-ring {
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  width: 44px;
+  height: 44px;
+
+  transform: translate(-50%, -50%);
+
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 50%;
+
+  pointer-events: none;
+}
+
+.vessel-marker-body {
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  width: 34px;
+  height: 34px;
+
+  transform: translate(-50%, -50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1.5px solid #64758a;
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 3px 9px rgba(15, 23, 42, 0.25);
+
+  z-index: 3;
+
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.probability-high .vessel-marker-body {
+  border-color: #dc2626;
+}
+
+.probability-medium .vessel-marker-body {
+  border-color: #eab308;
+}
+
+.probability-low .vessel-marker-body {
+  border-color: #16a34a;
+}
+
+.vessel-marker-symbol {
+  position: relative;
+
+  z-index: 4;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #334155;
+
+  font-size: 18px;
+  line-height: 1;
+
+  opacity: 0.85;
+
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Selected vessel */
+.oiltrace-vessel-marker.is-selected {
+  z-index: 1000;
+}
+
+.oiltrace-vessel-marker.is-selected .vessel-marker-body {
+  width: 37px;
+  height: 37px;
+
+  border-width: 2px;
+
+  background: #eef6ff;
+
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.12),
+    0 5px 14px rgba(15, 23, 42, 0.28);
+}
+
+.oiltrace-vessel-marker.is-selected .vessel-probability-label {
+  opacity: 0;
+}
+
+.oiltrace-vessel-marker.is-selected .vessel-marker-symbol {
+  color: #1769d3;
+
+  font-size: 19px;
+  opacity: 1;
+}
+
+.oiltrace-vessel-marker.is-selected .vessel-probability-ring {
+  width: 48px;
+  height: 48px;
+
+  border-color: rgba(37, 99, 235, 0.30);
+}
+
+/* Top candidate */
+.oiltrace-vessel-marker.is-top-candidate .vessel-marker-body {
+  animation:
+    oiltrace-anchor-pulse
+    1.9s
+    ease-in-out
+    infinite;
+}
+
+.oiltrace-vessel-marker.is-top-candidate .vessel-probability-ring {
+  border-color: rgba(217, 119, 6, 0.35);
+}
+
+@keyframes oiltrace-anchor-pulse {
+  0% {
+    box-shadow:
+      0 3px 9px rgba(15, 23, 42, 0.25);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(217, 119, 6, 0.11),
+      0 5px 15px rgba(15, 23, 42, 0.28);
+  }
+
+  100% {
+    box-shadow:
+      0 3px 9px rgba(15, 23, 42, 0.25);
+  }
+}
+
+/* Replay marker */
+.oiltrace-vessel-marker.is-replay {
+  width: 44px;
+  height: 44px;
+}
+
+.oiltrace-vessel-marker.is-replay .vessel-marker-body {
+  width: 27px;
+  height: 27px;
+}
+
+.oiltrace-vessel-marker.is-replay .vessel-probability-ring {
+  width: 35px;
+  height: 35px;
+}
+
+.oiltrace-vessel-marker.is-replay .vessel-marker-symbol {
+  font-size: 14px;
+}
+
+.oiltrace-vessel-marker.is-replay .vessel-probability-label {
+  top: -2px;
+  min-width: 27px;
+  padding: 2px 4px;
+  font-size: 7px;
+}
+
+/* =========================================================
+   VESSEL TOOLTIP
+========================================================= */
+
+.leaflet-tooltip.oiltrace-vessel-tooltip {
+  z-index: 5000 !important;
+
+  padding: 0 !important;
+
+  border: 1px solid #d5dee8;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #172235;
+
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.18),
+    0 3px 8px rgba(15, 23, 42, 0.08);
+
+  font-family: inherit;
+
+  overflow: hidden;
+
+  pointer-events: none;
+
+  opacity: 1 !important;
+}
+
+.leaflet-tooltip.oiltrace-vessel-tooltip::before {
+  border-top-color: #ffffff;
+}
+
+.vessel-tooltip-content {
+  min-width: 220px;
+  padding: 12px 13px;
+}
+
+.vessel-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding-bottom: 9px;
+  margin-bottom: 7px;
+
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.vessel-tooltip-header strong {
+  max-width: 150px;
+
+  overflow: hidden;
+
+  color: #172235;
+
+  font-size: 12px;
+  font-weight: 850;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vessel-tooltip-probability {
+  flex-shrink: 0;
+
+  min-width: 38px;
+
+  padding: 4px 6px;
+
+  border-radius: 5px;
+
+  text-align: center;
+
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.vessel-tooltip-probability.probability-high {
+  color: #c62828;
+  background: #fff1f1;
+  border: 1px solid #efb1b1;
+}
+
+.vessel-tooltip-probability.probability-medium {
+  color: #936300;
+  background: #fff8e6;
+  border: 1px solid #f0ca79;
+}
+
+.vessel-tooltip-probability.probability-low {
+  color: #147a45;
+  background: #effcf5;
+  border: 1px solid #9bd8b5;
+}
+
+.vessel-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  min-height: 25px;
+
+  border-bottom: 1px solid #eef1f4;
+}
+
+.vessel-tooltip-row:last-child {
+  border-bottom: 0;
+}
+
+.vessel-tooltip-row span {
+  color: #7b8a9c;
+
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.vessel-tooltip-row strong {
+  color: #33445a;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  text-align: right;
+}
+
+/* =========================================================
+   REPLAY
+========================================================= */
+
+.oiltrace-replay-panel {
+  color: #172235;
+}
+
+.replay-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  padding: 24px;
+
+  background: #ffffff;
+  border-bottom: 1px solid #dfe5ec;
+}
+
+.replay-kicker {
+  display: block;
+
+  margin-bottom: 6px;
+
+  color: #738399;
+
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 1.7px;
+}
+
+.replay-panel-header h2 {
+  margin: 0;
+
+  color: #172235;
+
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.replay-panel-header p {
+  margin: 8px 0 0;
+
+  max-width: 270px;
+
+  color: #718096;
+
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.replay-close {
+  width: 36px;
+  height: 36px;
+
+  border: 1px solid #d4dde7;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #64748b;
+
+  font-size: 21px;
+
+  cursor: pointer;
+}
+
+.replay-time-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: 17px;
+  padding: 17px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #14253a,
+      #1d3550
+    );
+
+  border-radius: 11px;
+
+  color: #ffffff;
+
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+.replay-time-label {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #9eb0c3;
+
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 1px;
+}
+
+.replay-time-card strong {
+  font-size: 27px;
+  line-height: 1;
+}
+
+.replay-status {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 6px 9px;
+
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+
+  border-radius: 20px;
+
+  color: #d5e0eb;
+
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.replay-status-dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #728297;
+}
+
+.replay-status-dot.playing {
+  background: #36c891;
+
+  box-shadow:
+    0 0 0 4px rgba(54, 200, 145, 0.13);
+}
+
+.replay-timeline-section {
+  padding: 0 18px 18px;
+}
+
+.replay-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+
+  margin-bottom: 7px;
+
+  color: #718096;
+
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.replay-slider {
+  width: 100%;
+  height: 5px;
+
+  appearance: none;
+
+  outline: none;
+
+  border-radius: 10px;
+
+  background: #d8e1ea;
+
+  cursor: pointer;
+}
+
+.replay-slider::-webkit-slider-thumb {
+  appearance: none;
+
+  width: 16px;
+  height: 16px;
+
+  border: 3px solid #1769d3;
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.22);
+}
+
+.replay-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+
+  border: 3px solid #1769d3;
+  border-radius: 50%;
+
+  background: #ffffff;
+}
+
+.replay-controls {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 14px 18px;
+
+  background: #ffffff;
+
+  border-top: 1px solid #e0e6ed;
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.replay-reset-button,
+.replay-play-button {
+  height: 40px;
+
+  border-radius: 9px;
+
+  cursor: pointer;
+}
+
+.replay-reset-button {
+  width: 40px;
+
+  border: 1px solid #d3dde7;
+
+  background: #ffffff;
+  color: #53657a;
+}
+
+.replay-play-button {
+  width: 48px;
+
+  border: 0;
+
+  background: #1769d3;
+  color: #ffffff;
+
+  font-weight: 850;
+}
+
+.replay-reset-text {
+  margin-left: auto;
+
+  border: 0;
+
+  background: transparent;
+  color: #708096;
+
+  font-size: 9px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.replay-speed-section {
+  padding: 18px;
+}
+
+.replay-speed-heading {
+  display: flex;
+  justify-content: space-between;
+
+  margin-bottom: 9px;
+}
+
+.replay-speed-title,
+.replay-speed-value {
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.replay-speed-value {
+  color: #1769d3;
+}
+
+.replay-speed-buttons {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 6px;
+}
+
+.speed-button {
+  padding: 7px 4px;
+
+  border: 1px solid #d6e0e9;
+  border-radius: 7px;
+
+  background: #ffffff;
+  color: #6d7d91;
+
+  font-size: 8px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.speed-button.active {
+  background: #eaf3ff;
+  border-color: #8ebcf0;
+  color: #1769d3;
+}
+
+/* =========================================================
+   VESSEL / SUSPECT PANEL
+========================================================= */
+
+.oiltrace-vessel-panel {
+  width: 430px;
+
+  background: #f5f7fa;
+  color: #172235;
+
+  overflow-y: auto;
+}
+
+.oiltrace-vessel-panel .context-panel-header {
+  min-height: 190px;
+
+  padding: 27px 25px 25px;
+}
+
+.oiltrace-vessel-panel .context-panel-header h2 {
+  max-width: 330px;
+
+  margin: 0;
+
+  color: #172235;
+
+  font-size: 26px;
+  line-height: 1.18;
+  font-weight: 850;
+}
+
+.oiltrace-vessel-panel .context-panel-header p {
+  max-width: 350px;
+
+  margin: 12px 0 0;
+
+  color: #697a90;
+
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.oiltrace-vessel-panel .context-section {
+  padding: 23px 22px 25px;
+
+  background: #f5f7fa;
+
+  border-bottom: 1px solid #dfe6ed;
+}
+
+/* =========================================================
+   DARK MODE
+========================================================= */
+
+.app-dark .incident-status-row {
+  background: #101b2a;
+  border-color: #293b50;
+}
+
+.app-dark .incident-status {
+  color: #bdc9d7;
+}
+
+.app-dark .incident-severity {
+  background: #321d22;
+  border-color: #70383f;
+  color: #ff9aa0;
+}
+
+.app-dark .context-section {
+  border-color: #293b50;
+}
+
+.app-dark .incident-title,
+.app-dark .incident-metric strong,
+.app-dark .incident-candidate-summary strong {
+  color: #f1f5f9;
+}
+
+.app-dark .incident-time,
+.app-dark .incident-metric span,
+.app-dark .incident-timeline-item span {
+  color: #91a1b5;
+}
+
+.app-dark .incident-metric,
+.app-dark .incident-candidate-summary {
+  background: #18283a;
+  border-color: #314257;
+}
+
+.app-dark .candidate-count {
+  background: #223247;
+  border-color: #3c5068;
+  color: #9cc8ff;
+}
+
+.app-dark .inspect-candidate-button {
+  background: #18283a;
+  border-color: #3d5168;
+  color: #c6d2df;
+}
+
+.app-dark .inspect-candidate-button:hover {
+  background: #20344c;
+  border-color: #52708f;
+  color: #e5f0fb;
+}
+
+.app-dark .timeline-marker::before {
+  background: #3b4d62;
+}
+
+.app-dark .timeline-marker span {
+  background: #142235;
+  border-color: #8191a4;
+}
+
+.app-dark .legend-group-title {
+  color: #8fa0b5;
+}
+
+.app-dark .legend-item {
+  color: #c5d0dc;
+  border-color: #293b50;
+}
+
+.app-dark .legend-vessel {
+  background: #18283a;
+  border-color: #485c73;
+  color: #cbd6e2;
+}
+
+.app-dark .legend-top-vessel {
+  border-color: #d97706;
+  color: #f0a33c;
+}
+
+.app-dark .legend-note {
+  background: #18283a;
+  border-color: #314257;
+  color: #8fa0b5;
+}
+
+.app-dark .legend-note strong {
+  color: #cbd6e2;
+}
+
+.app-dark .vessel-marker-body {
+  background: #142235;
+  border-color: #8191a4;
+
+  box-shadow:
+    0 4px 11px rgba(0, 0, 0, 0.35);
+}
+
+.app-dark .vessel-marker-symbol {
+  color: #e2e8f0;
+}
+
+.app-dark .vessel-probability-ring {
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.app-dark .oiltrace-vessel-marker.is-selected .vessel-marker-body {
+  background: #17365d;
+
+  box-shadow:
+    0 0 0 4px rgba(77, 156, 255, 0.13),
+    0 5px 14px rgba(0, 0, 0, 0.35);
+}
+
+.app-dark .oiltrace-vessel-marker.is-selected .vessel-marker-symbol {
+  color: #70afff;
+}
+
+.app-dark .oiltrace-vessel-marker.is-selected .vessel-probability-ring {
+  border-color: rgba(77, 156, 255, 0.38);
+}
+
+.app-dark .leaflet-tooltip.oiltrace-vessel-tooltip {
+  background: #142235;
+  border-color: #33465d;
+  color: #f4f7fb;
+}
+
+.app-dark .leaflet-tooltip.oiltrace-vessel-tooltip::before {
+  border-top-color: #142235;
+}
+
+.app-dark .vessel-tooltip-header,
+.app-dark .vessel-tooltip-row {
+  border-color: #304257;
+}
+
+.app-dark .vessel-tooltip-header strong,
+.app-dark .vessel-tooltip-row strong {
+  color: #f8fafc;
+}
+
+.app-dark .vessel-tooltip-row span {
+  color: #91a1b5;
+}
+
+.app-dark .replay-panel-header,
+.app-dark .replay-controls {
+  background: #131f30;
+  border-color: #314257;
+}
+
+.app-dark .replay-panel-header h2 {
+  color: #f4f7fb;
+}
+
+.app-dark .replay-panel-header p {
+  color: #91a1b5;
+}
+
+.app-dark .replay-close,
+.app-dark .replay-reset-button,
+.app-dark .speed-button {
+  background: #18283a;
+  border-color: #3b4d63;
+  color: #c5d0dc;
+}
+
+.app-dark .speed-button.active {
+  background: #162f50;
+  border-color: #4d9cff;
+  color: #7db8ff;
+}
+
+.app-dark .replay-timeline-labels {
+  color: #91a1b5;
+}
+
+.app-dark .replay-slider {
+  background: #33465b;
+}
+
+/* =========================================================
+   SCROLLBARS
+========================================================= */
+
+.oiltrace-context-panel::-webkit-scrollbar,
+.oiltrace-replay-panel::-webkit-scrollbar,
+.oiltrace-vessel-panel::-webkit-scrollbar,
+.legend-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.oiltrace-context-panel::-webkit-scrollbar-track,
+.oiltrace-replay-panel::-webkit-scrollbar-track,
+.oiltrace-vessel-panel::-webkit-scrollbar-track,
+.legend-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.oiltrace-context-panel::-webkit-scrollbar-thumb,
+.oiltrace-replay-panel::-webkit-scrollbar-thumb,
+.oiltrace-vessel-panel::-webkit-scrollbar-thumb,
+.legend-items::-webkit-scrollbar-thumb {
+  background: #c4cfdb;
+  border-radius: 10px;
+}
+
+.app-dark .oiltrace-context-panel::-webkit-scrollbar-thumb,
+.app-dark .oiltrace-replay-panel::-webkit-scrollbar-thumb,
+.app-dark .oiltrace-vessel-panel::-webkit-scrollbar-thumb,
+.app-dark .legend-items::-webkit-scrollbar-thumb {
+  background: #415263;
+}
+
+/* =========================================================
+   FULLSCREEN
+========================================================= */
+
+.map:fullscreen,
+.map:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
+  .oiltrace-map-toolbar {
+    top: 11px;
+
+    max-width:
+      calc(100vw - 92px);
+
+    overflow-x: auto;
+
+    scrollbar-width: none;
+  }
+
+  .oiltrace-map-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .map-tool-button {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+
+  .oiltrace-context-panel,
+  .oiltrace-replay-panel,
+  .oiltrace-vessel-panel {
+    width: min(100vw, 430px);
+
+    border-radius:
+      13px 0 0 13px;
+  }
+
+  .incident-metrics {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .context-panel-header {
+    padding: 20px;
+  }
+
+  .context-section {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .legend-items {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .legend-group-title {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .oiltrace-map-toolbar {
+    top: 9px;
+
+    max-width:
+      calc(100vw - 68px);
+  }
+
+  .map-tool-button {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .map-tool-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .oiltrace-context-panel,
+  .oiltrace-replay-panel,
+  .oiltrace-vessel-panel {
+    width: 100vw;
+
+    border-radius: 0;
+  }
+
+  .oiltrace-vessel-panel .context-panel-header {
+    padding: 22px 18px;
+  }
+
+  .oiltrace-vessel-panel .context-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .incident-metrics {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .legend-note {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================
+   BACKTRACK ANALYSIS PANEL ANIMATIONS
+========================================================= */
+
+@keyframes backtrackPanelIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes scanLine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sonarPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dotPulse {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes progressBar {
+  0% {
+    width: 25%;
+    left: 0%;
+  }
+  50% {
+    width: 55%;
+    left: 20%;
+  }
+  100% {
+    width: 35%;
+    left: 65%;
+  }
+}
+
+
+/* Keep animated oil canvas below Leaflet vessel markers at all times. */
+.map .leaflet-marker-pane,
+.map .leaflet-tooltip-pane,
+.map .leaflet-popup-pane {
+  z-index: 700 !important;
+}
+
+.map .leaflet-overlay-pane {
+  z-index: 500 !important;
+}
+
+/* =========================================================
+   OIL PLUME / FLOW-LINE VISUAL TUNING
+   The particle canvas is intentionally above the Leaflet overlay
+   pane, while vessels remain above both. This keeps the oil dots
+   visually continuous without hiding investigation markers.
+========================================================= */
+
+.oiltrace-oil-canvas {
+  z-index: 450 !important;
+  pointer-events: none !important;
+  mix-blend-mode: normal;
+}
+
+.leaflet-overlay-pane {
+  z-index: 400 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 650 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 700 !important;
+}
+
+/* The primary oil-flow line is deliberately readable but lighter
+   than the particle field, so it guides the eye instead of cutting
+   through the plume visually. */
+.leaflet-overlay-pane path {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Exact particle legend samples: same hues as DeckOilOverlay. */
+.legend-particle {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.legend-particle-initial {
+  background: #10b981 !important;
+}
+
+.legend-particle-active {
+  background: #2563eb !important;
+}
+
+.legend-particle-stranded {
+  background: #ef4444 !important;
+}
+
+.legend-drift-trail {
+  height: 2px;
+  background: rgba(59, 130, 246, 0.35) !important;
+}
+
+.legend-oil-centerline {
+  border-top: 3px dashed #1e293b !important;
+}
+/* =========================================================
+   OILTRACE — SUSPECT PANEL FINAL UI OVERRIDES
+   Fixes:
+   - Search box sizing
+   - Risk filter buttons
+   - Candidate cards
+   - Rank badges
+   - Confidence badges
+   - Progress bars
+   - Spacing / alignment
+   - Panel scrolling
+========================================================= */
+
+/* ---------------------------------------------------------
+   PANEL BASE
+--------------------------------------------------------- */
+
+.suspect-panel {
+  width: 430px;
+  max-width: 100vw;
+  background: #f8fafc;
+  border-left: 1px solid #dbe3ec;
+  border-radius: 16px 0 0 16px;
+  box-shadow:
+    -18px 0 45px rgba(15, 23, 42, 0.14),
+    -4px 0 12px rgba(15, 23, 42, 0.05);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------
+   HEADER
+--------------------------------------------------------- */
+
+.suspect-panel .panel-header {
+  flex: 0 0 auto;
+  padding: 20px 22px 17px;
+  min-height: 0;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  background: #ffffff;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.suspect-panel .panel-kicker-row {
+  margin-bottom: 5px;
+}
+
+.suspect-panel .panel-kicker {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.7px;
+  line-height: 1.2;
+}
+
+.suspect-panel .panel-header h2 {
+  margin: 2px 0 0;
+
+  color: #0f172a;
+  font-size: 21px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.suspect-panel .panel-header-description {
+  max-width: 335px;
+  margin: 6px 0 0;
+
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.suspect-panel .close-button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+
+  padding: 0;
+
+  border: 1px solid #d7dee7;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #64748b;
+
+  font-size: 20px;
+}
+
+/* ---------------------------------------------------------
+   SCROLL AREA
+--------------------------------------------------------- */
+
+.suspect-panel > .panel-scroll-content {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  padding: 15px 16px 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* ---------------------------------------------------------
+   METRICS
+--------------------------------------------------------- */
+
+.suspect-panel .investigation-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.suspect-panel .investigation-metric-card {
+  min-width: 0;
+  min-height: 84px;
+
+  padding: 12px 9px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+  border: 1px solid #e1e7ee;
+  border-radius: 10px;
+
+  text-align: center;
+}
+
+.suspect-panel .metric-label {
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 1px;
+  color: #68788d;
+  white-space: nowrap;
+}
+
+.suspect-panel .metric-val {
+  margin-top: 5px;
+
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 850;
+  color: #172235;
+}
+
+.suspect-panel .metric-sub {
+  margin-top: 5px;
+
+  font-size: 8px;
+  line-height: 1.2;
+  color: #9aa7b6;
+}
+
+/* ---------------------------------------------------------
+   PRIMARY SUSPECT
+--------------------------------------------------------- */
+
+.suspect-panel .primary-suspect-spotlight {
+  flex: 0 0 auto;
+
+  overflow: hidden;
+
+  background: #ffffff;
+  border: 1px solid #f3d47b;
+  border-radius: 11px;
+
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.06);
+}
+
+.suspect-panel .spotlight-badge {
+  min-height: 30px;
+
+  padding: 7px 12px;
+
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  background: #d97706;
+
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 1px;
+}
+
+.suspect-panel .spotlight-body {
+  padding: 13px 14px;
+}
+
+.suspect-panel .spotlight-title-row {
+  margin-bottom: 9px;
+}
+
+.suspect-panel .spotlight-name {
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #172235;
+}
+
+.suspect-panel .spotlight-type {
+  margin-top: 3px;
+  font-size: 9px;
+  color: #7a8798;
+}
+
+.suspect-panel .spotlight-score-pill {
+  min-width: 45px;
+  padding: 5px 7px;
+
+  background: #d97706;
+  border-radius: 7px;
+}
+
+.suspect-panel .spotlight-score-pill .score-num {
+  font-size: 13px;
+}
+
+.suspect-panel .spotlight-meter {
+  height: 5px;
+  margin-bottom: 9px;
+}
+
+/* ---------------------------------------------------------
+   CANDIDATE OVERVIEW
+--------------------------------------------------------- */
+
+.suspect-panel .candidate-overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Title */
+
+.suspect-panel .section-title-row {
+  min-height: 22px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.suspect-panel .overview-label {
+  color: #64748b;
+
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+
+.suspect-panel .candidate-count-badge {
+  padding: 4px 8px;
+
+  border-radius: 5px;
+
+  background: #e0f2fe;
+  color: #0284c7;
+
+  font-size: 8px;
+  font-weight: 750;
+}
+
+/* ---------------------------------------------------------
+   SEARCH
+--------------------------------------------------------- */
+
+/*
+   This specifically fixes the oversized search box
+   visible in your screenshot.
+*/
+
+.suspect-panel .candidate-overview-section input[type="text"],
+.suspect-panel .candidate-overview-section input[type="search"],
+.suspect-panel .candidate-overview-section input {
+  width: 100%;
+  height: 38px;
+
+  min-width: 0;
+
+  padding: 0 11px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+
+  background: #ffffff;
+  color: #172235;
+
+  font-size: 12px;
+  line-height: 38px;
+
+  outline: none;
+}
+
+.suspect-panel .candidate-overview-section input::placeholder {
+  color: #8a97a7;
+  opacity: 1;
+}
+
+.suspect-panel .candidate-overview-section input:focus {
+  border-color: #60a5fa;
+
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+/* ---------------------------------------------------------
+   FILTER BUTTONS
+--------------------------------------------------------- */
+
+/*
+   Your screenshot shows these becoming huge because
+   there is no scoped styling for them.
+*/
+
+.suspect-panel .candidate-overview-section button {
+  font-family: inherit;
+}
+
+/* Filter/tab style buttons */
+
+.suspect-panel .candidate-overview-section
+button:not(.candidate-entry-card):not(.spotlight-action-btn) {
+  min-height: 34px;
+
+  padding: 6px 10px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+
+  background: #ffffff;
+  color: #334155;
+
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.suspect-panel .candidate-overview-section
+button:not(.candidate-entry-card):not(.spotlight-action-btn):hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* ---------------------------------------------------------
+   CANDIDATE LIST
+--------------------------------------------------------- */
+
+.suspect-panel .candidate-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------
+   CANDIDATE CARD
+--------------------------------------------------------- */
+
+.suspect-panel .candidate-entry-card {
+  width: 100%;
+  min-height: 76px;
+
+  padding: 11px 12px;
+
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  background: #ffffff;
+  border: 1px solid #e1e7ee;
+  border-radius: 11px;
+
+  cursor: pointer;
+  text-align: left;
+
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease,
+    box-shadow 140ms ease;
+}
+
+.suspect-panel .candidate-entry-card:hover {
+  background: #fbfdff;
+  border-color: #cbd5e1;
+  transform: translateX(-1px);
+
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+/* Top candidate */
+
+.suspect-panel .candidate-entry-card.candidate-card-top {
+  background: #fffdf7;
+  border-color: #f3d47b;
+}
+
+/* ---------------------------------------------------------
+   RANK
+--------------------------------------------------------- */
+
+.suspect-panel .rank-badge {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+
+  border-radius: 8px;
+
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.suspect-panel .rank-badge.rank-1 {
+  background: #fff3cf;
+  border-color: #f6d878;
+  color: #b45309;
+}
+
+.suspect-panel .rank-badge.rank-2 {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.suspect-panel .rank-badge.rank-3 {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+/* ---------------------------------------------------------
+   CARD INFORMATION
+--------------------------------------------------------- */
+
+.suspect-panel .card-main-info {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.suspect-panel .card-name-row {
+  min-width: 0;
+  margin-bottom: 3px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.suspect-panel .vessel-title {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #172235;
+
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.suspect-panel .vessel-conf-badge {
+  flex: 0 0 auto;
+
+  min-width: 40px;
+
+  padding: 4px 7px;
+
+  border-radius: 6px;
+
+  font-size: 10px;
+  line-height: 1;
+
+  text-align: center;
+  font-weight: 850;
+}
+
+/* ---------------------------------------------------------
+   CARD SUBTEXT
+--------------------------------------------------------- */
+
+.suspect-panel .card-sub-row {
+  margin-bottom: 7px;
+
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  color: #748296;
+
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+/* ---------------------------------------------------------
+   PROGRESS BAR
+--------------------------------------------------------- */
+
+.suspect-panel .candidate-mini-bar {
+  width: 100%;
+  height: 4px;
+
+  overflow: hidden;
+
+  background: #edf1f5;
+  border-radius: 999px;
+}
+
+.suspect-panel .candidate-mini-fill {
+  height: 100%;
+  min-width: 2px;
+
+  border-radius: 999px;
+}
+
+/* ---------------------------------------------------------
+   ARROW
+--------------------------------------------------------- */
+
+.suspect-panel .card-chevron {
+  width: 14px;
+  flex: 0 0 14px;
+
+  color: #c5cfdb;
+
+  font-size: 19px;
+  line-height: 1;
+
+  text-align: center;
+}
+
+/* ---------------------------------------------------------
+   METHODOLOGY
+--------------------------------------------------------- */
+
+.suspect-panel .attribution-methodology-card {
+  padding: 12px;
+
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+
+  background: #f0fdf4;
+}
+
+.suspect-panel .methodology-title {
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.suspect-panel .methodology-desc {
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------
+   FOOTER
+--------------------------------------------------------- */
+
+.suspect-panel > .panel-footer {
+  flex: 0 0 auto;
+
+  padding: 11px 16px 14px;
+
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ---------------------------------------------------------
+   SELECTOR / STEPPER
+--------------------------------------------------------- */
+
+.suspect-panel .vessel-selector-stepper-bar {
+  flex: 0 0 auto;
+
+  padding: 9px 13px;
+
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  gap: 7px;
+
+  background: #ffffff;
+}
+
+.suspect-panel .stepper-nav-btn {
+  width: 32px;
+  height: 32px;
+
+  border-radius: 7px;
+
+  font-size: 11px;
+}
+
+.suspect-panel .stepper-current-trigger {
+  min-height: 32px;
+  padding: 5px 8px;
+
+  border-radius: 7px;
+
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------
+   SCROLLBAR
+--------------------------------------------------------- */
+
+.suspect-panel > .panel-scroll-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suspect-panel > .panel-scroll-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.suspect-panel > .panel-scroll-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* ---------------------------------------------------------
+   DARK MODE
+--------------------------------------------------------- */
+
+.app-dark .suspect-panel {
+  background: #0f172a;
+  border-color: #263449;
+}
+
+.app-dark .suspect-panel .panel-header,
+.app-dark .suspect-panel > .panel-footer,
+.app-dark .suspect-panel .vessel-selector-stepper-bar {
+  background: #131f30;
+  border-color: #334155;
+}
+
+.app-dark .suspect-panel .panel-header h2,
+.app-dark .suspect-panel .vessel-title,
+.app-dark .suspect-panel .metric-val {
+  color: #f8fafc;
+}
+
+.app-dark .suspect-panel .panel-header-description,
+.app-dark .suspect-panel .card-sub-row {
+  color: #94a3b8;
+}
+
+.app-dark .suspect-panel .investigation-metric-card,
+.app-dark .suspect-panel .candidate-entry-card {
+  background: #18283a;
+  border-color: #334155;
+}
+
+.app-dark .suspect-panel .candidate-entry-card.candidate-card-top {
+  background: #29251c;
+  border-color: #8a6419;
+}
+
+.app-dark .suspect-panel .candidate-overview-section input,
+.app-dark .suspect-panel .candidate-overview-section
+button:not(.candidate-entry-card):not(.spotlight-action-btn) {
+  background: #18283a;
+  border-color: #3b4d63;
+  color: #e2e8f0;
+}
+
+.app-dark .suspect-panel .candidate-overview-section input::placeholder {
+  color: #8191a4;
+}
+
+.app-dark .suspect-panel .candidate-mini-bar {
+  background: #263449;
+}
+
+.app-dark .suspect-panel .attribution-methodology-card {
+  background: rgba(22, 101, 52, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+/* ---------------------------------------------------------
+   RESPONSIVE
+--------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .suspect-panel {
+    width: min(430px, 100vw);
+    border-radius: 14px 0 0 14px;
+  }
+
+  .suspect-panel > .panel-scroll-content {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .suspect-panel {
+    width: 100vw;
+    border-radius: 0;
+  }
+
+  .suspect-panel .investigation-metrics-grid {
+    gap: 6px;
+  }
+
+  .suspect-panel .investigation-metric-card {
+    padding: 9px 6px;
+  }
+
+  .suspect-panel .candidate-entry-card {
+    padding: 10px;
+  }
+}

@@ -1,0 +1,292 @@
+{
+  "demoMode": true,
+  "dataStatus": "SIMULATED",
+  "demoNotice": "All incident, vessel, trajectory and scoring values are simulated for frontend demonstration only.",
+
+  "incident": {
+    "id": "OT-DEMO-001",
+    "status": "Under Investigation",
+    "severity": "High",
+
+    "detectedAt": "2026-08-26T10:32:00Z",
+
+    "location": {
+      "latitude": 18.520,
+      "longitude": 72.912
+    },
+
+    "areaKm2": 12.4,
+
+    "detectionConfidence": 0.94,
+
+    "spillType": "Suspected oil slick",
+
+    "spillPolygon": [
+      [18.515, 72.900],
+      [18.522, 72.905],
+      [18.528, 72.915],
+      [18.524, 72.925],
+      [18.516, 72.920],
+      [18.510, 72.910],
+      [18.515, 72.900]
+    ],
+
+    "centroid": {
+      "latitude": 18.520,
+      "longitude": 72.912
+    },
+
+    "sourceRegion": {
+      "type": "Uncertainty region",
+      "center": {
+        "latitude": 18.520,
+        "longitude": 72.912
+      },
+      "radiusMeters": 1800
+    },
+
+    "satellite": {
+      "platform": "Sentinel-1",
+      "sensor": "SAR",
+      "productStatus": "Demo reference",
+      "imageId": "DEMO-S1-001"
+    },
+
+    "timeline": [
+      {
+        "time": "10:00",
+        "label": "Initial vessel position"
+      },
+      {
+        "time": "10:15",
+        "label": "Vessel movement"
+      },
+      {
+        "time": "10:30",
+        "label": "Potential release window"
+      },
+      {
+        "time": "10:45",
+        "label": "Spill detected"
+      }
+    ],
+
+    "vessels": [
+      {
+        "id": "VESSEL-001",
+        "name": "MV Ocean Star",
+        "type": "Cargo",
+        "flag": "Demo",
+        "position": {
+          "latitude": 18.545,
+          "longitude": 72.875
+        },
+        "speedKnots": 12.4,
+        "heading": 274,
+
+        "candidateRank": 1,
+        "attributionConfidence": 0.87,
+
+        "evidence": {
+          "spatial": {
+            "score": 0.92,
+            "label": "1.2 km from source region"
+          },
+          "temporal": {
+            "score": 0.91,
+            "label": "Release window overlap: 91%"
+          },
+          "trajectory": {
+            "score": 0.89,
+            "label": "Heading compatible"
+          },
+          "drift": {
+            "score": 0.91,
+            "label": "Counterfactual match: 91%"
+          },
+          "aisReliability": {
+            "status": "Warning",
+            "label": "14-minute AIS gap"
+          }
+        },
+
+        "trajectory": [
+          {
+            "time": "10:00",
+            "latitude": 18.570,
+            "longitude": 72.820
+          },
+          {
+            "time": "10:15",
+            "latitude": 18.562,
+            "longitude": 72.835
+          },
+          {
+            "time": "10:30",
+            "latitude": 18.555,
+            "longitude": 72.850
+          },
+          {
+            "time": "10:45",
+            "latitude": 18.545,
+            "longitude": 72.875
+          },
+          {
+            "time": "11:00",
+            "latitude": 18.538,
+            "longitude": 72.890
+          },
+          {
+            "time": "11:15",
+            "latitude": 18.530,
+            "longitude": 72.902
+          }
+        ]
+      },
+
+      {
+        "id": "VESSEL-002",
+        "name": "MV Blue Horizon",
+        "type": "Tanker",
+        "flag": "Demo",
+        "position": {
+          "latitude": 18.475,
+          "longitude": 72.955
+        },
+        "speedKnots": 10.8,
+        "heading": 120,
+
+        "candidateRank": 2,
+        "attributionConfidence": 0.64,
+
+        "evidence": {
+          "spatial": {
+            "score": 0.71,
+            "label": "Moderate spatial proximity"
+          },
+          "temporal": {
+            "score": 0.68,
+            "label": "Partial release-window overlap"
+          },
+          "trajectory": {
+            "score": 0.62,
+            "label": "Partially compatible"
+          },
+          "drift": {
+            "score": 0.58,
+            "label": "Weak counterfactual match"
+          },
+          "aisReliability": {
+            "status": "Good",
+            "label": "Normal AIS coverage"
+          }
+        },
+
+        "trajectory": [
+          {
+            "time": "10:00",
+            "latitude": 18.440,
+            "longitude": 72.925
+          },
+          {
+            "time": "10:15",
+            "latitude": 18.448,
+            "longitude": 72.935
+          },
+          {
+            "time": "10:30",
+            "latitude": 18.458,
+            "longitude": 72.945
+          },
+          {
+            "time": "10:45",
+            "latitude": 18.468,
+            "longitude": 72.950
+          },
+          {
+            "time": "11:00",
+            "latitude": 18.475,
+            "longitude": 72.955
+          },
+          {
+            "time": "11:15",
+            "latitude": 18.485,
+            "longitude": 72.965
+          }
+        ]
+      },
+
+      {
+        "id": "VESSEL-003",
+        "name": "MV Coastal Wind",
+        "type": "Container",
+        "flag": "Demo",
+        "position": {
+          "latitude": 18.575,
+          "longitude": 72.970
+        },
+        "speedKnots": 14.2,
+        "heading": 185,
+
+        "candidateRank": 3,
+        "attributionConfidence": 0.38,
+
+        "evidence": {
+          "spatial": {
+            "score": 0.42,
+            "label": "Low spatial proximity"
+          },
+          "temporal": {
+            "score": 0.39,
+            "label": "Low release-window overlap"
+          },
+          "trajectory": {
+            "score": 0.35,
+            "label": "Poor trajectory compatibility"
+          },
+          "drift": {
+            "score": 0.31,
+            "label": "Weak counterfactual match"
+          },
+          "aisReliability": {
+            "status": "Good",
+            "label": "Normal AIS coverage"
+          }
+        },
+
+        "trajectory": [
+          {
+            "time": "10:00",
+            "latitude": 18.620,
+            "longitude": 72.960
+          },
+          {
+            "time": "10:15",
+            "latitude": 18.610,
+            "longitude": 72.963
+          },
+          {
+            "time": "10:30",
+            "latitude": 18.600,
+            "longitude": 72.965
+          },
+          {
+            "time": "10:45",
+            "latitude": 18.590,
+            "longitude": 72.968
+          },
+          {
+            "time": "11:00",
+            "latitude": 18.575,
+            "longitude": 72.970
+          },
+          {
+            "time": "11:15",
+            "latitude": 18.560,
+            "longitude": 72.972
+          }
+        ]
+      }
+    ]
+  }
+}
