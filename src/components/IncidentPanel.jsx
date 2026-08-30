@@ -3,9 +3,7 @@ import "./IncidentPanel.css";
 
 function IncidentPanel({ incident, vessels = [] }) {
   const sortedVessels = [...vessels].sort(
-    (a, b) =>
-      (a.candidateRank ?? 999) -
-      (b.candidateRank ?? 999)
+    (a, b) => (a.candidateRank ?? 999) - (b.candidateRank ?? 999)
   );
 
   const topCandidate = sortedVessels[0];
@@ -15,26 +13,48 @@ function IncidentPanel({ incident, vessels = [] }) {
 
     const date = new Date(value);
 
-    return date.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "UTC",
-    }) + " UTC";
+    return (
+      date.toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "UTC",
+      }) + " UTC"
+    );
   };
 
-  const lat = Number(incident?.centroid?.latitude ?? incident?.location?.latitude ?? 0);
-  const lng = Number(incident?.centroid?.longitude ?? incident?.location?.longitude ?? 0);
-  const latStr = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}`;
-  const lngStr = `${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? "E" : "W"}`;
+  const lat = Number(
+    incident?.centroid?.latitude ??
+      incident?.location?.latitude ??
+      0
+  );
+
+  const lng = Number(
+    incident?.centroid?.longitude ??
+      incident?.location?.longitude ??
+      0
+  );
+
+  const latStr = `${Math.abs(lat).toFixed(4)}° ${
+    lat >= 0 ? "N" : "S"
+  }`;
+
+  const lngStr = `${Math.abs(lng).toFixed(4)}° ${
+    lng >= 0 ? "E" : "W"
+  }`;
+
   const formattedCoordinates = `${latStr} · ${lngStr}`;
 
   const handleExportReport = () => {
-    const timestamp = new Date().toISOString().replace(/T/, " ").substring(0, 19) + " UTC";
-    const reportId = incident.id || "OT-INCIDENT-REPORT";
+    const timestamp =
+      new Date().toISOString().replace(/T/, " ").substring(0, 19) +
+      " UTC";
+
+    const reportId =
+      incident.id || "OT-INCIDENT-REPORT";
 
     let report = `================================================================================\n`;
     report += `OILTRACE — MARITIME INVESTIGATION REPORT\n`;
@@ -45,50 +65,143 @@ function IncidentPanel({ incident, vessels = [] }) {
     report += `1. INCIDENT IDENTIFICATION & LOCATION\n`;
     report += `--------------------------------------------------------------------------------\n`;
     report += `Incident ID:            ${incident.id || "—"}\n`;
-    report += `Status:                 ${incident.status || "Under Investigation"}\n`;
-    report += `Severity:               ${incident.severity || "High"}\n`;
-    report += `Spill Type:             ${incident.spillType || "Suspected oil slick"}\n`;
-    report += `Detected Date/Time:     ${formatDetectedTime(incident.detectedAt)}\n`;
-    report += `Centroid Coordinates:   ${latStr}, ${lngStr} (${lat.toFixed(4)}, ${lng.toFixed(4)})\n`;
-    report += `Estimated Area:         ${incident.areaKm2} km²\n`;
-    report += `Detection Confidence:   ${Math.round((incident.detectionConfidence || 0) * 100)}%\n`;
-    report += `Satellite Platform:     ${incident.satellite?.platform || "Sentinel-1"} (${incident.satellite?.sensor || "SAR"})\n`;
-    report += `Product Image ID:       ${incident.satellite?.imageId || "DEMO-S1-001"}\n\n`;
+    report += `Status:                 ${
+      incident.status || "Under Investigation"
+    }\n`;
+    report += `Severity:               ${
+      incident.severity || "High"
+    }\n`;
+    report += `Spill Type:             ${
+      incident.spillType || "Suspected oil slick"
+    }\n`;
+    report += `Detected Date/Time:     ${formatDetectedTime(
+      incident.detectedAt
+    )}\n`;
+    report += `Centroid Coordinates:   ${latStr}, ${lngStr} (${lat.toFixed(
+      4
+    )}, ${lng.toFixed(4)})\n`;
+    report += `Estimated Area:         ${
+      incident.areaKm2 ?? "—"
+    } km²\n`;
+    report += `Detection Confidence:   ${Math.round(
+      (incident.detectionConfidence || 0) * 100
+    )}%\n`;
+    report += `Satellite Platform:     ${
+      incident.satellite?.platform || "Sentinel-1"
+    } (${
+      incident.satellite?.sensor || "SAR"
+    })\n`;
+    report += `Product Image ID:       ${
+      incident.satellite?.imageId || "DEMO-S1-001"
+    }\n\n`;
 
     report += `2. SOURCE ESTIMATION (HYDRODYNAMIC BACKTRACKING)\n`;
     report += `--------------------------------------------------------------------------------\n`;
-    const sourceLat = incident.sourceRegion?.center?.latitude ?? lat;
-    const sourceLng = incident.sourceRegion?.center?.longitude ?? lng;
-    const sourceRadiusKm = ((incident.sourceRegion?.radiusMeters || 1800) / 1000).toFixed(2);
-    report += `Probable Source Center: ${Math.abs(sourceLat).toFixed(4)}° ${sourceLat >= 0 ? "N" : "S"}, ${Math.abs(sourceLng).toFixed(4)}° ${sourceLng >= 0 ? "E" : "W"}\n`;
-    report += `Uncertainty Radius:     ${sourceRadiusKm} km (${incident.sourceRegion?.radiusMeters || 1800} m)\n`;
-    report += `Source Type:            ${incident.sourceRegion?.type || "Uncertainty region"}\n\n`;
+
+    const sourceLat =
+      incident.sourceRegion?.center?.latitude ?? lat;
+
+    const sourceLng =
+      incident.sourceRegion?.center?.longitude ?? lng;
+
+    const sourceRadiusKm = (
+      (incident.sourceRegion?.radiusMeters || 1800) / 1000
+    ).toFixed(2);
+
+    report += `Probable Source Center: ${Math.abs(
+      sourceLat
+    ).toFixed(4)}° ${
+      sourceLat >= 0 ? "N" : "S"
+    }, ${Math.abs(sourceLng).toFixed(4)}° ${
+      sourceLng >= 0 ? "E" : "W"
+    }\n`;
+
+    report += `Uncertainty Radius:     ${sourceRadiusKm} km (${
+      incident.sourceRegion?.radiusMeters || 1800
+    } m)\n`;
+
+    report += `Source Type:            ${
+      incident.sourceRegion?.type || "Uncertainty region"
+    }\n\n`;
 
     report += `3. CANDIDATE VESSEL ATTRIBUTION RANKING\n`;
     report += `--------------------------------------------------------------------------------\n`;
+
     sortedVessels.forEach((v, idx) => {
-      const conf = Math.round((v.attributionConfidence || 0) * 100);
-      report += `Rank ${v.candidateRank || idx + 1}: ${v.name} [ID: ${v.id}]\n`;
-      report += `  Type:                 ${v.type} | Flag: ${v.flag || "—"}\n`;
-      report += `  Position:             ${Number(v.position?.latitude || 0).toFixed(4)}° N, ${Number(v.position?.longitude || 0).toFixed(4)}° E\n`;
-      report += `  Speed / Heading:      ${v.speedKnots || 0} kts | ${v.heading || 0}°\n`;
-      report += `  Attribution Score:    ${conf}% (${conf >= 70 ? "HIGH PROBABILITY" : conf >= 40 ? "MEDIUM PROBABILITY" : "LOW PROBABILITY"})\n`;
+      const conf = Math.round(
+        (v.attributionConfidence || 0) * 100
+      );
+
+      report += `Rank ${
+        v.candidateRank || idx + 1
+      }: ${v.name} [ID: ${v.id}]\n`;
+
+      report += `  Type:                 ${
+        v.type || "—"
+      } | Flag: ${v.flag || "—"}\n`;
+
+      report += `  Position:             ${Number(
+        v.position?.latitude || 0
+      ).toFixed(4)}° N, ${Number(
+        v.position?.longitude || 0
+      ).toFixed(4)}° E\n`;
+
+      report += `  Speed / Heading:      ${
+        v.speedKnots || 0
+      } kts | ${v.heading || 0}°\n`;
+
+      report += `  Attribution Score:    ${conf}% (${
+        conf >= 70
+          ? "HIGH PROBABILITY"
+          : conf >= 40
+          ? "MEDIUM PROBABILITY"
+          : "LOW PROBABILITY"
+      })\n`;
+
       if (v.evidence) {
         report += `  Evidence Breakdown:\n`;
-        if (v.evidence.spatial) report += `    • Spatial Proximity:   ${Math.round((v.evidence.spatial.score || 0) * 100)}% (${v.evidence.spatial.label})\n`;
-        if (v.evidence.temporal) report += `    • Temporal Overlap:    ${Math.round((v.evidence.temporal.score || 0) * 100)}% (${v.evidence.temporal.label})\n`;
-        if (v.evidence.trajectory) report += `    • Trajectory Match:    ${Math.round((v.evidence.trajectory.score || 0) * 100)}% (${v.evidence.trajectory.label})\n`;
-        if (v.evidence.drift) report += `    • Drift Counterfactual:${Math.round((v.evidence.drift.score || 0) * 100)}% (${v.evidence.drift.label})\n`;
-        if (v.evidence.aisReliability) report += `    • AIS Coverage Status: ${v.evidence.aisReliability.status} (${v.evidence.aisReliability.label})\n`;
+
+        if (v.evidence.spatial) {
+          report += `    • Spatial Proximity:   ${Math.round(
+            (v.evidence.spatial.score || 0) * 100
+          )}% (${v.evidence.spatial.label})\n`;
+        }
+
+        if (v.evidence.temporal) {
+          report += `    • Temporal Overlap:    ${Math.round(
+            (v.evidence.temporal.score || 0) * 100
+          )}% (${v.evidence.temporal.label})\n`;
+        }
+
+        if (v.evidence.trajectory) {
+          report += `    • Trajectory Match:    ${Math.round(
+            (v.evidence.trajectory.score || 0) * 100
+          )}% (${v.evidence.trajectory.label})\n`;
+        }
+
+        if (v.evidence.drift) {
+          report += `    • Drift Counterfactual:${Math.round(
+            (v.evidence.drift.score || 0) * 100
+          )}% (${v.evidence.drift.label})\n`;
+        }
+
+        if (v.evidence.aisReliability) {
+          report += `    • AIS Coverage Status: ${
+            v.evidence.aisReliability.status
+          } (${v.evidence.aisReliability.label})\n`;
+        }
       }
+
       report += `\n`;
     });
 
     report += `4. INCIDENT TIMELINE\n`;
     report += `--------------------------------------------------------------------------------\n`;
+
     (incident.timeline || []).forEach((event) => {
       report += `${event.time} UTC  -  ${event.label}\n`;
     });
+
     report += `\n`;
 
     report += `5. DRIFT & WEATHER MODEL PARAMETERS (SIMULATED)\n`;
@@ -102,13 +215,20 @@ function IncidentPanel({ incident, vessels = [] }) {
     report += `report are simulated for evaluation of the OilTrace automated attribution engine.\n`;
     report += `================================================================================\n`;
 
-    const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([report], {
+      type: "text/plain;charset=utf-8",
+    });
+
     const url = URL.createObjectURL(blob);
+
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `OILTRACE-REPORT-${reportId}.txt`;
+
     document.body.appendChild(link);
     link.click();
+
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
@@ -126,9 +246,7 @@ function IncidentPanel({ incident, vessels = [] }) {
               INCIDENT
             </span>
 
-            <h2>
-              {incident.id}
-            </h2>
+            <h2>{incident.id}</h2>
           </div>
 
           <button
@@ -137,11 +255,24 @@ function IncidentPanel({ incident, vessels = [] }) {
             onClick={handleExportReport}
             title="Export full incident investigation report"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
+              <line
+                x1="12"
+                y1="15"
+                x2="12"
+                y2="3"
+              />
             </svg>
+
             <span>Export Report</span>
           </button>
         </div>
@@ -165,14 +296,31 @@ function IncidentPanel({ incident, vessels = [] }) {
 
         <div className="incident-coordinates-card">
           <div className="coord-label">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
-              <circle cx="12" cy="10" r="3" />
+              <circle
+                cx="12"
+                cy="10"
+                r="3"
+              />
             </svg>
-            <span>LOCATION / COORDINATES</span>
+
+            <span>
+              LOCATION / COORDINATES
+            </span>
           </div>
+
           <div className="coord-values">
-            <strong>{formattedCoordinates}</strong>
+            <strong>
+              {formattedCoordinates}
+            </strong>
           </div>
         </div>
 
@@ -198,7 +346,7 @@ function IncidentPanel({ incident, vessels = [] }) {
             <span>AREA</span>
 
             <strong>
-              {incident.areaKm2}
+              {incident.areaKm2 ?? "—"}
               <small> km²</small>
             </strong>
           </div>
@@ -208,7 +356,7 @@ function IncidentPanel({ incident, vessels = [] }) {
 
             <strong>
               {Math.round(
-                incident.detectionConfidence *
+                (incident.detectionConfidence || 0) *
                   100
               )}
               <small>%</small>
@@ -224,8 +372,7 @@ function IncidentPanel({ incident, vessels = [] }) {
             </strong>
 
             <small className="metric-subtext">
-              {incident.satellite?.sensor ||
-                ""}
+              {incident.satellite?.sensor || ""}
             </small>
           </div>
         </div>
@@ -233,17 +380,21 @@ function IncidentPanel({ incident, vessels = [] }) {
 
       {/* INVESTIGATION */}
       <section className="incident-section">
-        <div className="incident-section-title">
-          Investigation
+        <div className="incident-section-heading">
+          <div className="incident-section-title">
+            Investigation
+          </div>
+
+          <span className="incident-investigation-count">
+            {vessels.length}
+          </span>
         </div>
 
         <div className="incident-investigation-card">
-          <div className="incident-candidate-count">
+          <div className="incident-candidate-count-box">
             <span>CANDIDATES</span>
 
-            <strong>
-              {vessels.length}
-            </strong>
+            <strong>{vessels.length}</strong>
 
             <small>
               potential source vessels
@@ -266,8 +417,8 @@ function IncidentPanel({ incident, vessels = [] }) {
 
                 <strong>
                   {Math.round(
-                    topCandidate.attributionConfidence *
-                      100
+                    (topCandidate.attributionConfidence ||
+                      0) * 100
                   )}
                   %
                 </strong>

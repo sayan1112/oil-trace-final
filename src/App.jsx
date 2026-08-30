@@ -32,6 +32,7 @@ import { SuspectPanel } from "./components/SuspectPanel";
 import Sidebar from "./Sidebar";
 
 import DeckOilOverlay from "./components/DeckOilOverlay";
+import { DetectionPanel } from "./components/DetectionPanel";
 
 import "./App.css";
 
@@ -40,6 +41,7 @@ import { generateOilSimulation } from "./Simulation/oilSimulation";
 import { backtrackOil } from "./Simulation/backtracking";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
+import { warmDetectionService } from "./services/detectionApi";
 
 /* =========================================================
    LEAFLET MARKER FIX
@@ -960,7 +962,41 @@ function App() {
     vessels: true,
     oceanCurrent: false,
     windField: false,
+    detectedSlicks: true,
   });
+
+  /* =======================================================
+     DETECTION API STATE
+  ======================================================= */
+
+  // GeoJSON FeatureCollection returned by the Detection Service, or null
+  const [detectionResult, setDetectionResult] = useState(null);
+
+  // Backtrack seed override: { lat, lon } from a detected slick centroid
+  const [apiSeedOverride, setApiSeedOverride] = useState(null);
+  // Which slick ID is the active seed (for button highlight)
+  const [activeSeedId, setActiveSeedId] = useState(null);
+
+  // Fire-and-forget warm-up on mount so the container is ready
+  useEffect(() => {
+    warmDetectionService();
+  }, []);
+
+  const handleDetectionResult = useCallback((geojson) => {
+    setDetectionResult(geojson);
+    // Auto-enable the detected slicks layer when results arrive
+    setLayers((prev) => ({ ...prev, detectedSlicks: true }));
+  }, []);
+
+  const handleSeedOverride = useCallback(({ lat, lon }, slickId) => {
+    setApiSeedOverride({ lat, lon });
+    setActiveSeedId(slickId);
+  }, []);
+
+  const handleClearSeed = useCallback(() => {
+    setApiSeedOverride(null);
+    setActiveSeedId(null);
+  }, []);
 
   const toggleLayer = (layer) => {
     setLayers((previous) => ({
@@ -1047,13 +1083,23 @@ function App() {
       setBacktrackStatusText("Evaluating ocean current field & wind vectors...");
 
       setTimeout(() => {
-        const res = backtrackOil({ incident, particleCount: 600 });
+        // If the user set an API seed override from a detected slick,
+        // use that centroid as the backtrack starting point.
+        const seedOverride = apiSeedOverride
+          ? {
+              centroid: {
+                latitude: apiSeedOverride.lat,
+                longitude: apiSeedOverride.lon,
+              },
+            }
+          : {};
+        const res = backtrackOil({ incident: { ...incident, ...seedOverride }, particleCount: 600 });
         setBacktrackResult(res);
         setIsBacktracking(false);
         setBacktrackStatusText("");
       }, 400);
     }, 300);
-  }, [isBacktracking]);
+  }, [isBacktracking, apiSeedOverride]);
 
   /* =======================================================
      REPLAY POSITION & TRAJECTORY COMPUTATION
@@ -1127,7 +1173,7 @@ function App() {
       setBacktrackVisible(false);
     }
 
-    if (["map", "incident", "vessels", "legend", "evidence", "tools", "replay"].includes(item)) {
+    if (["map", "incident", "vessels", "legend", "evidence", "tools", "replay", "detect"].includes(item)) {
       setIsPlaying(false);
     }
 
@@ -1334,6 +1380,73 @@ function App() {
             </Tooltip>
           </Polyline>
         )}
+
+        {/* API DETECTED SLICK POLYGONS (from Detection Service) */}
+        {layers.detectedSlicks && detectionResult && detectionResult.features.map((feature) => {
+          const { id, confidence, area_km2, centroid: slickCentroid } = feature.properties;
+          const geometry = feature.geometry;
+          // Convert GeoJSON [lon, lat] coords to Leaflet [lat, lon]
+          const toLeaflet = (coords) => coords.map(([lon, lat]) => [lat, lon]);
+
+          const ringPositions =
+            geometry.type === "Polygon"
+              ? [toLeaflet(geometry.coordinates[0])]
+              : geometry.coordinates.map((poly) => toLeaflet(poly[0]));
+
+          const slickColor = confidence >= 0.75 ? "#06b6d4" : "#22d3ee";
+          const confidencePct = Math.round(confidence * 100);
+
+          return (
+            <Fragment key={`api-slick-${id}`}>
+              {/* Outer ring(s) */}
+              {ringPositions.map((ring, ri) => (
+                <Polygon
+                  key={`ring-${id}-${ri}`}
+                  positions={ring}
+                  pathOptions={{
+                    color: slickColor,
+                    weight: 2,
+                    opacity: 0.9,
+                    fillColor: slickColor,
+                    fillOpacity: 0.12,
+                    lineCap: "round",
+                    lineJoin: "round",
+                    dashArray: "6 5",
+                  }}
+                >
+                  <Tooltip sticky direction="top">
+                    <strong>API Detection: {id}</strong>
+                    <br />
+                    Area: {area_km2.toFixed(1)} km²
+                    <br />
+                    Confidence: {confidencePct}%
+                    {confidence < 0.75 && <em> (uncertain)</em>}
+                    <br />
+                    Centroid: {slickCentroid.lat.toFixed(4)}°N {slickCentroid.lon.toFixed(4)}°E
+                  </Tooltip>
+                </Polygon>
+              ))}
+              {/* Centroid marker */}
+              <CircleMarker
+                center={[slickCentroid.lat, slickCentroid.lon]}
+                radius={5}
+                pathOptions={{
+                  color: slickColor,
+                  weight: 2,
+                  opacity: 1,
+                  fillColor: slickColor,
+                  fillOpacity: 0.85,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -6]}>
+                  <strong>Slick centroid: {id}</strong>
+                  <br />
+                  {slickCentroid.lat.toFixed(5)}°N, {slickCentroid.lon.toFixed(5)}°E
+                </Tooltip>
+              </CircleMarker>
+            </Fragment>
+          );
+        })}
 
         {/* SPILL POLYGON */}
         {layers.spill && spillPolygon.length >= 3 && (
@@ -1773,6 +1886,18 @@ function App() {
         <EvidencePanel
           vessel={selectedVessel}
           onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
+        />
+      )}
+
+      {/* DETECTION SERVICE PANEL */}
+      {activeItem === "detect" && (
+        <DetectionPanel
+          onDetectionResult={handleDetectionResult}
+          onClose={() => setActiveItem("map")}
+          onSeedOverride={handleSeedOverride}
+          onClearSeed={handleClearSeed}
+          activeSeedId={activeSeedId}
+          currentResult={detectionResult}
         />
       )}
     </div>

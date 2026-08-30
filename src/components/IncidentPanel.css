@@ -56,7 +56,9 @@
 
 .incident-panel-header {
   padding: 18px 20px;
+
   background: #ffffff;
+
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -64,6 +66,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+
   gap: 12px;
 }
 
@@ -71,21 +74,33 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+
   padding: 6px 10px;
+
   background: #f1f5f9;
+
   border: 1px solid #cbd5e1;
   border-radius: 6px;
+
   color: #1e293b;
+
   font-size: 10px;
   font-weight: 700;
+
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 100ms ease;
+
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 100ms ease;
+
   white-space: nowrap;
 }
 
 .incident-export-button:hover {
   background: #e2e8f0;
   border-color: #94a3b8;
+
   transform: translateY(-1px);
 }
 
@@ -95,18 +110,25 @@
 
 .incident-kicker {
   display: block;
+
   margin-bottom: 3px;
+
   color: #64748b;
+
   font-size: 9px;
   font-weight: 800;
+
   letter-spacing: 1.5px;
 }
 
 .incident-panel-header h2 {
   margin: 0;
+
   color: #172033;
+
   font-size: 20px;
   font-weight: 800;
+
   letter-spacing: -0.2px;
 }
 
@@ -117,29 +139,41 @@
 .incident-status-row {
   display: flex;
   align-items: center;
+
   gap: 7px;
+
   margin-top: 9px;
 }
 
 .incident-status {
   padding: 4px 8px;
+
   border-radius: 5px;
+
   background: #eef5ff;
   color: #315f91;
+
   font-size: 8px;
   font-weight: 800;
+
   letter-spacing: 0.5px;
+
   text-transform: uppercase;
 }
 
 .incident-severity {
   padding: 4px 8px;
+
   border-radius: 5px;
+
   background: #fef2f2;
   color: #b42318;
+
   font-size: 8px;
   font-weight: 800;
+
   letter-spacing: 0.5px;
+
   text-transform: uppercase;
 }
 
@@ -149,19 +183,24 @@
 
 .incident-block {
   padding: 16px 20px;
+
   border-bottom: 1px solid #e5e7eb;
 }
 
 .incident-description {
   color: #26364e;
+
   font-size: 14px;
   font-weight: 700;
 }
 
 .incident-coordinates-card {
   margin-top: 10px;
+
   padding: 8px 11px;
+
   background: #ffffff;
+
   border: 1px solid #e2e8f0;
   border-radius: 8px;
 }
@@ -169,11 +208,16 @@
 .incident-coordinates-card .coord-label {
   display: flex;
   align-items: center;
+
   gap: 5px;
+
   margin-bottom: 3px;
+
   color: #64748b;
+
   font-size: 8px;
   font-weight: 800;
+
   letter-spacing: 0.8px;
 }
 
@@ -183,31 +227,48 @@
 
 .incident-coordinates-card .coord-values strong {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
   font-size: 12.5px;
   font-weight: 700;
+
   color: #0f172a;
+
   letter-spacing: 0.2px;
 }
 
 .incident-detected {
   display: flex;
+
   justify-content: space-between;
   align-items: center;
+
   gap: 10px;
+
   margin-top: 10px;
 }
 
 .incident-detected span {
   color: #94a3b8;
+
   font-size: 9px;
   font-weight: 700;
+
   text-transform: uppercase;
+
   letter-spacing: 0.7px;
 }
 
 .incident-detected strong {
   color: #64748b;
+
   font-size: 10px;
   font-weight: 700;
 }
@@ -220,17 +281,60 @@
   padding: 18px 20px 0;
 }
 
-.incident-section-title {
+.incident-section-heading {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
   margin-bottom: 10px;
+}
+
+.incident-section-title {
+  margin: 0;
 
   color: #334155;
 
   font-size: 10px;
   font-weight: 800;
 
+  line-height: 1.2;
+
   text-transform: uppercase;
 
   letter-spacing: 1px;
+}
+
+/* =====================================================
+   INVESTIGATION COUNT
+===================================================== */
+
+.incident-investigation-count {
+  width: 52px;
+  height: 52px;
+
+  flex: 0 0 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  background: #eef5fb;
+
+  border: 1px solid #cbd8e5;
+  border-radius: 14px;
+
+  color: #526b84;
+
+  font-size: 20px;
+  font-weight: 800;
+
+  line-height: 1;
 }
 
 /* =====================================================
@@ -240,8 +344,7 @@
 .incident-metrics {
   display: grid;
 
-  grid-template-columns:
-    repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 
   gap: 7px;
 }
@@ -300,14 +403,13 @@
 }
 
 /* =====================================================
-   INVESTIGATION
+   INVESTIGATION CARD
 ===================================================== */
 
 .incident-investigation-card {
   display: grid;
 
-  grid-template-columns:
-    0.8fr 1.2fr;
+  grid-template-columns: 0.8fr 1.2fr;
 
   gap: 0;
 
@@ -320,16 +422,15 @@
   overflow: hidden;
 }
 
-.incident-candidate-count,
-.incident-top-candidate {
-  padding: 13px;
-}
+.incident-candidate-count-box {
+  min-width: 0;
 
-.incident-candidate-count {
+  padding: 13px;
+
   border-right: 1px solid #e5e7eb;
 }
 
-.incident-candidate-count > span,
+.incident-candidate-count-box > span,
 .incident-top-candidate > span {
   display: block;
 
@@ -343,24 +444,31 @@
   letter-spacing: 0.8px;
 }
 
-.incident-candidate-count > strong {
+.incident-candidate-count-box > strong {
   display: block;
 
   color: #26364e;
 
   font-size: 24px;
+  line-height: 1;
 }
 
-.incident-candidate-count > small {
+.incident-candidate-count-box > small {
   display: block;
 
-  margin-top: 3px;
+  margin-top: 5px;
 
   color: #94a3b8;
 
   font-size: 8px;
 
   line-height: 1.3;
+}
+
+.incident-top-candidate {
+  min-width: 0;
+
+  padding: 13px;
 }
 
 .incident-top-candidate > strong {
@@ -378,6 +486,7 @@
 
 .incident-confidence {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
 
@@ -583,8 +692,11 @@
 
 .app-dark .incident-panel {
   background: rgba(19, 31, 48, 0.97);
+
   border-color: #314257;
+
   color: #f3f7fb;
+
   box-shadow:
     0 20px 45px rgba(0, 0, 0, 0.4),
     0 4px 12px rgba(0, 0, 0, 0.2);
@@ -641,7 +753,10 @@
   color: #8fa0b5;
 }
 
-.app-dark .incident-coordinates-card .coord-values strong {
+.app-dark
+  .incident-coordinates-card
+  .coord-values
+  strong {
   color: #38bdf8;
 }
 
@@ -651,6 +766,12 @@
 
 .app-dark .incident-section-title {
   color: #94a3b8;
+}
+
+.app-dark .incident-investigation-count {
+  background: #18283a;
+  border-color: #3b4d63;
+  color: #cbd5e1;
 }
 
 .app-dark .incident-metric {
@@ -667,11 +788,11 @@
   border-color: #27384c;
 }
 
-.app-dark .incident-candidate-count {
+.app-dark .incident-candidate-count-box {
   border-color: #27384c;
 }
 
-.app-dark .incident-candidate-count > strong {
+.app-dark .incident-candidate-count-box > strong {
   color: #f3f7fb;
 }
 

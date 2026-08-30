@@ -68,6 +68,18 @@ const menuItems = [
     ),
   },
   {
+    id: "detect",
+    label: "Detect",
+    icon: (
+      <svg viewBox="0 0 24 24">
+        <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0" />
+        <path d="M12 8v4M12 12l3 3" />
+        <path d="M2 12h2M20 12h2M12 2v2M12 20v2" />
+        <circle cx="12" cy="12" r="2" />
+      </svg>
+    ),
+  },
+  {
     id: "evidence",
     label: "Evidence",
     icon: (
@@ -250,6 +262,19 @@ function Sidebar({ activeItem, layers, onToggleLayer, onSelect, onTriggerBacktra
                   Simulated Wind Field
                 </span>
               </label>
+
+              {/* API DETECTED SLICKS */}
+              <label className="layer-option">
+                <input
+                  type="checkbox"
+                  checked={layers?.detectedSlicks ?? false}
+                  onChange={() => onToggleLayer?.("detectedSlicks")}
+                />
+                <span>
+                  <span className="layer-color" style={{ backgroundColor: "#06b6d4" }} />
+                  API Detected Slicks
+                </span>
+              </label>
             </div>
           )}
 
@@ -285,6 +310,21 @@ function Sidebar({ activeItem, layers, onToggleLayer, onSelect, onTriggerBacktra
             >
               <span className="sidebar-icon">{item.icon}</span>
               <span className="sidebar-label">{item.label}</span>
+              {/* Live indicator dot for the Detect item */}
+              {item.id === "detect" && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: "#0ea5e9",
+                    boxShadow: "0 0 5px #0ea5e9",
+                    flexShrink: 0,
+                  }}
+                  aria-hidden="true"
+                />
+              )}
             </button>
           ))}
         </div>
