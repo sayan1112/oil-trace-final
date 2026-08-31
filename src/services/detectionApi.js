@@ -9,7 +9,10 @@
  * Always call warmDetectionService() on app mount and before live demos.
  */
 
-const BASE = "https://vscimatic999--oiltrace-detection-web.modal.run";
+// The ML service sends no CORS headers, so browsers cannot call it directly.
+// Dev: Vite proxies /ml-api → the Modal service (see vite.config.js).
+// Prod: set VITE_ML_BASE_URL, or configure the same rewrite on the host.
+const BASE = import.meta.env.VITE_ML_BASE_URL || "/ml-api";
 
 /**
  * Fire-and-forget liveness probe. Wakes the container so subsequent

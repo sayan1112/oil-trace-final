@@ -37,8 +37,24 @@ import { DetectionPanel } from "./components/DetectionPanel";
 import "./App.css";
 
 import { scoreAllVessels } from "./utils/attributionScoring";
+import {
+  warmBackend,
+  getBackendHealth,
+  runHindcast,
+  getCandidateVessels,
+  runAttribution,
+  runForwardSimulation,
+  runCounterfactual,
+  bboxFromGeometry,
+  trajectoryPoints,
+  sourceRegionForFrontend,
+  slickFromDetection,
+  slickFromIncident,
+  normalizeVessels,
+  buildFrontendScoring,
+  shiftIsoHours,
+} from "./services/backendApi";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
-import { backtrackOil } from "./Simulation/backtracking";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { warmDetectionService } from "./services/detectionApi";
@@ -261,13 +277,27 @@ function FitMapToIncident() {
     const points = getIncidentPoints();
     if (!points.length) return;
 
-    map.invalidateSize({ pan: false });
-    map.fitBounds(L.latLngBounds(points), {
-      paddingTopLeft: [70, 70],
-      paddingBottomRight: [390, 70],
-      maxZoom: 13,
-      animate: false,
-    });
+    // The grid layout may not have sized the map container yet on first
+    // paint; fitting a 0-size map collapses to maxZoom at a bogus center.
+    // Retry until the container has a real size.
+    let cancelled = false;
+    const fit = () => {
+      if (cancelled) return;
+      map.invalidateSize({ pan: false });
+      const size = map.getSize();
+      if (size.x < 200 || size.y < 200) {
+        setTimeout(fit, 120);
+        return;
+      }
+      map.fitBounds(L.latLngBounds(points), {
+        paddingTopLeft: [70, 70],
+        paddingBottomRight: [390, 70],
+        maxZoom: 13,
+        animate: false,
+      });
+    };
+    fit();
+    return () => { cancelled = true; };
   }, [map]);
 
   return null;
@@ -840,8 +870,8 @@ function App() {
 
   const simulatedCurrentVectors = useMemo(() => {
     const vectors = [];
-    for (let lat = 18.42; lat <= 18.64; lat += 0.035) {
-      for (let lng = 72.80; lng <= 73.02; lng += 0.035) {
+    for (let lat = 59.95; lat <= 60.42; lat += 0.055) {
+      for (let lng = 4.25; lng <= 4.98; lng += 0.075) {
         const vel = defaultCurrentField.getVelocity(lat, lng, 0);
         const rad = ((90 - vel.direction) * Math.PI) / 180;
         const len = 0.014;
@@ -866,8 +896,8 @@ function App() {
 
   const simulatedWindVectors = useMemo(() => {
     const vectors = [];
-    for (let lat = 18.44; lat <= 18.62; lat += 0.035) {
-      for (let lng = 72.82; lng <= 73.00; lng += 0.035) {
+    for (let lat = 59.97; lat <= 60.40; lat += 0.055) {
+      for (let lng = 4.28; lng <= 4.95; lng += 0.075) {
         const wind = defaultWindField.getVelocity(lat, lng, 0);
         const rad = ((90 - wind.direction) * Math.PI) / 180;
         const len = 0.015;
@@ -899,6 +929,13 @@ function App() {
   const [backtrackVisible, setBacktrackVisible] = useState(false);
   const [backtrackStatusText, setBacktrackStatusText] = useState("");
 
+  // Live backend investigation artifacts (null until the pipeline runs)
+  const [backendVessels, setBackendVessels] = useState(null);
+  const [forwardResult, setForwardResult] = useState(null);
+  const [counterfactualResult, setCounterfactualResult] = useState(null);
+  const [backendError, setBackendError] = useState(null);
+  const [backendOnline, setBackendOnline] = useState(null); // null=checking
+
   const calculatedSourceRegion = useMemo(() => {
     if (backtrackResult?.sourceRegion) {
       return backtrackResult.sourceRegion;
@@ -910,9 +947,12 @@ function App() {
      VESSEL SCORING
   ======================================================= */
 
+  // Backend-attributed vessels take over as soon as the live pipeline has
+  // run; the static incident.json list is only the initial preview.
   const scoredVessels = useMemo(
-    () => scoreAllVessels(incident.vessels, calculatedSourceRegion),
-    [calculatedSourceRegion]
+    () =>
+      backendVessels ?? scoreAllVessels(incident.vessels, calculatedSourceRegion),
+    [backendVessels, calculatedSourceRegion]
   );
 
   /* =======================================================
@@ -977,9 +1017,13 @@ function App() {
   // Which slick ID is the active seed (for button highlight)
   const [activeSeedId, setActiveSeedId] = useState(null);
 
-  // Fire-and-forget warm-up on mount so the container is ready
+  // Fire-and-forget warm-up on mount so both services are ready
   useEffect(() => {
     warmDetectionService();
+    warmBackend();
+    getBackendHealth()
+      .then(() => setBackendOnline(true))
+      .catch(() => setBackendOnline(false));
   }, []);
 
   const handleDetectionResult = useCallback((geojson) => {
@@ -1069,37 +1113,118 @@ function App() {
      BACKTRACK RUNNER
   ======================================================= */
 
-  const handleRunBacktrack = useCallback(() => {
+  // Full live investigation pipeline against the OilTrace backend:
+  // hindcast (OpenDrift) → AIS vessel query → attribution → forward
+  // simulation → counterfactual. Every analytical value shown afterwards
+  // comes from these responses.
+  const handleRunBacktrack = useCallback(async () => {
     if (isBacktracking) return;
 
-    // Backtrack is an explicit investigation mode. It becomes visible
-    // only when the user asks for it and is hidden when another tool is opened.
     setBacktrackVisible(true);
     setActiveItem("backtrack");
     setIsBacktracking(true);
-    setBacktrackStatusText("Tracing Lagrangian particles backward...");
+    setBackendError(null);
 
-    setTimeout(() => {
-      setBacktrackStatusText("Evaluating ocean current field & wind vectors...");
+    try {
+      // The slick to hindcast: an ML-detected slick if the user picked one
+      // as seed, otherwise the demo incident slick.
+      let slick = null;
+      if (activeSeedId && detectionResult?.features?.length) {
+        const feature = detectionResult.features.find(
+          (f) => String(f?.properties?.id) === String(activeSeedId)
+        );
+        if (feature) slick = slickFromDetection(feature);
+      }
+      if (!slick) slick = slickFromIncident(incident);
 
-      setTimeout(() => {
-        // If the user set an API seed override from a detected slick,
-        // use that centroid as the backtrack starting point.
-        const seedOverride = apiSeedOverride
-          ? {
-              centroid: {
-                latitude: apiSeedOverride.lat,
-                longitude: apiSeedOverride.lon,
-              },
-            }
-          : {};
-        const res = backtrackOil({ incident: { ...incident, ...seedOverride }, particleCount: 600 });
-        setBacktrackResult(res);
-        setIsBacktracking(false);
-        setBacktrackStatusText("");
-      }, 400);
-    }, 300);
-  }, [isBacktracking, apiSeedOverride]);
+      setBacktrackStatusText("Backend hindcast: OpenDrift backward simulation...");
+      const hc = await runHindcast(slick, 2);
+      const sourceRegion = sourceRegionForFrontend(hc.source_region);
+      setBacktrackResult({
+        sourceRegion,
+        sourceEstimate: {
+          latitude: sourceRegion.center.latitude,
+          longitude: sourceRegion.center.longitude,
+        },
+        confidence: sourceRegion.confidence,
+        uncertainty: {
+          radiusMeters: sourceRegion.radiusMeters,
+          radiusKm: Number((sourceRegion.radiusMeters / 1000).toFixed(2)),
+          confidence: sourceRegion.confidence,
+          particleConvergence: "Backend OpenDrift hindcast",
+        },
+        trajectory: trajectoryPoints(hc.backward_trajectory),
+        backend: hc,
+      });
+
+      setBacktrackStatusText("Querying AIS vessels near the source region...");
+      const region = hc.source_region?.candidate_regions?.[0];
+      const bbox = bboxFromGeometry(region?.geometry, 0.6);
+      const start = shiftIsoHours(region?.start_time_utc || slick.timestamp_utc, -12);
+      const end = shiftIsoHours(region?.end_time_utc || slick.timestamp_utc, 12);
+      const vessels = await getCandidateVessels(bbox, start, end);
+
+      setBacktrackStatusText("Ranking candidates (backend attribution engine)...");
+      const attribution = await runAttribution(
+        slick.id || incident.id,
+        hc.source_region,
+        vessels,
+        15
+      );
+      let normalized = normalizeVessels(vessels, attribution);
+
+      const top = attribution?.top_candidates?.[0];
+      if (top?.forward_request) {
+        setBacktrackStatusText("Forward simulation from estimated release...");
+        const fwd = await runForwardSimulation(top.forward_request);
+        setForwardResult(fwd);
+
+        setBacktrackStatusText("Counterfactual: comparing with observed slick...");
+        const cf = await runCounterfactual(
+          slick.id || incident.id,
+          fwd.vessel_mmsi,
+          fwd,
+          slick
+        );
+        setCounterfactualResult(cf);
+
+        normalized = normalized.map((v) =>
+          String(v.mmsi) === String(top.vessel_mmsi)
+            ? {
+                ...v,
+                evidence: {
+                  ...v.evidence,
+                  drift: {
+                    score: Math.max(0, Math.min(1, +(cf.spatial_agreement || 0))),
+                    label:
+                      cf.explanation ||
+                      `Counterfactual: ${Math.round((cf.spatial_agreement || 0) * 100)}% spatial agreement, ` +
+                        `${cf.trajectory_reaches_slick ? "trajectory reaches slick" : "trajectory misses slick"}.`,
+                  },
+                },
+              }
+            : v
+        );
+      } else {
+        setForwardResult(null);
+        setCounterfactualResult(null);
+      }
+
+      setBackendVessels(
+        normalized.map((v) => ({
+          ...v,
+          scoring: buildFrontendScoring(v),
+        }))
+      );
+      setBackendOnline(true);
+    } catch (err) {
+      setBackendError(err?.message || String(err));
+      setBackendOnline(false);
+    } finally {
+      setIsBacktracking(false);
+      setBacktrackStatusText("");
+    }
+  }, [isBacktracking, activeSeedId, detectionResult]);
 
   /* =======================================================
      REPLAY POSITION & TRAJECTORY COMPUTATION
@@ -1379,6 +1504,57 @@ function App() {
               {Math.round(scoredVessels.find((v) => v.candidateRank === 1).attributionConfidence * 100)}% Confidence)
             </Tooltip>
           </Polyline>
+        )}
+
+        {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
+        {backtrackVisible && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
+          <Polyline
+            positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
+            pathOptions={{
+              color: "#7c3aed",
+              weight: 3,
+              opacity: 0.9,
+              dashArray: "2 7",
+              lineCap: "round",
+            }}
+          >
+            <Tooltip sticky direction="top">
+              <strong>Forward Simulation (backend)</strong>
+              <br />
+              Release {forwardResult.release_time_utc} · MMSI {forwardResult.vessel_mmsi}
+            </Tooltip>
+          </Polyline>
+        )}
+        {backtrackVisible && layers.backtrack && forwardResult?.predicted_footprint && (
+          <Polygon
+            positions={
+              forwardResult.predicted_footprint.type === "Polygon"
+                ? [forwardResult.predicted_footprint.coordinates[0].map(([lon, lat]) => [lat, lon])]
+                : forwardResult.predicted_footprint.coordinates.map((poly) =>
+                    poly[0].map(([lon, lat]) => [lat, lon])
+                  )
+            }
+            pathOptions={{
+              color: "#0d9488",
+              weight: 2,
+              opacity: 0.9,
+              fillColor: "#0d9488",
+              fillOpacity: 0.16,
+            }}
+          >
+            <Tooltip sticky direction="top">
+              <strong>Predicted Footprint (backend)</strong>
+              <br />
+              Simulated particle envelope — not an observed slick
+              {counterfactualResult && (
+                <>
+                  <br />
+                  Counterfactual: {Math.round((counterfactualResult.spatial_agreement || 0) * 100)}%
+                  overlap · {counterfactualResult.evidence_strength}
+                </>
+              )}
+            </Tooltip>
+          </Polygon>
         )}
 
         {/* API DETECTED SLICK POLYGONS (from Detection Service) */}
@@ -1794,10 +1970,10 @@ function App() {
 
             {/* Progress steps */}
             {[
-              "Sampling particle distribution",
-              "Integrating ocean current field",
-              "Applying wind drift vectors",
-              "Computing source convergence",
+              "OpenDrift backward hindcast (backend)",
+              "AIS vessel query near source region",
+              "Attribution engine ranking",
+              "Forward simulation + counterfactual",
             ].map((step, i) => (
               <div key={step} style={{
                 display: "flex",
@@ -1833,6 +2009,51 @@ function App() {
               boxShadow: "0 0 8px rgba(6,182,212,0.6)",
             }} />
           </div>
+        </div>
+      )}
+
+      {/* BACKEND ERROR TOAST */}
+      {backendError && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "2rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 3000,
+            maxWidth: "440px",
+            background: "rgba(40,10,12,0.96)",
+            border: "1px solid rgba(239,68,68,0.45)",
+            borderRadius: "12px",
+            padding: "0.8rem 1rem",
+            color: "#fecaca",
+            fontSize: "0.8rem",
+            lineHeight: 1.45,
+            boxShadow: "0 18px 44px rgba(0,0,0,0.5)",
+          }}
+        >
+          <strong style={{ color: "#f87171" }}>Backend request failed.</strong>{" "}
+          {backendError}
+          {backendOnline === false && (
+            <>
+              {" "}Check that the OilTrace backend is running and reachable
+              (VITE_BACKEND_BASE_URL).
+            </>
+          )}
+          <button
+            onClick={() => setBackendError(null)}
+            style={{
+              marginLeft: "0.7rem",
+              background: "none",
+              border: "1px solid rgba(248,113,113,0.5)",
+              borderRadius: "7px",
+              color: "#fca5a5",
+              padding: "0.15rem 0.55rem",
+              fontSize: "0.72rem",
+            }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 

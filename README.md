@@ -18,3 +18,19 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ### Stability patch
 The map camera and oil particle layer are isolated from vessel-selection UI state. Selecting a vessel must not animate, refit, resize, recreate, or transform the oil field.
+
+## Backend integration (OilTrace)
+
+All analytical outputs are live from the OilTrace backend (`src/services/backendApi.js`):
+"Backtrack Oil" runs hindcast (OpenDrift) → AIS vessel query → attribution →
+forward simulation → counterfactual, and every score/region/trajectory shown
+afterwards comes from those responses. Configure the backend with
+`VITE_BACKEND_BASE_URL` (see `.env.example`; defaults to `http://127.0.0.1:8000`).
+
+The ML detection service has no CORS headers, so the browser reaches it through
+the `/ml-api` dev proxy (vite.config.js). In production, add CORS to the ML
+service or replicate the rewrite on the static host (or set `VITE_ML_BASE_URL`).
+
+The demo incident (`src/data/incident.json`) is the Norway scenario — it must
+stay inside the backend's forcing-data window (lon 4–6, lat 59–61,
+20–22 Aug 2025) or OpenDrift has no currents/wind to work with.

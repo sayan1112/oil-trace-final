@@ -1,46 +1,47 @@
 {
   "demoMode": true,
-  "dataStatus": "SIMULATED",
-  "demoNotice": "All incident, vessel, trajectory and scoring values are simulated for frontend demonstration only.",
+  "dataStatus": "DEMO SCENARIO",
+  "demoNotice": "Norway demo scenario with synthetic AIS. The initial view is a static preview — Run Backtracking to replace all analytical values with live OilTrace backend outputs (OpenDrift hindcast, AIS query, attribution, forward simulation, counterfactual).",
 
   "incident": {
-    "id": "OT-DEMO-001",
+    "id": "norway-test-001",
     "status": "Under Investigation",
     "severity": "High",
 
-    "detectedAt": "2026-08-26T10:32:00Z",
+    "detectedAt": "2025-08-20T12:00:00Z",
 
     "location": {
-      "latitude": 18.520,
-      "longitude": 72.912
+      "latitude": 60.106,
+      "longitude": 4.487
     },
 
-    "areaKm2": 12.4,
+    "areaKm2": 14.8,
 
-    "detectionConfidence": 0.94,
+    "detectionConfidence": 0.77,
 
     "spillType": "Suspected oil slick",
 
     "spillPolygon": [
-      [18.515, 72.900],
-      [18.522, 72.905],
-      [18.528, 72.915],
-      [18.524, 72.925],
-      [18.516, 72.920],
-      [18.510, 72.910],
-      [18.515, 72.900]
+      [60.093, 4.455],
+      [60.086, 4.487],
+      [60.095, 4.520],
+      [60.108, 4.531],
+      [60.121, 4.512],
+      [60.126, 4.478],
+      [60.113, 4.452],
+      [60.093, 4.455]
     ],
 
     "centroid": {
-      "latitude": 18.520,
-      "longitude": 72.912
+      "latitude": 60.106,
+      "longitude": 4.487
     },
 
     "sourceRegion": {
-      "type": "Uncertainty region",
+      "type": "Uncertainty region (preliminary)",
       "center": {
-        "latitude": 18.520,
-        "longitude": 72.912
+        "latitude": 60.121,
+        "longitude": 4.479
       },
       "radiusMeters": 1800
     },
@@ -49,242 +50,167 @@
       "platform": "Sentinel-1",
       "sensor": "SAR",
       "productStatus": "Demo reference",
-      "imageId": "DEMO-S1-001"
+      "imageId": "DEMO-NORWAY-S1-001"
     },
 
     "timeline": [
       {
         "time": "10:00",
-        "label": "Initial vessel position"
+        "label": "Release window opens"
       },
       {
         "time": "10:15",
-        "label": "Vessel movement"
+        "label": "Estimated release"
       },
       {
-        "time": "10:30",
-        "label": "Potential release window"
+        "time": "11:00",
+        "label": "Drift transport"
       },
       {
-        "time": "10:45",
-        "label": "Spill detected"
+        "time": "12:00",
+        "label": "Spill detected (SAR)"
       }
     ],
 
     "vessels": [
       {
-        "id": "VESSEL-001",
-        "name": "MV Ocean Star",
-        "type": "Cargo",
-        "flag": "Demo",
+        "id": "678901234",
+        "name": "NORWAY DEMO TANKER",
+        "type": "Tanker",
+        "flag": "Synthetic AIS",
         "position": {
-          "latitude": 18.545,
-          "longitude": 72.875
+          "latitude": 60.300,
+          "longitude": 4.482
         },
-        "speedKnots": 12.4,
-        "heading": 274,
+        "speedKnots": 6.0,
+        "heading": 0,
 
         "candidateRank": 1,
-        "attributionConfidence": 0.87,
+        "attributionConfidence": 0.0,
 
         "evidence": {
           "spatial": {
-            "score": 0.92,
-            "label": "1.2 km from source region"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "temporal": {
-            "score": 0.91,
-            "label": "Release window overlap: 91%"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "trajectory": {
-            "score": 0.89,
-            "label": "Heading compatible"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "drift": {
-            "score": 0.91,
-            "label": "Counterfactual match: 91%"
+            "score": 0,
+            "label": "Counterfactual simulation pending."
           },
           "aisReliability": {
-            "status": "Warning",
-            "label": "14-minute AIS gap"
+            "status": "Unknown",
+            "label": "Awaiting backend AIS analysis."
           }
         },
 
         "trajectory": [
-          {
-            "time": "10:00",
-            "latitude": 18.570,
-            "longitude": 72.820
-          },
-          {
-            "time": "10:15",
-            "latitude": 18.562,
-            "longitude": 72.835
-          },
-          {
-            "time": "10:30",
-            "latitude": 18.555,
-            "longitude": 72.850
-          },
-          {
-            "time": "10:45",
-            "latitude": 18.545,
-            "longitude": 72.875
-          },
-          {
-            "time": "11:00",
-            "latitude": 18.538,
-            "longitude": 72.890
-          },
-          {
-            "time": "11:15",
-            "latitude": 18.530,
-            "longitude": 72.902
-          }
+          { "time": "10:00", "latitude": 60.100, "longitude": 4.482 },
+          { "time": "10:30", "latitude": 60.150, "longitude": 4.482 },
+          { "time": "11:00", "latitude": 60.200, "longitude": 4.482 },
+          { "time": "11:30", "latitude": 60.250, "longitude": 4.482 },
+          { "time": "12:00", "latitude": 60.300, "longitude": 4.482 }
         ]
       },
 
       {
-        "id": "VESSEL-002",
-        "name": "MV Blue Horizon",
-        "type": "Tanker",
-        "flag": "Demo",
+        "id": "789012345",
+        "name": "NORWAY DEMO CARGO",
+        "type": "Cargo",
+        "flag": "Synthetic AIS",
         "position": {
-          "latitude": 18.475,
-          "longitude": 72.955
+          "latitude": 60.350,
+          "longitude": 4.900
         },
-        "speedKnots": 10.8,
-        "heading": 120,
+        "speedKnots": 11.0,
+        "heading": 90,
 
         "candidateRank": 2,
-        "attributionConfidence": 0.64,
+        "attributionConfidence": 0.0,
 
         "evidence": {
           "spatial": {
-            "score": 0.71,
-            "label": "Moderate spatial proximity"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "temporal": {
-            "score": 0.68,
-            "label": "Partial release-window overlap"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "trajectory": {
-            "score": 0.62,
-            "label": "Partially compatible"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "drift": {
-            "score": 0.58,
-            "label": "Weak counterfactual match"
+            "score": 0,
+            "label": "Counterfactual simulation pending."
           },
           "aisReliability": {
-            "status": "Good",
-            "label": "Normal AIS coverage"
+            "status": "Unknown",
+            "label": "Awaiting backend AIS analysis."
           }
         },
 
         "trajectory": [
-          {
-            "time": "10:00",
-            "latitude": 18.440,
-            "longitude": 72.925
-          },
-          {
-            "time": "10:15",
-            "latitude": 18.448,
-            "longitude": 72.935
-          },
-          {
-            "time": "10:30",
-            "latitude": 18.458,
-            "longitude": 72.945
-          },
-          {
-            "time": "10:45",
-            "latitude": 18.468,
-            "longitude": 72.950
-          },
-          {
-            "time": "11:00",
-            "latitude": 18.475,
-            "longitude": 72.955
-          },
-          {
-            "time": "11:15",
-            "latitude": 18.485,
-            "longitude": 72.965
-          }
+          { "time": "10:00", "latitude": 60.350, "longitude": 4.300 },
+          { "time": "10:30", "latitude": 60.350, "longitude": 4.450 },
+          { "time": "11:00", "latitude": 60.350, "longitude": 4.600 },
+          { "time": "11:30", "latitude": 60.350, "longitude": 4.750 },
+          { "time": "12:00", "latitude": 60.350, "longitude": 4.900 }
         ]
       },
 
       {
-        "id": "VESSEL-003",
-        "name": "MV Coastal Wind",
-        "type": "Container",
-        "flag": "Demo",
+        "id": "890123456",
+        "name": "NORWAY DEMO FISHER",
+        "type": "Fishing",
+        "flag": "Synthetic AIS",
         "position": {
-          "latitude": 18.575,
-          "longitude": 72.970
+          "latitude": 60.010,
+          "longitude": 4.620
         },
-        "speedKnots": 14.2,
-        "heading": 185,
+        "speedKnots": 3.5,
+        "heading": 210,
 
         "candidateRank": 3,
-        "attributionConfidence": 0.38,
+        "attributionConfidence": 0.0,
 
         "evidence": {
           "spatial": {
-            "score": 0.42,
-            "label": "Low spatial proximity"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "temporal": {
-            "score": 0.39,
-            "label": "Low release-window overlap"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "trajectory": {
-            "score": 0.35,
-            "label": "Poor trajectory compatibility"
+            "score": 0,
+            "label": "Awaiting backend attribution — run Backtracking."
           },
           "drift": {
-            "score": 0.31,
-            "label": "Weak counterfactual match"
+            "score": 0,
+            "label": "Counterfactual simulation pending."
           },
           "aisReliability": {
-            "status": "Good",
-            "label": "Normal AIS coverage"
+            "status": "Unknown",
+            "label": "Awaiting backend AIS analysis."
           }
         },
 
         "trajectory": [
-          {
-            "time": "10:00",
-            "latitude": 18.620,
-            "longitude": 72.960
-          },
-          {
-            "time": "10:15",
-            "latitude": 18.610,
-            "longitude": 72.963
-          },
-          {
-            "time": "10:30",
-            "latitude": 18.600,
-            "longitude": 72.965
-          },
-          {
-            "time": "10:45",
-            "latitude": 18.590,
-            "longitude": 72.968
-          },
-          {
-            "time": "11:00",
-            "latitude": 18.575,
-            "longitude": 72.970
-          },
-          {
-            "time": "11:15",
-            "latitude": 18.560,
-            "longitude": 72.972
-          }
+          { "time": "10:00", "latitude": 60.030, "longitude": 4.640 },
+          { "time": "10:30", "latitude": 60.025, "longitude": 4.632 },
+          { "time": "11:00", "latitude": 60.020, "longitude": 4.628 },
+          { "time": "11:30", "latitude": 60.015, "longitude": 4.624 },
+          { "time": "12:00", "latitude": 60.010, "longitude": 4.620 }
         ]
       }
     ]
