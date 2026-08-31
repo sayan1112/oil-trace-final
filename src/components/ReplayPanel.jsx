@@ -18,6 +18,7 @@ function ReplayPanel({
   midLabel = "10:45 (Spill)",
   endLabel = "11:15 (T+30m)",
   forcingTag = "SIMULATED",
+  releaseFrac,
 }) {
   const START_MINUTES = 10 * 60; // 10:00
   const END_MINUTES = 11 * 60 + 15; // 11:15
@@ -90,32 +91,93 @@ function ReplayPanel({
       </div>
 
       <div className="replay-timeline-section">
-        <div className="replay-timeline-labels">
-          <span>{startLabel}</span>
-          <span>{midLabel}</span>
-          <span>{endLabel}</span>
+        {releaseFrac === undefined ? (
+          <div className="replay-timeline-labels">
+            <span>{startLabel}</span>
+            <span>{midLabel}</span>
+            <span>{endLabel}</span>
+          </div>
+        ) : (
+          <div className="replay-timeline-labels">
+            <span>{startLabel}</span>
+            <span>{endLabel}</span>
+          </div>
+        )}
+
+        <div style={{ position: "relative" }}>
+          <input
+            className="replay-slider"
+            type="range"
+            min={0}
+            max={maxProgress}
+            step={0.01}
+            value={normalizedProgress}
+            style={{
+              "--replay-progress": `${progressPercent}%`,
+            }}
+            onChange={handleSliderChange}
+            aria-label="Replay timeline"
+          />
+          {/* Release tick at its true position on the timeline */}
+          {releaseFrac !== undefined &&
+            releaseFrac !== null &&
+            releaseFrac > 0.03 &&
+            releaseFrac < 0.97 && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${releaseFrac * 100}%`,
+                  top: "-2px",
+                  transform: "translateX(-50%)",
+                  width: "2px",
+                  height: "16px",
+                  background: "#d97706",
+                  borderRadius: "1px",
+                  pointerEvents: "none",
+                }}
+              />
+            )}
         </div>
 
-        <input
-          className="replay-slider"
-          type="range"
-          min={0}
-          max={maxProgress}
-          step={0.01}
-          value={normalizedProgress}
-          style={{
-            "--replay-progress": `${progressPercent}%`,
-          }}
-          onChange={handleSliderChange}
-          aria-label="Replay timeline"
-        />
-
-        <div className="replay-timeline-markers">
-          <span>START</span>
-          <span>{computedTime}</span>
-          <span>RELEASE</span>
-          <span>DETECTED</span>
-        </div>
+        {releaseFrac === undefined ? (
+          <div className="replay-timeline-markers">
+            <span>START</span>
+            <span>{computedTime}</span>
+            <span>RELEASE</span>
+            <span>DETECTED</span>
+          </div>
+        ) : (
+          <div
+            className="replay-timeline-markers"
+            style={{ position: "relative", display: "block", height: "16px" }}
+          >
+            <span style={{ position: "absolute", left: 0 }}>START</span>
+            {releaseFrac !== null && releaseFrac > 0.1 && releaseFrac < 0.86 && (
+              <span
+                style={{
+                  position: "absolute",
+                  left: `${releaseFrac * 100}%`,
+                  transform: "translateX(-50%)",
+                  color: "#d97706",
+                }}
+              >
+                RELEASE
+              </span>
+            )}
+            <span
+              style={{
+                position: "absolute",
+                left: `${Math.max(8, Math.min(92, progressPercent))}%`,
+                transform: "translateX(-50%)",
+                fontWeight: 700,
+                color: "#2563eb",
+              }}
+            >
+              {computedTime}
+            </span>
+            <span style={{ position: "absolute", right: 0 }}>DETECTED</span>
+          </div>
+        )}
       </div>
 
       <div className="replay-controls">

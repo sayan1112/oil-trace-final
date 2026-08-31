@@ -1516,6 +1516,13 @@ function App() {
   // open in time mode (so scrubbing the slider moves vessels live).
   const replayActive = isPlaying || (activeItem === "replay" && simRange && Number.isFinite(simMs));
 
+  // Estimated-release position within the simulation window (0..1).
+  const releaseMs = forwardResult ? Date.parse(forwardResult.release_time_utc) : NaN;
+  const releaseFrac =
+    simRange && Number.isFinite(releaseMs)
+      ? Math.max(0, Math.min(1, (releaseMs - simRange.t0) / (simRange.t1 - simRange.t0)))
+      : null;
+
   // Adapters mapping the ReplayPanel's index-based API onto the master clock.
   const panelMaxP = Math.max(1, totalReplayPoints - 1);
   const panelProgress =
@@ -2421,9 +2428,13 @@ function App() {
           setReplaySpeed={setReplaySpeed}
           totalPoints={totalReplayPoints}
           timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : currentOilFrame?.timeLabel}
-          startLabel={simRange ? `${fmtSimClock(simRange.t0)} (window opens)` : undefined}
-          midLabel={simRange && forwardResult ? `${fmtSimClock(Date.parse(forwardResult.release_time_utc))} (est. release)` : undefined}
-          endLabel={simRange ? `${fmtSimClock(simRange.t1)} (observed)` : undefined}
+          startLabel={simRange
+            ? `${fmtSimClock(simRange.t0)} (window opens${releaseFrac !== null && releaseFrac <= 0.03 ? " · est. release" : ""})`
+            : undefined}
+          endLabel={simRange
+            ? `${fmtSimClock(simRange.t1)} (observed${releaseFrac !== null && releaseFrac >= 0.97 ? " · est. release" : ""})`
+            : undefined}
+          releaseFrac={simRange ? releaseFrac : undefined}
           forcingTag={simRange ? "BACKEND (OpenDrift)" : undefined}
           currentFieldDesc={simRange ? "Ocean currents - backend forcing data (OpenDrift)" : undefined}
           windFieldDesc={simRange ? "Wind field - backend forcing data (OpenDrift)" : undefined}

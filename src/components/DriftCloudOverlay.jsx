@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/particles";
@@ -43,6 +43,8 @@ export default function DriftCloudOverlay({
   const originRef = useRef(null);
   const backBufRef = useRef(null);
   const fwdBufRef = useRef(null);
+  // View mode: which cloud(s) to display — everything stays on the one clock.
+  const [mode, setMode] = useState("both"); // 'both' | 'back' | 'fwd'
 
   /* ── Clouds from backend outputs ─────────────────────────────────── */
 
@@ -85,7 +87,7 @@ export default function DriftCloudOverlay({
   /* ── Drawing (both clouds, one clock) ────────────────────────────── */
 
   const stateRef = useRef({});
-  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs };
+  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs, mode };
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -96,7 +98,7 @@ export default function DriftCloudOverlay({
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t } =
+    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t, mode: md } =
       stateRef.current;
     if (!vis || (!bc && !fc)) return;
     const tMs = Number.isFinite(t) ? t : (fc || bc).t1;
@@ -117,10 +119,10 @@ export default function DriftCloudOverlay({
     };
 
     // Reconstruction cloud runs across the whole window.
-    if (bc) drawCloud(bc, "rgba(8,94,120,0.45)", backBufRef);
+    if (bc && md !== "fwd") drawCloud(bc, "rgba(8,94,120,0.45)", backBufRef);
 
     // Released oil exists only from the estimated release time onward.
-    if (fc && tMs >= fc.t0) {
+    if (fc && md !== "back" && tMs >= fc.t0) {
       drawCloud(fc, "rgba(15,19,25,0.62)", fwdBufRef);
 
       // Release pulse: expanding red ring right after the release moment.
@@ -184,7 +186,7 @@ export default function DriftCloudOverlay({
     };
   }, [map]);
 
-  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, draw]);
+  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, mode, draw]);
 
   /* ── Control chip (steers the master clock) ──────────────────────── */
 
@@ -241,19 +243,48 @@ export default function DriftCloudOverlay({
         <option value={2}>2×</option>
         <option value={4}>4×</option>
       </select>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", color: "#7dd3fc", fontSize: "0.68rem" }}>
-        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(8,94,120,0.9)" }} />
-        reconstruction
+      <span style={{ display: "inline-flex", gap: "2px", background: "rgba(15,30,52,0.9)", border: "1px solid rgba(148,163,184,0.35)", borderRadius: "8px", padding: "2px" }}>
+        {[
+          ["back", "◀ Backtrack", "#67e8f9"],
+          ["both", "Both", "#e2e8f0"],
+          ["fwd", "Forward ▶", "#cbd5e1"],
+        ].map(([key, label, color]) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            disabled={key !== "back" && !fwdCloud}
+            style={{
+              background: mode === key ? "#2563eb" : "none",
+              border: "none",
+              borderRadius: "6px",
+              color: mode === key ? "#fff" : color,
+              padding: "0.15rem 0.5rem",
+              fontSize: "0.68rem",
+              opacity: key !== "back" && !fwdCloud ? 0.4 : 1,
+            }}
+            title={
+              key === "back"
+                ? "Teal cloud: backward hindcast reconstruction"
+                : key === "fwd"
+                  ? "Black cloud: released oil (appears at estimated release)"
+                  : "Show both clouds"
+            }
+          >
+            {label}
+          </button>
+        ))}
       </span>
-      <span
-        style={{
-          display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.68rem",
-          color: released ? "#e2e8f0" : "#64748b",
-        }}
-      >
-        <span style={{ width: 7, height: 7, borderRadius: "50%", background: released ? "#0f1319" : "#334155", outline: released ? "none" : "1px dashed #475569" }} />
-        {released ? "released oil" : "awaiting release"}
-      </span>
+      {mode !== "back" && fwdCloud && (
+        <span
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.68rem",
+            color: released ? "#e2e8f0" : "#64748b",
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: released ? "#0f1319" : "#334155", outline: released ? "none" : "1px dashed #475569" }} />
+          {released ? "released oil" : "awaiting release"}
+        </span>
+      )}
     </div>
   );
 }
