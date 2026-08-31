@@ -57,6 +57,7 @@ import {
   isWithinForcingCoverage,
   transposeSlickToDemoWindow,
 } from "./services/backendApi";
+import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
@@ -939,6 +940,7 @@ function App() {
   const [backendError, setBackendError] = useState(null);
   const [backendOnline, setBackendOnline] = useState(null); // null=checking
   const [transposeNotice, setTransposeNotice] = useState(null);
+  const [activeSlick, setActiveSlick] = useState(null); // slick sent to the backend
 
   const calculatedSourceRegion = useMemo(() => {
     if (backtrackResult?.sourceRegion) {
@@ -1171,6 +1173,9 @@ function App() {
           ? "The ML-detected slick's real shape was moved into the North Sea demo forcing window (location/time are not the detection's own). All results below are computed by the backend on the transposed slick."
           : null
       );
+      setActiveSlick(slick);
+      setForwardResult(null);
+      setCounterfactualResult(null);
 
       setBacktrackStatusText("Backend hindcast: OpenDrift backward simulation...");
       const hc = await runHindcast(slick, 2);
@@ -1540,6 +1545,14 @@ function App() {
             </Tooltip>
           </Polyline>
         )}
+
+        {/* BACKEND DRIFT PARTICLE CLOUD (OpenDrift-style) */}
+        <DriftCloudOverlay
+          hindcast={backtrackResult?.backend}
+          forward={forwardResult}
+          slickGeometry={activeSlick?.geometry}
+          visible={backtrackVisible && layers.backtrack}
+        />
 
         {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
         {backtrackVisible && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
