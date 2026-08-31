@@ -1221,7 +1221,7 @@ function App() {
   // The local illustrative plume is a pre-analysis visual only. Once the
   // backend pipeline has produced real drift results, hide it — its
   // hardcoded wind/current constants contradict the OpenDrift output.
-  const showLocalPlume = !backtrackResult || activeItem === "replay";
+  const showLocalPlume = !backtrackResult;
   const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
   const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
   const currentOilFlowLines = showLocalPlume ? displayOilFrame?.flowLines || [] : [];
@@ -1571,7 +1571,11 @@ function App() {
 
   const appThemeClass = darkMode ? "app-dark" : "app-light";
 
-  const mapSourceRegion = backtrackVisible ? calculatedSourceRegion : incident.sourceRegion;
+  // Backend investigation layers stay visible while replaying, not only in
+  // the explicit Backtrack tool view.
+  const investigationVisible = backtrackVisible || activeItem === "replay";
+
+  const mapSourceRegion = investigationVisible ? calculatedSourceRegion : incident.sourceRegion;
 
   const sourceCenter = [
     Number(mapSourceRegion?.center?.latitude ?? leafletCentroid[0]),
@@ -1717,7 +1721,7 @@ function App() {
         ))}
 
         {/* BACKTRACKED TRANSPORT PATH */}
-        {backtrackVisible && layers.backtrack && backtrackedCenterline.length >= 2 && (
+        {investigationVisible && layers.backtrack && backtrackedCenterline.length >= 2 && (
           <Polyline
             positions={backtrackedCenterline}
             pathOptions={{
@@ -1737,7 +1741,7 @@ function App() {
         )}
 
         {/* BACKTRACKED SUSPECT INTERSECTION LINK */}
-        {backtrackVisible && layers.backtrack && backtrackResult && scoredVessels.find((v) => v.candidateRank === 1) && (
+        {investigationVisible && layers.backtrack && backtrackResult && scoredVessels.find((v) => v.candidateRank === 1) && (
           <Polyline
             positions={[
               sourceCenter,
@@ -1768,7 +1772,7 @@ function App() {
           hindcast={backtrackResult?.backend}
           forward={forwardResult}
           slickGeometry={activeSlick?.geometry}
-          visible={backtrackVisible && layers.backtrack}
+          visible={investigationVisible && layers.backtrack}
           timeMs={simMs}
           playing={isPlaying}
           onPlayPause={() => setIsPlaying((prev) => !prev)}
@@ -1781,7 +1785,7 @@ function App() {
         />
 
         {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
-        {backtrackVisible && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
+        {investigationVisible && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
           <Polyline
             positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
             pathOptions={{
@@ -1799,7 +1803,7 @@ function App() {
             </Tooltip>
           </Polyline>
         )}
-        {backtrackVisible && layers.backtrack && forwardResult?.predicted_footprint && (
+        {investigationVisible && layers.backtrack && forwardResult?.predicted_footprint && (
           <Polygon
             positions={
               forwardResult.predicted_footprint.type === "Polygon"

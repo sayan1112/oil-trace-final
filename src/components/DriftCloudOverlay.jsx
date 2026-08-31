@@ -1,30 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/particles";
 
-// OpenDrift-style particle cloud for the BACKEND simulations.
+// OpenDrift-style particle clouds for the BACKEND simulations, all driven by
+// the app's ONE master simulation clock (`timeMs`):
 //
-// Renders an animated cloud of pseudo-particles along the backend's
-// backward-hindcast trajectory (source region → observed slick) and, once the
-// forward simulation has run, along the forward trajectory (release →
-// predicted footprint). The cloud is a deterministic, seeded visualisation of
-// the backend outputs — centroid path, timestamps and spread envelopes all
-// come from the API responses; nothing is computed locally.
+//   • teal cloud  — backward-hindcast reconstruction (probable source region
+//     converging onto the observed slick) across the whole window
+//   • black cloud — released oil: appears exactly when the clock reaches the
+//     backend's estimated release time, then drifts along the forward
+//     trajectory and spreads to the predicted footprint
+//   • a red pulse marks the release moment at the release location
 //
-// TIME: this overlay does not own a clock. It renders at `timeMs`, the app's
-// master simulation clock, so the Replay panel, vessel replay and the
-// particle cloud always stay in sync. The chip's controls delegate to the
-// same master clock via the on* callbacks.
-//
-// The canvas lives in Leaflet's overlay pane so it pans with the map for free
-// and is CSS-scaled during animated zooms (Leaflet.heat technique).
+// Everything is a deterministic, seeded visualisation of backend outputs —
+// centroid paths, timestamps and spread envelopes come from the API
+// responses; nothing is computed locally. The overlay owns no clock: the
+// Replay panel and the chip below both steer the same master clock.
 
 function fmtClock(ms) {
   const d = new Date(ms);
   const p = (n) => String(n).padStart(2, "0");
   return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
 }
+
+const RELEASE_PULSE_SIM_MS = 8 * 60 * 1000; // pulse lasts 8 simulated minutes
 
 export default function DriftCloudOverlay({
   hindcast,
@@ -41,8 +41,8 @@ export default function DriftCloudOverlay({
   const map = useMap();
   const canvasRef = useRef(null);
   const originRef = useRef(null);
-  const posBufRef = useRef(null);
-  const [phase, setPhase] = useState("back"); // 'back' | 'fwd' (view choice)
+  const backBufRef = useRef(null);
+  const fwdBufRef = useRef(null);
 
   /* ── Clouds from backend outputs ─────────────────────────────────── */
 
@@ -56,7 +56,7 @@ export default function DriftCloudOverlay({
     return buildCloud({
       points,
       timesUtc: hindcast.trajectory_timestamps_utc,
-      count: 900,
+      count: 800,
       startSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
       endSpreadKm: envelopeRadiusKm(slickGeometry, 1.8),
       seed: "oiltrace-back",
@@ -76,15 +76,16 @@ export default function DriftCloudOverlay({
     });
   }, [forward]);
 
-  // Default to the forward view once it exists.
-  useEffect(() => { if (fwdCloud) setPhase("fwd"); }, [fwdCloud]);
+  const releaseLatLng = useMemo(() => {
+    const loc = forward?.release_location;
+    if (!loc) return null;
+    return [+loc.lat, +loc.lon];
+  }, [forward]);
 
-  const activeCloud = phase === "fwd" && fwdCloud ? fwdCloud : backCloud;
-
-  /* ── Drawing ─────────────────────────────────────────────────────── */
+  /* ── Drawing (both clouds, one clock) ────────────────────────────── */
 
   const stateRef = useRef({});
-  stateRef.current = { visible, activeCloud, phase, timeMs };
+  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs };
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -95,20 +96,49 @@ export default function DriftCloudOverlay({
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { visible: vis, activeCloud: cloud, phase: ph, timeMs: t } = stateRef.current;
-    if (!vis || !cloud) return;
-    const tMs = Number.isFinite(t) ? t : cloud.t1;
-    const pos = cloudPositions(cloud, tMs, posBufRef.current);
-    posBufRef.current = pos;
-    ctx.fillStyle = ph === "fwd" ? "rgba(15,19,25,0.62)" : "rgba(8,94,120,0.55)";
+    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t } =
+      stateRef.current;
+    if (!vis || (!bc && !fc)) return;
+    const tMs = Number.isFinite(t) ? t : (fc || bc).t1;
     const r = map.getZoom() >= 10 ? 1.9 : 1.5;
-    for (let i = 0; i < cloud.count; i++) {
-      const p = map.latLngToLayerPoint([pos[i * 2], pos[i * 2 + 1]]);
-      const x = p.x - origin.x, y = p.y - origin.y;
-      if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, 6.2832);
-      ctx.fill();
+
+    const drawCloud = (cloud, style, bufRef) => {
+      const pos = cloudPositions(cloud, tMs, bufRef.current);
+      bufRef.current = pos;
+      ctx.fillStyle = style;
+      for (let i = 0; i < cloud.count; i++) {
+        const p = map.latLngToLayerPoint([pos[i * 2], pos[i * 2 + 1]]);
+        const x = p.x - origin.x, y = p.y - origin.y;
+        if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 6.2832);
+        ctx.fill();
+      }
+    };
+
+    // Reconstruction cloud runs across the whole window.
+    if (bc) drawCloud(bc, "rgba(8,94,120,0.45)", backBufRef);
+
+    // Released oil exists only from the estimated release time onward.
+    if (fc && tMs >= fc.t0) {
+      drawCloud(fc, "rgba(15,19,25,0.62)", fwdBufRef);
+
+      // Release pulse: expanding red ring right after the release moment.
+      const since = tMs - fc.t0;
+      if (rel && since <= RELEASE_PULSE_SIM_MS) {
+        const f = since / RELEASE_PULSE_SIM_MS;
+        const p = map.latLngToLayerPoint(rel);
+        const x = p.x - origin.x, y = p.y - origin.y;
+        ctx.strokeStyle = `rgba(217,47,35,${(1 - f) * 0.9})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y, 8 + f * 34, 0, 6.2832);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(217,47,35,${(1 - f) * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 6.2832);
+        ctx.fill();
+      }
     }
   }, [map]);
   const drawRef = useRef(draw);
@@ -154,12 +184,13 @@ export default function DriftCloudOverlay({
     };
   }, [map]);
 
-  useEffect(() => { drawRef.current(); }, [timeMs, visible, activeCloud, phase, draw]);
+  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, draw]);
 
-  /* ── Control chip (delegates to the master clock) ────────────────── */
+  /* ── Control chip (steers the master clock) ──────────────────────── */
 
-  if (!visible || !activeCloud) return null;
-  const t = Number.isFinite(timeMs) ? timeMs : activeCloud.t1;
+  if (!visible || (!backCloud && !fwdCloud)) return null;
+  const t = Number.isFinite(timeMs) ? timeMs : (fwdCloud || backCloud).t1;
+  const released = fwdCloud && t >= fwdCloud.t0;
 
   return (
     <div
@@ -174,24 +205,22 @@ export default function DriftCloudOverlay({
         zIndex: 900,
         display: "flex",
         alignItems: "center",
-        gap: "0.5rem",
+        gap: "0.55rem",
         background: "rgba(8,20,36,0.92)",
         border: "1px solid rgba(148,163,184,0.25)",
         borderRadius: "12px",
-        padding: "0.45rem 0.7rem",
+        padding: "0.45rem 0.75rem",
         color: "#e2e8f0",
         fontSize: "0.75rem",
         boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
       }}
     >
-      <span style={{ fontWeight: 700, letterSpacing: "0.06em", color: phase === "fwd" ? "#cbd5e1" : "#67e8f9" }}>
-        {phase === "fwd" ? "FORWARD DRIFT" : "BACKTRACK DRIFT"}
-      </span>
-      <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "70px" }}>{fmtClock(t)}</span>
+      <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DRIFT REPLAY</span>
+      <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "72px" }}>{fmtClock(t)}</span>
       <button
         onClick={() => onPlayPause?.()}
         style={{ background: "#2563eb", border: "none", borderRadius: "8px", color: "#fff", width: "30px", height: "26px", fontSize: "0.7rem" }}
-        title="Play / pause drift animation"
+        title="Play / pause drift replay"
       >
         {playing ? "❚❚" : "▶"}
       </button>
@@ -212,15 +241,19 @@ export default function DriftCloudOverlay({
         <option value={2}>2×</option>
         <option value={4}>4×</option>
       </select>
-      {backCloud && fwdCloud && (
-        <button
-          onClick={() => setPhase((ph) => (ph === "fwd" ? "back" : "fwd"))}
-          style={{ background: "none", border: "1px solid rgba(148,163,184,0.4)", borderRadius: "8px", color: "#cbd5e1", padding: "0 0.5rem", height: "26px", fontSize: "0.68rem" }}
-          title="Switch between backtrack and forward drift view"
-        >
-          {phase === "fwd" ? "⇤ Backtrack" : "Forward ⇥"}
-        </button>
-      )}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", color: "#7dd3fc", fontSize: "0.68rem" }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(8,94,120,0.9)" }} />
+        reconstruction
+      </span>
+      <span
+        style={{
+          display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.68rem",
+          color: released ? "#e2e8f0" : "#64748b",
+        }}
+      >
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: released ? "#0f1319" : "#334155", outline: released ? "none" : "1px dashed #475569" }} />
+        {released ? "released oil" : "awaiting release"}
+      </span>
     </div>
   );
 }
