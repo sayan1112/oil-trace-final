@@ -332,3 +332,66 @@ export function buildFrontendScoring(v) {
 export function shiftIsoHours(iso, hours) {
   return new Date(new Date(iso).getTime() + hours * 3600 * 1000).toISOString();
 }
+
+/* ── Forcing-data coverage guard ──────────────────────────────────── */
+// The demo backend ships OpenDrift forcing (currents/wind/waves) only for
+// this North Sea window. Hindcasts outside it abort with "Missing variables".
+export const FORCING_COVERAGE = {
+  minLon: 4.0, maxLon: 6.0, minLat: 59.0, maxLat: 61.0,
+  startUtc: "2025-08-20T00:00:00Z", endUtc: "2025-08-22T23:59:59Z",
+};
+
+export function assertWithinForcingCoverage(slick) {
+  const { lat, lon } = slick?.centroid || {};
+  const t = Date.parse(slick?.timestamp_utc);
+  const c = FORCING_COVERAGE;
+  const inSpace = lon >= c.minLon && lon <= c.maxLon && lat >= c.minLat && lat <= c.maxLat;
+  const inTime = Number.isFinite(t) && t >= Date.parse(c.startUtc) && t <= Date.parse(c.endUtc);
+  if (!inSpace || !inTime) {
+    throw new Error(
+      `This slick (${(+lat).toFixed(2)}°N, ${(+lon).toFixed(2)}°E, ${slick?.timestamp_utc}) is outside ` +
+      `the demo forcing-data coverage (${c.minLon}–${c.maxLon}°E, ${c.minLat}–${c.maxLat}°N, ` +
+      `20–22 Aug 2025 UTC) — the backend has no ocean-current/wind data there, so OpenDrift cannot run. ` +
+      `Note: the bundled ML demo scene is in the Eastern Mediterranean. Clear the backtrack seed in the ` +
+      `Detect panel to analyse the Norway demo incident instead.`
+    );
+  }
+}
+
+export function isWithinForcingCoverage(slick) {
+  try { assertWithinForcingCoverage(slick); return true; } catch { return false; }
+}
+
+/**
+ * Demo bridge: carry a detected slick's REAL polygon shape into the demo
+ * forcing window (location + time shifted, shape preserved) so the physics
+ * pipeline can run on it. Always label the result as transposed in the UI —
+ * the location/time are no longer the detection's own.
+ */
+export function transposeSlickToDemoWindow(slick) {
+  const target = { lat: 60.106, lon: 4.487 };
+  const dLat = target.lat - +slick.centroid.lat;
+  const dLon = target.lon - +slick.centroid.lon;
+  // Longitude degrees shrink with latitude; rescale so the shape keeps its
+  // physical width at the new latitude.
+  const lonScale =
+    Math.cos((+slick.centroid.lat * Math.PI) / 180) /
+    Math.cos((target.lat * Math.PI) / 180);
+  const shiftRing = (ring) =>
+    ring.map(([lon, lat]) => [
+      target.lon + (lon - +slick.centroid.lon) * lonScale,
+      lat + dLat,
+    ]);
+  const g = slick.geometry;
+  const geometry =
+    g.type === "Polygon"
+      ? { type: "Polygon", coordinates: g.coordinates.map(shiftRing) }
+      : { type: "MultiPolygon", coordinates: g.coordinates.map((p) => p.map(shiftRing)) };
+  return {
+    ...slick,
+    id: `${slick.id}-transposed`,
+    timestamp_utc: "2025-08-20T12:00:00Z",
+    centroid: target,
+    geometry,
+  };
+}

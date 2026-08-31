@@ -53,6 +53,9 @@ import {
   normalizeVessels,
   buildFrontendScoring,
   shiftIsoHours,
+  assertWithinForcingCoverage,
+  isWithinForcingCoverage,
+  transposeSlickToDemoWindow,
 } from "./services/backendApi";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
 import { defaultCurrentField } from "./Simulation/currentField";
@@ -935,6 +938,7 @@ function App() {
   const [counterfactualResult, setCounterfactualResult] = useState(null);
   const [backendError, setBackendError] = useState(null);
   const [backendOnline, setBackendOnline] = useState(null); // null=checking
+  const [transposeNotice, setTransposeNotice] = useState(null);
 
   const calculatedSourceRegion = useMemo(() => {
     if (backtrackResult?.sourceRegion) {
@@ -1129,13 +1133,44 @@ function App() {
       // The slick to hindcast: an ML-detected slick if the user picked one
       // as seed, otherwise the demo incident slick.
       let slick = null;
+      let transposed = false;
       if (activeSeedId && detectionResult?.features?.length) {
         const feature = detectionResult.features.find(
           (f) => String(f?.properties?.id) === String(activeSeedId)
         );
         if (feature) slick = slickFromDetection(feature);
       }
+      if (slick && !isWithinForcingCoverage(slick)) {
+        // The detected slick lies outside the backend's forcing-data window
+        // (the ML demo scene is in the Eastern Mediterranean; forcing covers
+        // only the North Sea demo window). Offer to carry its real shape
+        // into the demo window so the physics can run — clearly labeled.
+        const ok = window.confirm(
+          "The detected slick is outside the backend's forcing-data coverage " +
+            "(North Sea 4–6°E / 59–61°N, 20–22 Aug 2025 UTC), so OpenDrift has no " +
+            "currents or wind there.\n\n" +
+            "Run it as a DEMO TRANSPOSITION instead? The slick's real detected " +
+            "shape is kept, but its location and time are moved into the demo " +
+            "window. Results will be labeled accordingly.\n\n" +
+            "Cancel to keep the seed unused (the Norway demo incident runs instead)."
+        );
+        if (ok) {
+          slick = transposeSlickToDemoWindow(slick);
+          transposed = true;
+        } else {
+          slick = null;
+        }
+      }
       if (!slick) slick = slickFromIncident(incident);
+
+      // Fail fast with a clear message when the slick lies outside the demo
+      // forcing-data window — OpenDrift has no currents/wind anywhere else.
+      assertWithinForcingCoverage(slick);
+      setTransposeNotice(
+        transposed
+          ? "The ML-detected slick's real shape was moved into the North Sea demo forcing window (location/time are not the detection's own). All results below are computed by the backend on the transposed slick."
+          : null
+      );
 
       setBacktrackStatusText("Backend hindcast: OpenDrift backward simulation...");
       const hc = await runHindcast(slick, 2);
@@ -2009,6 +2044,45 @@ function App() {
               boxShadow: "0 0 8px rgba(6,182,212,0.6)",
             }} />
           </div>
+        </div>
+      )}
+
+      {/* DEMO TRANSPOSITION NOTICE */}
+      {transposeNotice && !isBacktracking && (
+        <div
+          style={{
+            position: "fixed",
+            top: "5.2rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 2900,
+            maxWidth: "520px",
+            background: "rgba(45,30,4,0.95)",
+            border: "1px solid rgba(245,158,11,0.5)",
+            borderRadius: "12px",
+            padding: "0.7rem 1rem",
+            color: "#fde68a",
+            fontSize: "0.78rem",
+            lineHeight: 1.45,
+            boxShadow: "0 14px 36px rgba(0,0,0,0.45)",
+          }}
+        >
+          <strong style={{ color: "#fbbf24" }}>Demo transposition.</strong>{" "}
+          {transposeNotice}
+          <button
+            onClick={() => setTransposeNotice(null)}
+            style={{
+              marginLeft: "0.6rem",
+              background: "none",
+              border: "1px solid rgba(251,191,36,0.5)",
+              borderRadius: "7px",
+              color: "#fcd34d",
+              padding: "0.12rem 0.5rem",
+              fontSize: "0.7rem",
+            }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
