@@ -12,10 +12,13 @@ import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/part
 // the backend outputs — centroid path, timestamps and spread envelopes all
 // come from the API responses; nothing is computed locally.
 //
+// TIME: this overlay does not own a clock. It renders at `timeMs`, the app's
+// master simulation clock, so the Replay panel, vessel replay and the
+// particle cloud always stay in sync. The chip's controls delegate to the
+// same master clock via the on* callbacks.
+//
 // The canvas lives in Leaflet's overlay pane so it pans with the map for free
 // and is CSS-scaled during animated zooms (Leaflet.heat technique).
-
-const PLAY_MS = 13000; // full simulation span at 1× — presentable pacing
 
 function fmtClock(ms) {
   const d = new Date(ms);
@@ -23,15 +26,23 @@ function fmtClock(ms) {
   return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
 }
 
-export default function DriftCloudOverlay({ hindcast, forward, slickGeometry, visible }) {
+export default function DriftCloudOverlay({
+  hindcast,
+  forward,
+  slickGeometry,
+  visible,
+  timeMs,
+  playing,
+  onPlayPause,
+  onRestart,
+  speed,
+  onSpeed,
+}) {
   const map = useMap();
   const canvasRef = useRef(null);
   const originRef = useRef(null);
   const posBufRef = useRef(null);
-  const [phase, setPhase] = useState("back"); // 'back' | 'fwd'
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [clockMs, setClockMs] = useState(null);
+  const [phase, setPhase] = useState("back"); // 'back' | 'fwd' (view choice)
 
   /* ── Clouds from backend outputs ─────────────────────────────────── */
 
@@ -65,12 +76,15 @@ export default function DriftCloudOverlay({ hindcast, forward, slickGeometry, vi
     });
   }, [forward]);
 
+  // Default to the forward view once it exists.
+  useEffect(() => { if (fwdCloud) setPhase("fwd"); }, [fwdCloud]);
+
   const activeCloud = phase === "fwd" && fwdCloud ? fwdCloud : backCloud;
 
   /* ── Drawing ─────────────────────────────────────────────────────── */
 
   const stateRef = useRef({});
-  stateRef.current = { visible, activeCloud, phase, clockMs };
+  stateRef.current = { visible, activeCloud, phase, timeMs };
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -81,9 +95,9 @@ export default function DriftCloudOverlay({ hindcast, forward, slickGeometry, vi
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { visible: vis, activeCloud: cloud, phase: ph, clockMs: t } = stateRef.current;
+    const { visible: vis, activeCloud: cloud, phase: ph, timeMs: t } = stateRef.current;
     if (!vis || !cloud) return;
-    const tMs = t ?? cloud.t1;
+    const tMs = Number.isFinite(t) ? t : cloud.t1;
     const pos = cloudPositions(cloud, tMs, posBufRef.current);
     posBufRef.current = pos;
     ctx.fillStyle = ph === "fwd" ? "rgba(15,19,25,0.62)" : "rgba(8,94,120,0.55)";
@@ -140,48 +154,12 @@ export default function DriftCloudOverlay({ hindcast, forward, slickGeometry, vi
     };
   }, [map]);
 
-  /* ── Auto-play when a simulation arrives ─────────────────────────── */
+  useEffect(() => { drawRef.current(); }, [timeMs, visible, activeCloud, phase, draw]);
 
-  useEffect(() => {
-    if (!backCloud) return;
-    setPhase("back");
-    setClockMs(backCloud.t0);
-    setPlaying(true);
-  }, [backCloud]);
-
-  useEffect(() => {
-    if (!fwdCloud) return;
-    setPhase("fwd");
-    setClockMs(fwdCloud.t0);
-    setPlaying(true);
-  }, [fwdCloud]);
-
-  /* ── Smooth playback clock (local rAF variable, not React state) ── */
-
-  useEffect(() => {
-    if (!playing || !activeCloud) return;
-    let raf, last = performance.now();
-    let cur = clockMs ?? activeCloud.t0;
-    if (cur >= activeCloud.t1 - 500) cur = activeCloud.t0;
-    const rate = ((activeCloud.t1 - activeCloud.t0) / PLAY_MS) * speed;
-    const tick = (now) => {
-      cur = Math.min(activeCloud.t1, cur + (now - last) * rate);
-      last = now;
-      setClockMs(cur);
-      if (cur >= activeCloud.t1) { setPlaying(false); return; }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, speed, activeCloud]);
-
-  useEffect(() => { drawRef.current(); }, [clockMs, visible, activeCloud, draw]);
-
-  /* ── Replay control chip ─────────────────────────────────────────── */
+  /* ── Control chip (delegates to the master clock) ────────────────── */
 
   if (!visible || !activeCloud) return null;
-  const t = clockMs ?? activeCloud.t1;
+  const t = Number.isFinite(timeMs) ? timeMs : activeCloud.t1;
 
   return (
     <div
@@ -211,39 +189,34 @@ export default function DriftCloudOverlay({ hindcast, forward, slickGeometry, vi
       </span>
       <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "70px" }}>{fmtClock(t)}</span>
       <button
-        onClick={() => setPlaying((p) => !p)}
+        onClick={() => onPlayPause?.()}
         style={{ background: "#2563eb", border: "none", borderRadius: "8px", color: "#fff", width: "30px", height: "26px", fontSize: "0.7rem" }}
         title="Play / pause drift animation"
       >
         {playing ? "❚❚" : "▶"}
       </button>
       <button
-        onClick={() => { setClockMs(activeCloud.t0); setPlaying(true); }}
+        onClick={() => onRestart?.()}
         style={{ background: "none", border: "1px solid rgba(148,163,184,0.4)", borderRadius: "8px", color: "#cbd5e1", width: "28px", height: "26px", fontSize: "0.7rem" }}
-        title="Replay from release"
+        title="Replay from the start of the window"
       >
         ↺
       </button>
       <select
         value={speed}
-        onChange={(e) => setSpeed(Number(e.target.value))}
+        onChange={(e) => onSpeed?.(Number(e.target.value))}
         style={{ background: "rgba(15,30,52,0.9)", color: "#e2e8f0", border: "1px solid rgba(148,163,184,0.35)", borderRadius: "7px", height: "26px", fontSize: "0.72rem" }}
       >
+        <option value={0.5}>0.5×</option>
         <option value={1}>1×</option>
         <option value={2}>2×</option>
         <option value={4}>4×</option>
       </select>
       {backCloud && fwdCloud && (
         <button
-          onClick={() => {
-            const next = phase === "fwd" ? "back" : "fwd";
-            const cloud = next === "fwd" ? fwdCloud : backCloud;
-            setPhase(next);
-            setClockMs(cloud.t0);
-            setPlaying(true);
-          }}
+          onClick={() => setPhase((ph) => (ph === "fwd" ? "back" : "fwd"))}
           style={{ background: "none", border: "1px solid rgba(148,163,184,0.4)", borderRadius: "8px", color: "#cbd5e1", padding: "0 0.5rem", height: "26px", fontSize: "0.68rem" }}
-          title="Switch between backtrack and forward drift"
+          title="Switch between backtrack and forward drift view"
         >
           {phase === "fwd" ? "⇤ Backtrack" : "Forward ⇥"}
         </button>

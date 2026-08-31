@@ -14,6 +14,10 @@ function ReplayPanel({
   timeLabel,
   currentFieldDesc = "SIMULATED CURRENT (WESTWARD 0.3 m/s)",
   windFieldDesc = "SIMULATED WIND (NNW 5.2 m/s)",
+  startLabel = "10:00 (T-45m)",
+  midLabel = "10:45 (Spill)",
+  endLabel = "11:15 (T+30m)",
+  forcingTag = "SIMULATED",
 }) {
   const START_MINUTES = 10 * 60; // 10:00
   const END_MINUTES = 11 * 60 + 15; // 11:15
@@ -87,9 +91,9 @@ function ReplayPanel({
 
       <div className="replay-timeline-section">
         <div className="replay-timeline-labels">
-          <span>10:00 (T-45m)</span>
-          <span>10:45 (Spill)</span>
-          <span>11:15 (T+30m)</span>
+          <span>{startLabel}</span>
+          <span>{midLabel}</span>
+          <span>{endLabel}</span>
         </div>
 
         <input
@@ -168,7 +172,7 @@ function ReplayPanel({
       <div className="replay-vessel-summary" style={{ marginBottom: "1rem" }}>
         <div className="replay-summary-header">
           <span>DRIFT FORCING FIELDS</span>
-          <span className="demo-text" style={{ fontSize: "0.7rem", opacity: 0.8 }}>SIMULATED</span>
+          <span className="demo-text" style={{ fontSize: "0.7rem", opacity: 0.8 }}>{forcingTag}</span>
         </div>
 
         <div className="replay-vessel-row" style={{ fontSize: "0.78rem" }}>

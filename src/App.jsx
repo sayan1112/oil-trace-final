@@ -308,22 +308,62 @@ function FitMapToIncident() {
 }
 
 /* =========================================================
+   INVESTIGATION FOCUS CONTROLLER
+   Keeps the visible area on the spill/vessel action:
+   - refits automatically as each backend stage completes
+   - soft-bounds panning so the user can't drift far from the scene
+========================================================= */
+
+function MapFocusController({ storyPoints, scenePoints, stageKey }) {
+  const map = useMap();
+  const lastKeyRef = useRef("0-0-0");
+
+  useEffect(() => {
+    if (stageKey === lastKeyRef.current) return;
+    lastKeyRef.current = stageKey;
+    // Vessels stage frames ships + spill; other stages frame the drift story.
+    const pts = stageKey === "1-1-0" ? scenePoints : storyPoints;
+    if (!pts.length) return;
+    map.fitBounds(L.latLngBounds(pts), {
+      paddingTopLeft: [70, 70],
+      paddingBottomRight: [390, 70],
+      maxZoom: 12,
+      animate: true,
+      duration: 0.9,
+    });
+  }, [map, stageKey, storyPoints, scenePoints]);
+
+  useEffect(() => {
+    const pts = scenePoints.length ? scenePoints : storyPoints;
+    if (!pts.length) return;
+    map.setMaxBounds(L.latLngBounds(pts).pad(2.5));
+    map.options.maxBoundsViscosity = 0.6;
+    if (map.getMinZoom() < 6) map.setMinZoom(6);
+  }, [map, storyPoints, scenePoints]);
+
+  return null;
+}
+
+/* =========================================================
    MAP TOOLBAR
 ========================================================= */
 
-function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktracking }) {
+function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktracking, storyPoints, scenePoints }) {
   const map = useMap();
 
-  const handleResetView = () => {
-    const points = getIncidentPoints();
+  const fitTo = (points) => {
+    if (!points?.length) points = getIncidentPoints();
     if (!points.length) return;
     map.fitBounds(L.latLngBounds(points), {
-      paddingTopLeft: [100, 80],
-      paddingBottomRight: [100, 80],
+      paddingTopLeft: [70, 70],
+      paddingBottomRight: [390, 70],
+      maxZoom: 12,
       animate: true,
       duration: 0.7,
     });
   };
+
+  const handleResetView = () => fitTo(scenePoints);
 
   const handleFullscreen = () => {
     const mapElement = document.querySelector(".map");
@@ -389,8 +429,8 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
         type="button"
         className="map-tool-button"
         onClick={handleResetView}
-        title="Reset map view"
-        aria-label="Reset map view"
+        title="Reset view — spill + all vessels"
+        aria-label="Reset view to spill and vessels"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="7" />
@@ -399,6 +439,18 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
           <path d="M12 19v3" />
           <path d="M2 12h3" />
           <path d="M19 12h3" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        className="map-tool-button"
+        onClick={() => fitTo(storyPoints)}
+        title="Focus spill — slick, source region & drift"
+        aria-label="Focus on the oil spill drift story"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 4c3.2 4 5.6 6.9 5.6 9.8a5.6 5.6 0 1 1-11.2 0C6.4 10.9 8.8 8 12 4z" />
         </svg>
       </button>
 
@@ -962,6 +1014,83 @@ function App() {
   );
 
   /* =======================================================
+     LIVE FOCUS GEOMETRY (what the camera should frame)
+  ======================================================= */
+
+  // "Story": where the oil is — slick, source region, drift trajectories,
+  // predicted footprint. Always from the live investigation state.
+  const storyPoints = useMemo(() => {
+    const pts = [];
+    const pushRing = (ring) =>
+      (ring || []).forEach(([lon, lat]) => pts.push([+lat, +lon]));
+    const pushGeom = (g) => {
+      if (!g) return;
+      if (g.type === "Polygon") g.coordinates.forEach(pushRing);
+      else if (g.type === "MultiPolygon")
+        g.coordinates.forEach((poly) => poly.forEach(pushRing));
+      else if (g.type === "LineString") pushRing(g.coordinates);
+    };
+    if (activeSlick?.geometry) pushGeom(activeSlick.geometry);
+    else spillPolygon.forEach((p) => pts.push(p));
+    pushGeom(calculatedSourceRegion?.geometry);
+    if (calculatedSourceRegion?.center)
+      pts.push([
+        +calculatedSourceRegion.center.latitude,
+        +calculatedSourceRegion.center.longitude,
+      ]);
+    (backtrackResult?.trajectory || []).forEach((p) =>
+      pts.push([+p.latitude, +p.longitude])
+    );
+    pushGeom(forwardResult?.trajectory);
+    pushGeom(forwardResult?.predicted_footprint);
+    return pts.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+  }, [activeSlick, calculatedSourceRegion, backtrackResult, forwardResult]);
+
+  // "Scene": story + every vessel's track — spill AND ships in frame.
+  const scenePoints = useMemo(() => {
+    const pts = [...storyPoints];
+    scoredVessels.forEach((v) => {
+      if (v.position)
+        pts.push([+v.position.latitude, +v.position.longitude]);
+      (v.trajectory || []).forEach((p) =>
+        pts.push([+p.latitude, +p.longitude])
+      );
+    });
+    return pts.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+  }, [storyPoints, scoredVessels]);
+
+  const focusStageKey = `${backtrackResult ? 1 : 0}-${backendVessels ? 1 : 0}-${forwardResult ? 1 : 0}`;
+
+  /* =======================================================
+     MASTER SIMULATION CLOCK
+     One UTC clock spanning the backend simulation window
+     drives the Replay panel, the vessel replay AND the
+     drift particle cloud - everything stays in sync.
+  ======================================================= */
+
+  const simRange = useMemo(() => {
+    const ts = [];
+    (backtrackResult?.backend?.trajectory_timestamps_utc || []).forEach((t) =>
+      ts.push(Date.parse(t))
+    );
+    (forwardResult?.trajectory_timestamps_utc || []).forEach((t) =>
+      ts.push(Date.parse(t))
+    );
+    const valid = ts.filter(Number.isFinite);
+    if (valid.length < 2) return null;
+    return { t0: Math.min(...valid), t1: Math.max(...valid) };
+  }, [backtrackResult, forwardResult]);
+
+  const [simMs, setSimMs] = useState(null);
+
+  const fmtSimClock = (ms) => {
+    if (!Number.isFinite(ms)) return null;
+    const d = new Date(ms);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+  };
+
+  /* =======================================================
      ACTIVE SIDEBAR ITEM & THEME
   ======================================================= */
 
@@ -1089,9 +1218,13 @@ function App() {
   );
 
   const displayOilFrame = activeItem === "replay" ? currentOilFrame : detectionOilFrame;
-  const currentOilParticles = displayOilFrame?.particles || [];
-  const currentOilTrails = displayOilFrame?.trails || [];
-  const currentOilFlowLines = displayOilFrame?.flowLines || [];
+  // The local illustrative plume is a pre-analysis visual only. Once the
+  // backend pipeline has produced real drift results, hide it — its
+  // hardcoded wind/current constants contradict the OpenDrift output.
+  const showLocalPlume = !backtrackResult || activeItem === "replay";
+  const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
+  const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
+  const currentOilFlowLines = showLocalPlume ? displayOilFrame?.flowLines || [] : [];
 
   /* =======================================================
      REPLAY ENGINE
@@ -1100,6 +1233,25 @@ function App() {
   useEffect(() => {
     if (!isPlaying) return undefined;
 
+    // Time-based engine: advance the master UTC clock smoothly over the
+    // backend simulation window (~16 s per full run at 1x).
+    if (simRange) {
+      let raf, last = performance.now();
+      let cur = Number.isFinite(simMs) ? simMs : simRange.t0;
+      if (cur >= simRange.t1 - 500) cur = simRange.t0;
+      const rate = ((simRange.t1 - simRange.t0) / 16000) * replaySpeed;
+      const tick = (now) => {
+        cur = Math.min(simRange.t1, cur + (now - last) * rate);
+        last = now;
+        setSimMs(cur);
+        if (cur >= simRange.t1) { setIsPlaying(false); return; }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(raf);
+    }
+
+    // Legacy index-based engine (pre-analysis demo replay).
     const intervalTime = 120 / replaySpeed;
     const interval = setInterval(() => {
       setReplayProgress((previous) => {
@@ -1113,7 +1265,8 @@ function App() {
     }, intervalTime);
 
     return () => clearInterval(interval);
-  }, [isPlaying, replaySpeed, totalReplayPoints]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, replaySpeed, totalReplayPoints, simRange]);
 
   /* =======================================================
      BACKTRACK RUNNER
@@ -1256,6 +1409,15 @@ function App() {
           scoring: buildFrontendScoring(v),
         }))
       );
+      // Start the synced replay (particle cloud + vessels) from the top of
+      // the simulation window.
+      const simTs = (hc.trajectory_timestamps_utc || [])
+        .map((t) => Date.parse(t))
+        .filter(Number.isFinite);
+      if (simTs.length) {
+        setSimMs(Math.min(...simTs));
+        setIsPlaying(true);
+      }
       setBackendOnline(true);
     } catch (err) {
       setBackendError(err?.message || String(err));
@@ -1270,7 +1432,30 @@ function App() {
      REPLAY POSITION & TRAJECTORY COMPUTATION
   ======================================================= */
 
+  // Time-based interpolation along a vessel's AIS track (backend tracks
+  // carry ISO timestamps); returns null when timestamps are unavailable.
+  const timeReplayPosition = (vessel) => {
+    if (!simRange || !Number.isFinite(simMs)) return null;
+    const tr = (vessel.trajectory || [])
+      .map((pt) => ({ ...pt, ms: Date.parse(pt.time) }))
+      .filter((pt) => Number.isFinite(pt.ms));
+    if (tr.length < 2) return null;
+    if (simMs <= tr[0].ms) return [tr[0].latitude, tr[0].longitude];
+    const last = tr[tr.length - 1];
+    if (simMs >= last.ms) return [last.latitude, last.longitude];
+    let i = 1;
+    while (tr[i].ms < simMs) i++;
+    const a = tr[i - 1], b = tr[i];
+    const f = b.ms === a.ms ? 0 : (simMs - a.ms) / (b.ms - a.ms);
+    return [
+      a.latitude + (b.latitude - a.latitude) * f,
+      a.longitude + (b.longitude - a.longitude) * f,
+    ];
+  };
+
   const getReplayPosition = (vessel) => {
+    const timed = timeReplayPosition(vessel);
+    if (timed) return timed;
     const trajectory = vessel.trajectory || [];
     if (!trajectory.length) {
       return [vessel.position.latitude, vessel.position.longitude];
@@ -1300,6 +1485,19 @@ function App() {
     const trajectory = vessel.trajectory || [];
     if (!trajectory.length) return [];
 
+    // Time-based: every past track point plus the interpolated position.
+    if (simRange && Number.isFinite(simMs)) {
+      const pts = trajectory
+        .filter((pt) => {
+          const ms = Date.parse(pt.time);
+          return Number.isFinite(ms) && ms <= simMs;
+        })
+        .map((pt) => [pt.latitude, pt.longitude]);
+      const cur = timeReplayPosition(vessel);
+      if (cur) pts.push(cur);
+      return pts;
+    }
+
     const visibleProgress = Math.min(replayProgress, trajectory.length - 1);
     const completedPoints = Math.floor(visibleProgress);
 
@@ -1312,6 +1510,25 @@ function App() {
     }
 
     return points;
+  };
+
+  // Replay visuals are active while playing or whenever the Replay panel is
+  // open in time mode (so scrubbing the slider moves vessels live).
+  const replayActive = isPlaying || (activeItem === "replay" && simRange && Number.isFinite(simMs));
+
+  // Adapters mapping the ReplayPanel's index-based API onto the master clock.
+  const panelMaxP = Math.max(1, totalReplayPoints - 1);
+  const panelProgress =
+    simRange && Number.isFinite(simMs)
+      ? ((simMs - simRange.t0) / (simRange.t1 - simRange.t0)) * panelMaxP
+      : replayProgress;
+  const setPanelProgress = (next) => {
+    const value = typeof next === "function" ? next(panelProgress) : next;
+    if (simRange) {
+      setSimMs(simRange.t0 + (value / panelMaxP) * (simRange.t1 - simRange.t0));
+    } else {
+      setReplayProgress(value);
+    }
   };
 
   /* =======================================================
@@ -1552,6 +1769,15 @@ function App() {
           forward={forwardResult}
           slickGeometry={activeSlick?.geometry}
           visible={backtrackVisible && layers.backtrack}
+          timeMs={simMs}
+          playing={isPlaying}
+          onPlayPause={() => setIsPlaying((prev) => !prev)}
+          onRestart={() => {
+            if (simRange) setSimMs(simRange.t0);
+            setIsPlaying(true);
+          }}
+          speed={replaySpeed}
+          onSpeed={setReplaySpeed}
         />
 
         {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
@@ -1762,10 +1988,19 @@ function App() {
           onToggleTheme={() => setDarkMode((prev) => !prev)}
           onTriggerBacktrack={handleRunBacktrack}
           isBacktracking={isBacktracking}
+          storyPoints={storyPoints}
+          scenePoints={scenePoints}
         />
 
         {/* INITIAL MAP FIT */}
         <FitMapToIncident />
+
+        {/* AUTO-REFIT + SOFT PAN BOUNDS AROUND THE INVESTIGATION */}
+        <MapFocusController
+          storyPoints={storyPoints}
+          scenePoints={scenePoints}
+          stageKey={focusStageKey}
+        />
 
         {/* VESSELS + TRAJECTORIES */}
         {scoredVessels.map((vessel) => {
@@ -1809,7 +2044,7 @@ function App() {
           return (
             <Fragment key={vessel.id}>
               {/* NORMAL TRAJECTORY */}
-              {layers.trajectories && !isPlaying && normalTrajectory.length >= 2 && (
+              {layers.trajectories && !replayActive && normalTrajectory.length >= 2 && (
                 <>
                   {isSelected && (
                     <Polyline
@@ -1837,7 +2072,7 @@ function App() {
               )}
 
               {/* REPLAY TRAJECTORY */}
-              {layers.trajectories && isPlaying && replayTrajectory.length >= 2 && (
+              {layers.trajectories && replayActive && replayTrajectory.length >= 2 && (
                 <>
                   {isSelected && (
                     <Polyline
@@ -1869,7 +2104,7 @@ function App() {
               )}
 
               {/* NORMAL VESSEL MARKER */}
-              {layers.vessels && !isPlaying && (
+              {layers.vessels && !replayActive && (
                 <Marker
                   position={[
                     Number(vessel.position.latitude),
@@ -1895,7 +2130,7 @@ function App() {
               )}
 
               {/* REPLAY VESSEL MARKER */}
-              {layers.vessels && isPlaying && (
+              {layers.vessels && replayActive && (
                 <Marker
                   position={replayPosition}
                   icon={createVesselIcon({
@@ -2176,12 +2411,18 @@ function App() {
           vessels={scoredVessels}
           isPlaying={isPlaying}
           setIsPlaying={setIsPlaying}
-          replayProgress={replayProgress}
-          setReplayProgress={setReplayProgress}
+          replayProgress={panelProgress}
+          setReplayProgress={setPanelProgress}
           replaySpeed={replaySpeed}
           setReplaySpeed={setReplaySpeed}
           totalPoints={totalReplayPoints}
-          timeLabel={currentOilFrame?.timeLabel}
+          timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : currentOilFrame?.timeLabel}
+          startLabel={simRange ? `${fmtSimClock(simRange.t0)} (window opens)` : undefined}
+          midLabel={simRange && forwardResult ? `${fmtSimClock(Date.parse(forwardResult.release_time_utc))} (est. release)` : undefined}
+          endLabel={simRange ? `${fmtSimClock(simRange.t1)} (observed)` : undefined}
+          forcingTag={simRange ? "BACKEND (OpenDrift)" : undefined}
+          currentFieldDesc={simRange ? "Ocean currents - backend forcing data (OpenDrift)" : undefined}
+          windFieldDesc={simRange ? "Wind field - backend forcing data (OpenDrift)" : undefined}
           onClose={() => {
             setIsPlaying(false);
             setActiveItem("map");
