@@ -58,6 +58,8 @@ import {
   shiftIsoHours,
   assertWithinForcingCoverage,
   getActiveBackendUrl,
+  describeHindcastFailure,
+  describeEmptyMediterraneanAis,
   CANONICAL_INCIDENT_ID,
   CANONICAL_AIS_BBOX,
   CANONICAL_AIS_START,
@@ -1326,6 +1328,7 @@ function App() {
       }
 
       let hc = null;
+      let hindcastNotice = null;
       try {
         setBacktrackStatusText("OpenDrift hindcast…");
         hc = await runHindcast(slick, 6);
@@ -1348,12 +1351,7 @@ function App() {
         });
         setIncident((prev) => ({ ...prev, sourceRegion }));
       } catch (hindcastErr) {
-        const msg = hindcastErr?.message || String(hindcastErr);
-        if (!/hdf|netcdf/i.test(msg)) {
-          setTransposeNotice(`Live OpenDrift unavailable (${msg}). Showing reconstructed drift on the scene.`);
-        } else {
-          setTransposeNotice("Forcing files on the live server are unreadable (NetCDF/HDF). Drift on the map is the reconstructed transport field.");
-        }
+        hindcastNotice = describeHindcastFailure(hindcastErr?.message || String(hindcastErr));
       }
 
       const region = hc?.source_region?.candidate_regions?.[0];
@@ -1372,30 +1370,38 @@ function App() {
       try {
         setBacktrackStatusText("Loading AIS candidates…");
         vessels = await getCandidateVessels(bbox, start, end);
-        setBacktrackStatusText("Ranking candidates…");
-        attribution = await runAttribution(
-          CANONICAL_INCIDENT_ID,
-          hc?.source_region || {
-            id: "sr-med",
-            slick_id: CANONICAL_INCIDENT_ID,
-            generated_at_utc: new Date().toISOString(),
-            candidate_regions: [
-              {
-                id: "local-src",
-                geometry: slick.geometry,
-                centroid: slick.centroid,
-                start_time_utc: start,
-                end_time_utc: end,
-                probability: 0.7,
-              },
-            ],
-          },
-          vessels,
-          10
-        );
+        if (vessels.length) {
+          setBacktrackStatusText("Ranking candidates…");
+          attribution = await runAttribution(
+            CANONICAL_INCIDENT_ID,
+            hc?.source_region || {
+              id: "sr-med",
+              slick_id: CANONICAL_INCIDENT_ID,
+              generated_at_utc: new Date().toISOString(),
+              candidate_regions: [
+                {
+                  id: "local-src",
+                  geometry: slick.geometry,
+                  centroid: slick.centroid,
+                  start_time_utc: start,
+                  end_time_utc: end,
+                  probability: 0.7,
+                },
+              ],
+            },
+            vessels,
+            10
+          );
+        }
       } catch (aisErr) {
-        setTransposeNotice((n) => n || aisErr.message);
+        hindcastNotice = [hindcastNotice, aisErr.message].filter(Boolean).join(" ");
       }
+
+      if (!vessels.length) {
+        hindcastNotice = [hindcastNotice, describeEmptyMediterraneanAis()].filter(Boolean).join(" ");
+      }
+
+      setTransposeNotice(hindcastNotice);
 
       let normalized = vesselsNearCentroid(
         attribution ? normalizeVessels(vessels, attribution) : normalizeVessels(vessels, null),

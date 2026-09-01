@@ -178,7 +178,10 @@ export default function InvestigationList({
           );
         })}
         {!visible.length && (
-          <p className="inv-empty">No vessels match this filter. Run hindcast to load AIS candidates.</p>
+          <p className="inv-empty">
+            No Mediterranean AIS tracks on the live API yet. Run hindcast after the backend Med deploy
+            (MT Cyprus Sun / 211000001). Norway sample ships are not drawn on this scene.
+          </p>
         )}
       </div>
 
