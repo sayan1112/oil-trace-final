@@ -132,16 +132,36 @@ export function cloudPositions(cloud, tMs, out) {
   return res;
 }
 
-export function cloudTrail(cloud, tMs, steps = 14) {
-  if (!cloud?.samples?.length) return [];
-  const now = Number.isFinite(tMs) ? tMs : cloud.t0;
-  const span = Math.max(1, cloud.t1 - cloud.t0);
-  const start = Math.max(cloud.t0, now - span * 0.22);
-  const path = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const t = start + ((now - start) * i) / steps;
-    const c = centroidAt(cloud.samples, t);
-    path.push([c.lon, c.lat]);
+export function overlayFrameFromCloud(cloud, tMs) {
+  if (!cloud?.samples?.length) return { particles: [], trails: [], flowLines: [] };
+  const now = Number.isFinite(tMs)
+    ? Math.min(cloud.t1, Math.max(cloud.t0, tMs))
+    : cloud.t0;
+  const c = centroidAt(cloud.samples, now);
+  const kmLon = KM_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180);
+  const particles = [];
+  for (let i = 0; i < cloud.count; i += 1) {
+    const ang = cloud.parts[i * 4];
+    const rad = cloud.parts[i * 4 + 1];
+    const rKm = rad * 0.55;
+    particles.push({
+      id: i,
+      latitude: c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT,
+      longitude: c.lon + (Math.cos(ang) * rKm) / kmLon,
+      position: [
+        c.lon + (Math.cos(ang) * rKm) / kmLon,
+        c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT,
+      ],
+      radiusPixels: rad < 0.35 ? 1.7 : 1.2,
+      category: rad < 0.35 ? "stranded" : rad < 0.7 ? "active" : "initial",
+    });
   }
-  return path;
+  const trailPath = cloud.samples
+    .filter((sample) => sample.t <= now + 1000)
+    .map((sample) => [sample.lon, sample.lat]);
+  return {
+    particles,
+    trails: trailPath.length >= 2 ? [{ id: "opendrift-path", path: trailPath }] : [],
+    flowLines: [],
+  };
 }
