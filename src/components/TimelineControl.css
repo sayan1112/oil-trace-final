@@ -9,7 +9,7 @@
   gap: 10px;
   padding: 14px 16px 12px;
   border: 0;
-  border-radius: 28px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18px 40px rgba(17, 19, 24, 0.16);
   backdrop-filter: blur(18px);
@@ -36,9 +36,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #4b5563;
+  border-radius: 8px;
+  background: rgba(232, 245, 239, 0.92);
+  border: 1px solid rgba(47, 122, 78, 0.32);
+  color: #1f7a4d;
   font-size: 11px;
   font-weight: 700;
 }

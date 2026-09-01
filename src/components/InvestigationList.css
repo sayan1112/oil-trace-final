@@ -36,8 +36,8 @@
 .inv-link-chip {
   flex-shrink: 0;
   margin-top: 2px;
-  padding: 4px 8px;
-  border-radius: 999px;
+  padding: 4px 10px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 650;
   border: 1px solid #e5e7eb;

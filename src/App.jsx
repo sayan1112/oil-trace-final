@@ -73,7 +73,7 @@ import {
   vesselsNearCentroid,
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
-import { generateOilSimulation } from "./Simulation/oilSimulation";
+import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
 import { displaySpillPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
@@ -944,11 +944,6 @@ function App() {
   const leafletCentroid = centroidFromIncident(incident);
   const spillPolygon = polygonFromIncident(incident);
 
-  const oilSimulation = useMemo(
-    () => generateOilSimulation({ incident }),
-    [incident]
-  );
-
   const simulatedCurrentVectors = useMemo(() => {
     const [clat, clng] = centroidFromIncident(incident);
     if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
@@ -1030,6 +1025,26 @@ function App() {
   const scoredVessels = useMemo(
     () => vesselsNearCentroid(backendVessels || [], incident.centroid),
     [backendVessels, incident]
+  );
+
+  const oilClock = useMemo(() => {
+    const detected = Date.parse(incident.detectedAt);
+    const t1 = Number.isFinite(detected) ? detected : Date.UTC(2024, 7, 26, 12);
+    return { t0: t1 - 6 * 60 * 60 * 1000, t1 };
+  }, [incident]);
+
+  const oilSimulation = useMemo(() => {
+    const vessel =
+      scoredVessels.find((row) => row.candidateRank === 1) || scoredVessels[0];
+    return generateOilSimulation({
+      incident,
+      releaseTrack: trackFromVesselTrajectory(vessel, oilClock.t0, oilClock.t1),
+    });
+  }, [incident, scoredVessels, oilClock]);
+
+  const observedSlickFrame = useMemo(
+    () => buildObservedSlickFrame({ incident }),
+    [incident],
   );
 
   const envSnapshot = useMemo(() => {
@@ -1279,23 +1294,27 @@ function App() {
     return Math.max(0, Math.min(1, replayProgress / maxP));
   }, [replayProgress, totalReplayPoints]);
 
+  const oilProgressRatio = useMemo(() => {
+    if (simRange && Number.isFinite(simMs)) {
+      return Math.max(
+        0,
+        Math.min(1, (simMs - simRange.t0) / Math.max(1, simRange.t1 - simRange.t0)),
+      );
+    }
+    return replayProgressRatio;
+  }, [simRange, simMs, replayProgressRatio]);
+
   const currentOilFrame = useMemo(
-    () => oilSimulation.getFrameByProgress(replayProgressRatio),
-    [oilSimulation, replayProgressRatio]
+    () => oilSimulation.getFrameByProgress(oilProgressRatio),
+    [oilSimulation, oilProgressRatio]
   );
 
-  // Outside Replay mode, show the actual detected-spill state (10:45)
-  // instead of leaving the map on the untouched 10:00 release cluster.
-  // Replay mode then takes over the exact same simulation clock and slider.
-  const detectionOilFrame = useMemo(
-    () => oilSimulation.getFrameByProgress(1),
-    [oilSimulation]
-  );
+  const sceneLive =
+    isPlaying ||
+    replayProgress > 0.02 ||
+    (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
 
-  const displayOilFrame = activeItem === "replay" ? currentOilFrame : detectionOilFrame;
-  // The local illustrative plume is a pre-analysis visual only. Once the
-  // backend pipeline has produced real drift results, hide it — its
-  // hardcoded wind/current constants contradict the OpenDrift output.
+  const displayOilFrame = sceneLive ? currentOilFrame : observedSlickFrame;
   const showLocalPlume = true;
   const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
   const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
@@ -1640,7 +1659,7 @@ function App() {
 
   // Replay visuals are active while playing or whenever the Replay panel is
   // open in time mode (so scrubbing the slider moves vessels live).
-  const replayActive = isPlaying || (activeItem === "replay" && simRange && Number.isFinite(simMs));
+  const replayActive = sceneLive;
 
   // Estimated-release position within the simulation window (0..1).
   const releaseMs = forwardResult ? Date.parse(forwardResult.release_time_utc) : NaN;
@@ -2209,7 +2228,7 @@ function App() {
         })}
 
         {/* SPILL POLYGON */}
-        {layers.spill && spillPolygon.length >= 3 && (
+        {layers.spill && !sceneLive && spillPolygon.length >= 3 && (
           <Polygon
             positions={spillPolygon}
             pathOptions={{
@@ -2260,7 +2279,7 @@ function App() {
         )}
 
         {/* SPILL CENTROID */}
-        {layers.spill && (
+        {layers.spill && !sceneLive && (
           <>
             <CircleMarker
               center={leafletCentroid}
