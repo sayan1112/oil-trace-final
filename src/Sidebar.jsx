@@ -1,4 +1,3 @@
-import { useState } from "react";
 import "./Sidebar.css";
 
 const NAV = [
@@ -101,23 +100,16 @@ function NavIcon({ id }) {
 
 function Sidebar({
   activeItem,
-  layers,
-  onToggleLayer,
   onSelect,
   onTriggerBacktrack,
   backendOnline,
 }) {
-  const [layersOpen, setLayersOpen] = useState(false);
 
   return (
     <aside className="oiltrace-sidebar command-nav" aria-label="OilTrace navigation">
       <div className="sidebar-brand">
         <div className="brand-mark">
           <span />
-        </div>
-        <div className="brand-text">
-          <div className="brand-name">OILTRACE</div>
-          <div className="brand-subtitle">SIH 26143 · NTRO</div>
         </div>
       </div>
 
@@ -146,63 +138,10 @@ function Sidebar({
         ))}
 
         <div className="sidebar-divider" />
-
-        <div className="navigation-section">
-          <button
-            type="button"
-            className={`sidebar-item ${layersOpen ? "active" : ""}`}
-            onClick={() => setLayersOpen((open) => !open)}
-            aria-expanded={layersOpen}
-          >
-            <span className="sidebar-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 4 4 8.5 12 13 20 8.5 12 4Z" />
-                <path d="M4 12 12 16.5 20 12" />
-                <path d="M4 15.5 12 20 20 15.5" />
-              </svg>
-            </span>
-            <span className="sidebar-label">Layers</span>
-            <span className={`layer-chevron ${layersOpen ? "open" : ""}`}>›</span>
-          </button>
-
-          {layersOpen && (
-            <div className="layer-options" id="oiltrace-layer-options">
-              {[
-                ["spill", "Oil plume", "spill-color"],
-                ["oilTrajectory", "Oil trajectory", null],
-                ["backtrack", "Hindcast path", null],
-                ["sourceRegion", "Source region", "source-color"],
-                ["trajectories", "Vessel tracks", "trajectory-color"],
-                ["vessels", "Vessels", "vessel-color"],
-                ["oceanCurrent", "Ocean current", null],
-                ["windField", "Wind field", null],
-                ["detectedSlicks", "Detected slicks", null],
-              ].map(([key, label, colorClass]) => (
-                <label className="layer-option" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(layers?.[key])}
-                    onChange={() => onToggleLayer?.(key)}
-                  />
-                  <span>
-                    <span className={`layer-color ${colorClass || ""}`} />
-                    {label}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
       </nav>
 
       <div className="sidebar-footer command-user">
         <span className={`demo-dot ${backendOnline === false ? "offline" : ""}`} />
-        <div className="brand-text" style={{ opacity: 1, transform: "none", marginLeft: 10 }}>
-          <div className="brand-name" style={{ fontSize: 13, letterSpacing: "0.02em" }}>
-            Duty desk
-          </div>
-          <div className="brand-subtitle">Maritime analyst</div>
-        </div>
       </div>
     </aside>
   );

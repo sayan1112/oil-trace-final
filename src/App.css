@@ -3129,19 +3129,22 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .app.command-center {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 1fr);
   gap: 10px;
   padding: 10px;
+  width: 100%;
+  height: 100%;
   background: #111318;
   font-family: "Plus Jakarta Sans", Inter, "Segoe UI", sans-serif;
 }
 
 .command-shell {
   display: grid;
-  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
   padding: 12px;
   border-radius: 32px;
@@ -3151,15 +3154,18 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .command-stage {
   position: relative;
-  overflow: hidden;
+  min-width: 0;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
   border-radius: 28px;
   background: #ffffff;
   box-shadow: 0 10px 30px rgba(17, 19, 24, 0.06);
 }
 
 .command-stage-track {
-  display: flex;
+  display: grid;
+  grid-template-columns: 50% 50%;
   width: 200%;
   height: 100%;
   transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -3170,7 +3176,8 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-stage-pane {
-  width: 50%;
+  min-width: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden auto;
 }
@@ -3180,6 +3187,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
   background: transparent;
 }
@@ -3214,6 +3222,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   display: flex;
   flex: 1;
   min-height: 0;
+  width: 100%;
 }
 
 .command-detail {
@@ -3228,6 +3237,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   position: relative;
   flex: 1;
   min-width: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden;
   border-radius: 28px;
@@ -3300,13 +3310,49 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   left: auto !important;
   bottom: auto !important;
   width: 100% !important;
-  height: 100%;
-  max-width: none;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  padding: 16px 18px 24px !important;
   border-radius: 0 !important;
   border-left: 0;
   box-shadow: none !important;
   z-index: 2;
   animation: none;
+}
+
+.command-stage .context-section,
+.command-stage .incident-metrics,
+.command-stage .investigation-metrics-grid,
+.command-stage .candidate-overview-section,
+.command-stage .panel-scroll-content {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.oil-legend-chip {
+  position: absolute;
+  left: 14px;
+  bottom: 118px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 24px rgba(17, 19, 24, 0.12);
+  color: #17181c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.oil-legend-chip span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #3a1a08 0%, #b45309 55%, rgba(180, 83, 9, 0) 100%);
 }
 
 .pipeline-status {
@@ -3428,7 +3474,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 @media (max-width: 1100px) {
   .app.command-center {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 84px minmax(0, 1fr);
   }
 
   .command-shell {
