@@ -2128,7 +2128,7 @@ function App() {
               weight: 2,
               opacity: 0.85,
               fillColor: "#1a0c04",
-              fillOpacity: 0.18,
+              fillOpacity: 0.38,
               lineCap: "round",
               lineJoin: "round",
             }}

@@ -269,13 +269,13 @@ class OilCanvasLayer {
     });
     ctx.closePath();
 
-    const fill = ctx.createRadialGradient(cx, cy, 8, cx, cy, Math.max(rx, ry) * 1.15);
-    fill.addColorStop(0, `rgba(12, 8, 4, ${0.78 + pulse * 0.08})`);
-    fill.addColorStop(0.28, `rgba(48, 24, 8, ${0.72 + pulse * 0.06})`);
-    fill.addColorStop(0.55, `rgba(92, 48, 12, ${0.58 + pulse * 0.08})`);
-    fill.addColorStop(0.78, `rgba(164, 108, 28, ${0.38 + pulse * 0.1})`);
-    fill.addColorStop(0.9, `rgba(48, 92, 92, ${0.22 + pulse * 0.08})`);
-    fill.addColorStop(1, `rgba(72, 48, 120, ${0.12 + pulse * 0.06})`);
+    const fill = ctx.createRadialGradient(cx, cy, 4, cx, cy, Math.max(rx, ry) * 1.05);
+    fill.addColorStop(0, `rgba(4, 3, 2, ${0.94 + pulse * 0.03})`);
+    fill.addColorStop(0.22, `rgba(18, 10, 4, ${0.92 + pulse * 0.03})`);
+    fill.addColorStop(0.48, `rgba(42, 22, 8, ${0.88 + pulse * 0.04})`);
+    fill.addColorStop(0.72, `rgba(72, 40, 12, ${0.76 + pulse * 0.05})`);
+    fill.addColorStop(0.88, `rgba(110, 72, 18, ${0.42 + pulse * 0.06})`);
+    fill.addColorStop(1, `rgba(28, 48, 42, ${0.18 + pulse * 0.05})`);
     ctx.fillStyle = fill;
     ctx.fill();
 
@@ -284,8 +284,8 @@ class OilCanvasLayer {
     const b = Math.min(0.92, a + 0.18);
     const iridescence = ctx.createLinearGradient(minX, minY, maxX, maxY);
     iridescence.addColorStop(0, "rgba(40, 180, 170, 0)");
-    iridescence.addColorStop(a, `rgba(56, 210, 190, ${0.16 + pulse * 0.1})`);
-    iridescence.addColorStop(b, `rgba(210, 170, 70, ${0.14 + pulse * 0.08})`);
+    iridescence.addColorStop(a, `rgba(56, 210, 190, ${0.08 + pulse * 0.05})`);
+    iridescence.addColorStop(b, `rgba(210, 170, 70, ${0.07 + pulse * 0.04})`);
     iridescence.addColorStop(1, "rgba(90, 40, 140, 0)");
     ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = iridescence;
