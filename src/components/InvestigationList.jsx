@@ -131,15 +131,23 @@ export default function InvestigationList({
         <div className="inv-assess">
           <div>
             <span>Area</span>
-            <strong>{incident?.areaKm2 ?? "—"} km²</strong>
+            <strong>
+              {incident?.areaKm2 ?? "—"}
+              <i>km²</i>
+            </strong>
           </div>
           <div>
-            <span>Confidence</span>
-            <strong>{confidencePct(incident?.detectionConfidence)}%</strong>
+            <span>Conf.</span>
+            <strong>
+              {confidencePct(incident?.detectionConfidence)}
+              <i>%</i>
+            </strong>
           </div>
           <div>
             <span>Sensor</span>
-            <strong>{incident?.satellite?.sensor || "SAR"}</strong>
+            <strong>
+              {incident?.satellite?.sensor || "SAR"}
+            </strong>
           </div>
         </div>
       </button>
