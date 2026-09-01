@@ -240,8 +240,9 @@
 
 .timeline-counter {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow: hidden;
+  overflow: visible;
   color: #9aa0a8;
   font-size: 11px;
 }

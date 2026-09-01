@@ -275,6 +275,14 @@ function getIncidentPoints() {
    FIT MAP
 ========================================================= */
 
+function pipelineStepIndex(text) {
+  const t = String(text || "").toLowerCase();
+  if (t.includes("ais")) return 1;
+  if (t.includes("rank") || t.includes("attrib")) return 2;
+  if (t.includes("forward") || t.includes("counter")) return 3;
+  return 0;
+}
+
 function MapFill() {
   const map = useMap();
   useEffect(() => {
@@ -406,7 +414,7 @@ function MapToolbar({ onTriggerBacktrack, isBacktracking, storyPoints, scenePoin
         disabled={isBacktracking}
         title="Run hindcast"
       >
-        {isBacktracking ? "Running" : "Hindcast"}
+        {isBacktracking ? "…" : "↩"}
       </button>
 
       <span className="map-tool-divider" />
@@ -2347,15 +2355,22 @@ function App() {
             />
 
             {isBacktracking && (
-              <div className="pipeline-status" role="status">
-                <strong>Pipeline running</strong>
-                <span>{backtrackStatusText || "Connecting to orchestration…"}</span>
-                <ol>
-                  <li>Hindcast</li>
-                  <li>AIS query</li>
-                  <li>Attribution</li>
-                  <li>Forward check</li>
-                </ol>
+              <div className="run-card" role="status">
+                <div className="run-card-head">
+                  <strong>Hindcast</strong>
+                  <span className="run-badge">Running</span>
+                </div>
+                <p>{backtrackStatusText || "Connecting…"}</p>
+                <div className="run-rail" aria-hidden="true">
+                  {["Hindcast", "AIS", "Rank", "Forward"].map((label, index) => (
+                    <span
+                      key={label}
+                      className={index <= pipelineStepIndex(backtrackStatusText) ? "is-on" : ""}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 

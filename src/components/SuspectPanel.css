@@ -289,11 +289,9 @@
 
   color: #94a3b8;
 
-  white-space: nowrap;
+  white-space: normal;
 
-  overflow: hidden;
-
-  text-overflow: ellipsis;
+  overflow: visible;
 
   margin-top: 1px;
 }
@@ -1068,19 +1066,19 @@
 .vessel-title {
   min-width: 0;
 
-  overflow: hidden;
+  overflow: visible;
 
   color: #172235;
 
   font-size: 13px;
 
-  line-height: 1.2;
+  line-height: 1.3;
 
   font-weight: 800;
 
-  white-space: nowrap;
+  white-space: normal;
 
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .vessel-conf-badge {
@@ -1606,11 +1604,11 @@
 .item-name {
   min-width: 0;
 
-  overflow: hidden;
+  overflow: visible;
 
-  text-overflow: ellipsis;
+  white-space: normal;
 
-  white-space: nowrap;
+  word-break: break-word;
 
   font-size: 11px;
 
