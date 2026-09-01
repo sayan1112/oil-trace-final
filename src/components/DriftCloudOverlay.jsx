@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/particles";
+import { buildCloud, cloudPositions, cloudTrail, envelopeRadiusKm } from "../Simulation/particles";
 
 // OpenDrift-style particle clouds for the BACKEND simulations, all driven by
 // the app's ONE master simulation clock (`timeMs`):
@@ -58,9 +58,9 @@ export default function DriftCloudOverlay({
     return buildCloud({
       points,
       timesUtc: forward.trajectory_timestamps_utc,
-      count: 1400,
-      startSpreadKm: 0.25,
-      endSpreadKm: envelopeRadiusKm(forward.predicted_footprint, 2.0),
+      count: 1800,
+      startSpreadKm: 0.18,
+      endSpreadKm: Math.min(2.2, envelopeRadiusKm(forward.predicted_footprint, 1.6)),
       seed: "oiltrace-fwd",
     });
   }, [forward]);
@@ -88,33 +88,46 @@ export default function DriftCloudOverlay({
     const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t } =
       stateRef.current;
     if (!vis || (!bc && !fc)) return;
-    const tMs = Number.isFinite(t) ? t : (fc || bc).t1;
-    const r = Math.max(7, Math.min(22, 5 * Math.pow(1.45, 12 - map.getZoom())));
+    const tMs = Number.isFinite(t) ? t : (fc || bc).t0;
+    const zoom = map.getZoom();
+    const r = Math.max(1.05, Math.min(2.8, 1.15 * Math.pow(1.12, 10.5 - zoom)));
 
-    const drawCloud = (cloud, colors, bufRef) => {
+    const drawCloud = (cloud, fill, bufRef) => {
       const pos = cloudPositions(cloud, tMs, bufRef.current);
       bufRef.current = pos;
-      const step = cloud.count > 900 ? 2 : 1;
-      for (let i = 0; i < cloud.count; i += step) {
-        const p = map.latLngToLayerPoint([pos[i * 2], pos[i * 2 + 1]]);
-        const x = p.x - origin.x;
-        const y = p.y - origin.y;
+      const trail = cloudTrail(cloud, tMs);
+      if (trail.length >= 2) {
+        ctx.beginPath();
+        trail.forEach((pair, index) => {
+          const point = map.latLngToLayerPoint([pair[1], pair[0]]);
+          const x = point.x - origin.x;
+          const y = point.y - origin.y;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = "rgba(92, 54, 12, 0.18)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = fill;
+      for (let i = 0; i < cloud.count; i += 1) {
+        const lat = pos[i * 2];
+        const lng = pos[i * 2 + 1];
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        const point = map.latLngToLayerPoint([lat, lng]);
+        const x = point.x - origin.x;
+        const y = point.y - origin.y;
         if (x < -r || y < -r || x > w + r || y > h + r) continue;
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, colors[0]);
-        g.addColorStop(0.5, colors[1]);
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
     };
 
-    if (fc && tMs >= fc.t0) {
-      drawCloud(fc, ["rgba(28, 12, 4, 0.4)", "rgba(180, 83, 9, 0.16)"], fwdBufRef);
-    } else if (bc) {
-      drawCloud(bc, ["rgba(42, 22, 8, 0.28)", "rgba(146, 64, 14, 0.12)"], backBufRef);
+    if (fc && tMs >= fc.t0 - 1000) {
+      drawCloud(fc, "rgba(92, 42, 12, 0.28)", fwdBufRef);
+    } else if (bc && tMs >= bc.t0) {
+      drawCloud(bc, "rgba(67, 32, 10, 0.22)", backBufRef);
     }
 
     if (fc && rel && tMs >= fc.t0) {
@@ -164,11 +177,11 @@ export default function DriftCloudOverlay({
         .subtract(map._getMapPanePos());
       L.DomUtil.setTransform(canvas, offset, scale);
     };
-    map.on("moveend zoomend viewreset resize", reset);
+    map.on("move moveend zoomend viewreset resize", reset);
     if (map.options.zoomAnimation && L.Browser.any3d) map.on("zoomanim", animateZoom);
     reset();
     return () => {
-      map.off("moveend zoomend viewreset resize", reset);
+      map.off("move moveend zoomend viewreset resize", reset);
       map.off("zoomanim", animateZoom);
       L.DomUtil.remove(canvas);
       canvasRef.current = null;

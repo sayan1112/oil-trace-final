@@ -70,15 +70,22 @@ export function buildCloud({ points, timesUtc, count, startSpreadKm, endSpreadKm
   samples.sort((a, b) => a.t - b.t);
 
   const rnd = mulberry32(hashSeed(seed));
-  const parts = new Float32Array(count * 4); // ang, radial(|gauss|), lagJitter, wobblePhase
+  const parts = new Float32Array(count * 4); // ang, radial, birthFrac, wobblePhase
   for (let i = 0; i < count; i++) {
     parts[i * 4] = rnd() * Math.PI * 2;
-    parts[i * 4 + 1] = Math.min(2.6, Math.abs(gauss(rnd))) * 0.55;
-    parts[i * 4 + 2] = (rnd() - 0.5) * 0.10;
+    parts[i * 4 + 1] = Math.min(1.8, Math.abs(gauss(rnd))) * 0.42;
+    parts[i * 4 + 2] = Math.pow(rnd(), 0.72) * 0.62;
     parts[i * 4 + 3] = rnd() * Math.PI * 2;
   }
-  return { samples, parts, count, startSpreadKm, endSpreadKm,
-    t0: samples[0].t, t1: samples[samples.length - 1].t };
+  return {
+    samples,
+    parts,
+    count,
+    startSpreadKm: Math.min(0.35, Number(startSpreadKm) || 0.2),
+    endSpreadKm: Math.min(2.4, Number(endSpreadKm) || 1.4),
+    t0: samples[0].t,
+    t1: samples[samples.length - 1].t,
+  };
 }
 
 // Centroid position at time t (piecewise-linear over backend timestamps).
@@ -98,19 +105,43 @@ export function cloudPositions(cloud, tMs, out) {
   const { samples, parts, count, startSpreadKm, endSpreadKm, t0, t1 } = cloud;
   const span = Math.max(1, t1 - t0);
   const res = out && out.length === count * 2 ? out : new Float64Array(count * 2);
-  const pGlobal = Math.min(1, Math.max(0, (tMs - t0) / span));
+  const now = Number.isFinite(tMs) ? tMs : t0;
   for (let i = 0; i < count; i++) {
-    const ang = parts[i * 4], rad = parts[i * 4 + 1],
-      lag = parts[i * 4 + 2], ph = parts[i * 4 + 3];
-    const p = Math.min(1, Math.max(0, pGlobal + lag * pGlobal * (1 - pGlobal) * 4));
-    const c = centroidAt(samples, t0 + p * span);
-    // diffusive growth of the cloud radius between the two backend envelopes
-    const spread = startSpreadKm + (endSpreadKm - startSpreadKm) * Math.sqrt(pGlobal);
-    const wob = 1 + 0.16 * Math.sin(ph + pGlobal * 5.2);
+    const ang = parts[i * 4];
+    const rad = parts[i * 4 + 1];
+    const birthFrac = parts[i * 4 + 2];
+    const ph = parts[i * 4 + 3];
+    const birthT = t0 + birthFrac * span;
+    if (now < birthT) {
+      res[i * 2] = Number.NaN;
+      res[i * 2 + 1] = Number.NaN;
+      continue;
+    }
+    // Spread particles along the OpenDrift centroid path from release
+    // to the current clock, so the plume moves with the model.
+    const alongT = t0 + birthFrac * Math.max(0, now - t0);
+    const c = centroidAt(samples, alongT);
+    const age = Math.max(0, Math.min(1, (now - birthT) / span));
+    const spread = startSpreadKm + (endSpreadKm - startSpreadKm) * Math.sqrt(age);
+    const wob = 1 + 0.12 * Math.sin(ph + age * 6.2);
     const rKm = rad * spread * wob;
     const kmLon = KM_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180);
     res[i * 2] = c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT;
     res[i * 2 + 1] = c.lon + (Math.cos(ang) * rKm) / kmLon;
   }
   return res;
+}
+
+export function cloudTrail(cloud, tMs, steps = 14) {
+  if (!cloud?.samples?.length) return [];
+  const now = Number.isFinite(tMs) ? tMs : cloud.t0;
+  const span = Math.max(1, cloud.t1 - cloud.t0);
+  const start = Math.max(cloud.t0, now - span * 0.22);
+  const path = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = start + ((now - start) * i) / steps;
+    const c = centroidAt(cloud.samples, t);
+    path.push([c.lon, c.lat]);
+  }
+  return path;
 }
