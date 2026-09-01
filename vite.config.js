@@ -1,33 +1,41 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    // 5173 is in the backend's CORS allowlist (ALLOWED_ORIGINS).
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      // The ML detection service sends no CORS headers, so the browser can't
-      // call it directly. In dev, Vite proxies /ml-api/* to it server-side.
-      // In production, either add CORS to the ML service or configure the
-      // same rewrite on the static host (and/or set VITE_ML_BASE_URL).
-      "/ml-api": {
-        target: "https://vscimatic999--oiltrace-detection-web.modal.run",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ml-api/, ""),
-      },
-      "/api": {
-        target: "https://vscimatic999--oiltrace-backend-web.modal.run",
-        changeOrigin: true,
-        timeout: 180000,
-      },
-      "/__backend-fallback": {
-        target: "https://vscimatic999--oiltrace-backend-web.modal.run",
-        changeOrigin: true,
-        timeout: 180000,
-        rewrite: (path) => path.replace(/^\/__backend-fallback/, ""),
-      },
+function originFromApiBase(raw, fallback) {
+  const value = String(raw || fallback || "").trim();
+  return value.replace(/\/api\/v1\/?$/i, "").replace(/\/$/, "") || fallback;
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const localBackend = originFromApiBase(
+    env.VITE_BACKEND_PROXY_TARGET || env.VITE_API_BASE_URL || env.VITE_BACKEND_PRIMARY_URL,
+    "http://localhost:8000"
+  );
+  const useModalMl = env.VITE_USE_MODAL_ML === "true";
+
+  const proxy = {
+    "/api": {
+      target: localBackend,
+      changeOrigin: true,
+      timeout: 180000,
     },
-  },
+  };
+
+  if (useModalMl) {
+    proxy["/ml-api"] = {
+      target: "https://vscimatic999--oiltrace-detection-web.modal.run",
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/ml-api/, ""),
+    };
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 5173,
+      strictPort: true,
+      proxy,
+    },
+  };
 });

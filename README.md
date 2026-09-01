@@ -21,19 +21,29 @@ The map camera and oil particle layer are isolated from vessel-selection UI stat
 
 ## Backend integration (OilTrace)
 
-All analytical outputs are live from the OilTrace backend (`src/services/api.js`
-+ `src/services/backendApi.js`). Axios tries
-`https://vscimatic999--oiltrace-backend-web.modal.run`, then failovers to
-`https://sih-oil-spill-26143-backend.onrender.com`.
-"Run hindcast" executes hindcast (OpenDrift, 6 hours) → AIS query → attribution →
-forward simulation → counterfactual. Override hosts with
-`VITE_BACKEND_PRIMARY_URL` / `VITE_BACKEND_FALLBACK_URL` (see `.env.example`).
+Local development talks to a backend on your machine. Production talks to Modal.
 
-The ML detection service has no CORS headers, so the browser reaches it through
-the `/ml-api` dev proxy (vite.config.js). In production, add CORS to the ML
-service or replicate the rewrite on the static host (or set `VITE_ML_BASE_URL`).
+| Mode | Command | API |
+|---|---|---|
+| Development | `npm run dev` | `http://localhost:8000/api/v1` (Vite proxies `/api` → localhost:8000) |
+| Production build | `npm run build` | `https://vscimatic999--oiltrace-backend-web.modal.run/api/v1` |
 
-The canonical SIH demo is Eastern Mediterranean / Cyprus (`incident-mediterranean-001`,
-centroid 35.63533°N, 34.87040°E). The map is seeded from ML detection (Oil/00067);
-source region, AIS ranking, forward drift, and replay come from the backend API.
-Do not use Norway/Mumbai regression fixtures as the frontend demo.
+Start the FastAPI app from the **backend** repo (not this frontend repo):
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Config lives in `.env.development` / `.env.production` (`VITE_API_BASE_URL`).
+Axios does **not** fail over to Modal during `npm run dev`, so local work does not
+consume Modal credits. Override with `.env.local` if needed (see `.env.example`).
+
+"Run hindcast" executes hindcast → AIS → attribution → forward → counterfactual
+against whichever host the env points at. The map shows coordinates returned by
+that API.
+
+The ML detection demo on Modal is **off** in local development (`VITE_USE_MODAL_ML=false`).
+Set it to `true` only if you explicitly want the Modal ML scene.
+
+The canonical SIH demo is Eastern Mediterranean / Cyprus (`incident-mediterranean-001`).
+Source region, AIS ranking, forward drift, and replay come from the backend API.
