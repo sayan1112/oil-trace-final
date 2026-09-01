@@ -1789,7 +1789,8 @@ function App() {
                 </div>
                 <div className="oil-legend-chip">
                   <span aria-hidden="true" />
-                  {showBackendOil ? "Oil sheen from hindcast" : "Detected oil slick"}
+                  Detected oil slick
+
                 </div>
               </div>
               <div className="command-head-actions">
@@ -1901,12 +1902,13 @@ function App() {
           </Fragment>
         ))}
 
-        {/* OIL PARTICLE FIELD (LAGRANGIAN PARTICLE DOTS — Leaflet canvas) */}
-        {layers.spill && !showBackendOil && (
+        {/* OIL SHEEN (SAR footprint + Lagrangian particles — Leaflet canvas) */}
+        {layers.spill && (
           <DeckOilOverlay
             enabled
             particles={currentOilParticles}
             trails={currentOilTrails}
+            polygon={spillPolygon}
           />
         )}
 
@@ -2122,11 +2124,11 @@ function App() {
           <Polygon
             positions={spillPolygon}
             pathOptions={{
-              color: "#5c3a12",
-              weight: 1.2,
-              opacity: 0.4,
-              fillColor: "#2a1608",
-              fillOpacity: showBackendOil ? 0.08 : 0.22,
+              color: "#d4a017",
+              weight: 2,
+              opacity: 0.85,
+              fillColor: "#1a0c04",
+              fillOpacity: 0.38,
               lineCap: "round",
               lineJoin: "round",
             }}

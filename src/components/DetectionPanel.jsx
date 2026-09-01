@@ -104,6 +104,11 @@ export function DetectionPanel({
     setStatus("loading-demo");
     setError(null);
     try {
+      if (import.meta.env.VITE_USE_MODAL_ML !== "true") {
+        throw new Error(
+          "Modal ML demo is off in local development. The Mediterranean incident is already loaded from incident.json. Set VITE_USE_MODAL_ML=true only if you want the Modal detection service.",
+        );
+      }
       const geojson = await fetchDemoDetection();
       setResult(geojson);
       setStatus("success");
@@ -125,8 +130,12 @@ export function DetectionPanel({
         let geojson;
         try {
           geojson = await detectViaBackend(file);
-        } catch {
-          geojson = await runLiveDetection(file);
+        } catch (backendError) {
+          if (import.meta.env.VITE_USE_MODAL_ML === "true") {
+            geojson = await runLiveDetection(file);
+          } else {
+            throw backendError;
+          }
         }
         setResult(geojson);
         setStatus("success");
