@@ -58,10 +58,10 @@ export default function InvestigationList({
   const lon = Number(incident?.centroid?.longitude ?? incident?.location?.longitude);
   const linkLabel =
     backendOnline === true
-      ? "Orchestration online"
+      ? "Live"
       : backendOnline === false
-        ? "Orchestration offline"
-        : "Checking orchestration";
+        ? "Offline"
+        : "Checking";
 
   return (
     <section className="inv-list" aria-label="Investigation queue">

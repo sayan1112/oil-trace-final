@@ -3128,9 +3128,34 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .app.command-center {
   display: grid;
-  grid-template-columns: 232px 340px minmax(0, 1fr);
-  background: #0e1014;
+  grid-template-columns: 232px 360px minmax(0, 1fr);
+  background: #eef1f4;
   font-family: "IBM Plex Sans", Inter, "Segoe UI", sans-serif;
+}
+
+.command-stage {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+}
+
+.command-stage-track {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.command-stage.is-detail .command-stage-track {
+  transform: translateX(-50%);
+}
+
+.command-stage-pane {
+  width: 50%;
+  height: 100%;
+  overflow: hidden auto;
 }
 
 .command-workspace {
@@ -3139,7 +3164,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: #121418;
+  background: #f7f8fa;
 }
 
 .command-workspace-head {
@@ -3148,14 +3173,15 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #2a2e36;
-  background: #16181d;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
 }
 
 .command-workspace-head h1 {
   margin: 0;
   font-size: 16px;
   font-weight: 650;
+  color: #1a1d23;
 }
 
 .command-head-actions {
@@ -3166,12 +3192,18 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .head-chip {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #2f343c;
+  border: 1px solid #e5e7eb;
   border-radius: 999px;
-  background: transparent;
-  color: #d7dbe2;
+  background: #fff;
+  color: #374151;
   font-size: 12px;
   cursor: pointer;
+}
+
+.head-chip.is-active {
+  background: #f0c14b;
+  border-color: #f0c14b;
+  color: #1a1404;
 }
 
 .command-workspace-main {
@@ -3181,13 +3213,11 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-detail {
-  width: 400px;
-  flex: 0 0 400px;
+  width: 100%;
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  border-right: 1px solid #2a2e36;
-  background: #16181d;
+  background: #ffffff;
 }
 
 .command-map-wrap {
@@ -3204,11 +3234,17 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   height: 100%;
 }
 
+.command-center .leaflet-container {
+  background: #dce5ed;
+}
+
 .command-center .oiltrace-context-panel,
 .command-center .oiltrace-replay-panel,
 .command-center .oiltrace-vessel-panel,
 .command-center .evidence-panel,
-.command-center .suspect-panel {
+.command-center .suspect-panel,
+.command-center .detection-panel,
+.command-center .incident-panel {
   position: relative !important;
   inset: auto !important;
   top: auto !important;
@@ -3232,10 +3268,11 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   z-index: 1200;
   width: 280px;
   padding: 14px;
-  border: 1px solid #2f343c;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  background: #16181d;
-  color: #d7dbe2;
+  background: #ffffff;
+  color: #1a1d23;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
 }
 
 .pipeline-status strong {
@@ -3246,7 +3283,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .pipeline-status span {
   display: block;
-  color: #9aa1ab;
+  color: #6b7280;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -3254,7 +3291,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .pipeline-status ol {
   margin: 10px 0 0;
   padding-left: 18px;
-  color: #8b939e;
+  color: #8a9099;
   font-size: 11px;
 }
 
@@ -3272,15 +3309,15 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .ops-toast.warn {
-  background: #2a2210;
-  border: 1px solid #6b5420;
-  color: #e6c15a;
+  background: #fff8e8;
+  border: 1px solid #f0d48a;
+  color: #7a5b00;
 }
 
 .ops-toast.error {
-  background: #2a1616;
-  border: 1px solid #6b3333;
-  color: #e08b8b;
+  background: #fff1f1;
+  border: 1px solid #f0c7c7;
+  color: #b42318;
 }
 
 .ops-toast button {
@@ -3294,6 +3331,13 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .command-center .oiltrace-map-toolbar {
   top: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: #e5e7eb;
+}
+
+.command-center .map-tool-button.backtrack-tool-button {
+  background: #111318;
+  color: #fff;
 }
 
 @media (max-width: 1100px) {
@@ -3301,7 +3345,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
     grid-template-columns: 72px minmax(0, 1fr);
   }
 
-  .inv-list {
+  .command-stage {
     display: none;
   }
 }

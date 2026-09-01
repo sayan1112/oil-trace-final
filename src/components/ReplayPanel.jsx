@@ -14,29 +14,17 @@ function ReplayPanel({
   timeLabel,
   currentFieldDesc = "SIMULATED CURRENT (WESTWARD 0.3 m/s)",
   windFieldDesc = "SIMULATED WIND (NNW 5.2 m/s)",
-  startLabel = "10:00 (T-45m)",
-  midLabel = "10:45 (Spill)",
-  endLabel = "11:15 (T+30m)",
+  startLabel = "Start",
+  midLabel = "Detected",
+  endLabel = "End",
   forcingTag = "SIMULATED",
   releaseFrac,
 }) {
-  const START_MINUTES = 10 * 60; // 10:00
-  const END_MINUTES = 11 * 60 + 15; // 11:15
-
   const maxProgress = Math.max(1, totalPoints - 1);
   const normalizedProgress = Math.max(0, Math.min(replayProgress, maxProgress));
   const progressPercent = (normalizedProgress / maxProgress) * 100;
 
-  const replayMinutes =
-    START_MINUTES + ((END_MINUTES - START_MINUTES) * normalizedProgress) / maxProgress;
-
-  const formatTime = (minutes) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-  };
-
-  const computedTime = useMemo(() => timeLabel || formatTime(replayMinutes), [timeLabel, replayMinutes]);
+  const computedTime = useMemo(() => timeLabel || "—", [timeLabel]);
 
   const togglePlaying = () => {
     if (normalizedProgress >= maxProgress) {
@@ -80,7 +68,7 @@ function ReplayPanel({
 
       <div className="replay-time-card">
         <div className="replay-current-time">
-          <span className="replay-time-label">REPLAY / SIMULATION TIME</span>
+          <span className="replay-time-label">SCENE CLOCK</span>
           <strong>{computedTime} UTC</strong>
         </div>
 

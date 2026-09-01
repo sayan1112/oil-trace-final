@@ -3,9 +3,8 @@
   flex-direction: column;
   min-width: 0;
   height: 100%;
-  background: #16181d;
-  border-right: 1px solid #2a2e36;
-  color: #e8eaed;
+  background: #ffffff;
+  color: #1a1d23;
 }
 
 .inv-list-header {
@@ -18,7 +17,7 @@
 
 .inv-kicker {
   margin: 0 0 4px;
-  color: #8b939e;
+  color: #8a9099;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -39,20 +38,21 @@
   border-radius: 999px;
   font-size: 10px;
   font-weight: 650;
-  border: 1px solid #3a3f48;
-  color: #c5cad1;
+  border: 1px solid #e5e7eb;
+  color: #5b616b;
+  background: #f8fafc;
 }
 
 .inv-link-chip.ok {
-  border-color: #2f6b4f;
-  background: #163226;
-  color: #7dcea0;
+  border-color: #b7e4c7;
+  background: #ecfdf3;
+  color: #157a3c;
 }
 
 .inv-link-chip.bad {
-  border-color: #6b3333;
-  background: #2a1616;
-  color: #e08b8b;
+  border-color: #f0c7c7;
+  background: #fff1f1;
+  color: #b42318;
 }
 
 .inv-search {
@@ -68,7 +68,7 @@
   height: 16px;
   transform: translateY(-50%);
   fill: none;
-  stroke: #8b939e;
+  stroke: #8a9099;
   stroke-width: 1.8;
 }
 
@@ -76,15 +76,16 @@
   width: 100%;
   height: 40px;
   padding: 0 12px 0 36px;
-  border: 1px solid #2f343c;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  background: #101217;
-  color: #f3f4f6;
+  background: #f8fafc;
+  color: #1a1d23;
   outline: none;
 }
 
 .inv-search input:focus {
-  border-color: #c9a227;
+  border-color: #f0c14b;
+  background: #fff;
 }
 
 .inv-filters {
@@ -98,18 +99,18 @@
   flex: 0 0 auto;
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #2f343c;
+  border: 1px solid #e5e7eb;
   border-radius: 999px;
-  background: transparent;
-  color: #b7bcc4;
+  background: #fff;
+  color: #4b5563;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .inv-filters button.is-active {
-  background: #c9a227;
-  border-color: #c9a227;
+  background: #f0c14b;
+  border-color: #f0c14b;
   color: #1a1404;
 }
 
@@ -119,18 +120,19 @@
   width: calc(100% - 36px);
   margin: 0 18px 10px;
   padding: 14px;
-  border: 1px solid #2a2e36;
-  border-radius: 14px;
-  background: #1c1f26;
+  border: 1px solid #eceff3;
+  border-radius: 16px;
+  background: #fff;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .inv-vessel-card.is-selected,
 .inv-case-card:hover,
 .inv-vessel-card:hover {
-  border-color: #c9a227;
+  border-color: #f0c14b;
 }
 
 .inv-case-top {
@@ -155,18 +157,18 @@
 
 .inv-badge.investigating,
 .inv-badge.in-transit {
-  background: #1d3a5c;
-  color: #8ec0ff;
+  background: #fff4cc;
+  color: #8a6d00;
 }
 
 .inv-badge.queued {
-  background: #3a2e12;
-  color: #e6c15a;
+  background: #e8f1ff;
+  color: #1d4ed8;
 }
 
 .inv-badge.delivered {
-  background: #1c3b2c;
-  color: #7dcea0;
+  background: #ecfdf3;
+  color: #157a3c;
 }
 
 .inv-route {
@@ -174,7 +176,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 10px;
-  color: #9aa1ab;
+  color: #6b7280;
   font-size: 12px;
 }
 
@@ -191,7 +193,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
-  color: #8b939e;
+  color: #8a9099;
   font-size: 11px;
 }
 
@@ -204,18 +206,18 @@
 
 .inv-action {
   height: 36px;
-  border: 1px solid #2f343c;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #101217;
-  color: #e8eaed;
+  background: #fff;
+  color: #1a1d23;
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
 }
 
 .inv-action.primary {
-  background: #c9a227;
-  border-color: #c9a227;
+  background: #f0c14b;
+  border-color: #f0c14b;
   color: #1a1404;
 }
 
@@ -228,7 +230,7 @@
   display: flex;
   justify-content: space-between;
   padding: 4px 18px 8px;
-  color: #8b939e;
+  color: #8a9099;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -255,8 +257,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #2a3140;
-  color: #d7dde6;
+  background: #eef1f5;
+  color: #334155;
   font-size: 12px;
   font-weight: 700;
 }
@@ -267,13 +269,13 @@
 }
 
 .inv-person small {
-  color: #8b939e;
+  color: #8a9099;
   font-size: 11px;
 }
 
 .inv-empty {
   margin: 8px 18px;
-  color: #8b939e;
+  color: #8a9099;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -281,11 +283,11 @@
 .inv-host {
   margin: 0;
   padding: 10px 18px 14px;
-  color: #6d7480;
+  color: #9aa1ab;
   font-size: 10px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-top: 1px solid #2a2e36;
+  border-top: 1px solid #eceff3;
 }

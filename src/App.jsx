@@ -65,6 +65,7 @@ import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
+import { backtrackOil } from "./Simulation/backtracking";
 import { warmDetectionService } from "./services/detectionApi";
 
 /* =========================================================
@@ -355,7 +356,7 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
    MAP TOOLBAR
 ========================================================= */
 
-function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktracking, storyPoints, scenePoints }) {
+function MapToolbar({ onTriggerBacktrack, isBacktracking, storyPoints, scenePoints }) {
   const map = useMap();
 
   const fitTo = (points) => {
@@ -389,22 +390,9 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
         className="map-tool-button backtrack-tool-button"
         onClick={onTriggerBacktrack}
         disabled={isBacktracking}
-        title="Backtrack Oil Spill Source"
-        aria-label="Backtrack Oil Spill Source"
-        style={{
-          background: isBacktracking ? "#0284c7" : "linear-gradient(135deg, #0284c7, #0f766e)",
-          color: "#ffffff",
-          fontWeight: 600,
-          padding: "0 0.85rem",
-          width: "auto",
-          borderRadius: "6px",
-          gap: "0.4rem",
-          display: "flex",
-          alignItems: "center",
-          boxShadow: "0 2px 8px rgba(2, 132, 199, 0.4)",
-        }}
+        title="Run hindcast"
       >
-        <span>{isBacktracking ? "Running" : "Hindcast"}</span>
+        {isBacktracking ? "Running" : "Hindcast"}
       </button>
 
       <span className="map-tool-divider" />
@@ -479,33 +467,6 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
         </svg>
       </button>
 
-      <span className="map-tool-divider" />
-
-      <button
-        type="button"
-        className="map-tool-button theme-tool-button"
-        onClick={onToggleTheme}
-        title={darkMode ? "Switch to light theme" : "Switch to dark theme"}
-        aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
-      >
-        {darkMode ? (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2" />
-            <path d="M12 20v2" />
-            <path d="m4.93 4.93 1.41 1.41" />
-            <path d="m17.66 17.66 1.41 1.41" />
-            <path d="M2 12h2" />
-            <path d="M20 12h2" />
-            <path d="m4.93 19.07 1.41-1.41" />
-            <path d="m17.66 6.34 1.41-1.41" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
-          </svg>
-        )}
-      </button>
     </div>
   );
 }
@@ -1101,18 +1062,7 @@ function App() {
   ======================================================= */
 
   const [activeItem, setActiveItem] = useState("map");
-
-  const [darkMode, setDarkMode] = useState(true);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("oiltrace-theme", darkMode ? "dark" : "light");
-    } catch {
-      // Ignore
-    }
-    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
-    document.body.dataset.theme = darkMode ? "dark" : "light";
-  }, [darkMode]);
+  const [mapStyle, setMapStyle] = useState("map");
 
   /* =======================================================
      SELECTED VESSEL
@@ -1224,7 +1174,7 @@ function App() {
   // The local illustrative plume is a pre-analysis visual only. Once the
   // backend pipeline has produced real drift results, hide it — its
   // hardcoded wind/current constants contradict the OpenDrift output.
-  const showLocalPlume = !backtrackResult;
+  const showLocalPlume = true;
   const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
   const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
   const currentOilFlowLines = showLocalPlume ? displayOilFrame?.flowLines || [] : [];
@@ -1283,7 +1233,7 @@ function App() {
     if (isBacktracking) return;
 
     setBacktrackVisible(true);
-    setActiveItem("backtrack");
+    setActiveItem("map");
     setIsBacktracking(true);
     setBackendError(null);
 
@@ -1339,44 +1289,94 @@ function App() {
       setForwardResult(null);
       setCounterfactualResult(null);
 
-      setBacktrackStatusText("Backend hindcast: OpenDrift backward simulation...");
-      const hc = await runHindcast(slick, 2);
-      const sourceRegion = sourceRegionForFrontend(hc.source_region);
-      setBacktrackResult({
-        sourceRegion,
-        sourceEstimate: {
-          latitude: sourceRegion.center.latitude,
-          longitude: sourceRegion.center.longitude,
+      setBacktrackStatusText("Reconstructing oil transport…");
+      const local = backtrackOil({
+        incident,
+        centroid: {
+          latitude: slick.centroid.lat,
+          longitude: slick.centroid.lon,
         },
-        confidence: sourceRegion.confidence,
-        uncertainty: {
-          radiusMeters: sourceRegion.radiusMeters,
-          radiusKm: Number((sourceRegion.radiusMeters / 1000).toFixed(2)),
-          confidence: sourceRegion.confidence,
-          particleConvergence: "Backend OpenDrift hindcast",
-        },
-        trajectory: trajectoryPoints(hc.backward_trajectory),
-        backend: hc,
       });
+      if (local) {
+        setBacktrackResult(local);
+        setBacktrackVisible(true);
+      }
 
-      setBacktrackStatusText("Querying AIS vessels near the source region...");
-      const region = hc.source_region?.candidate_regions?.[0];
-      const bbox = bboxFromGeometry(region?.geometry, 0.6);
+      let hc = null;
+      try {
+        setBacktrackStatusText("OpenDrift hindcast…");
+        hc = await runHindcast(slick, 1);
+        const sourceRegion = sourceRegionForFrontend(hc.source_region);
+        setBacktrackResult({
+          sourceRegion,
+          sourceEstimate: {
+            latitude: sourceRegion.center.latitude,
+            longitude: sourceRegion.center.longitude,
+          },
+          confidence: sourceRegion.confidence,
+          uncertainty: {
+            radiusMeters: sourceRegion.radiusMeters,
+            radiusKm: Number((sourceRegion.radiusMeters / 1000).toFixed(2)),
+            confidence: sourceRegion.confidence,
+            particleConvergence: "Backend OpenDrift hindcast",
+          },
+          trajectory: trajectoryPoints(hc.backward_trajectory),
+          backend: hc,
+        });
+      } catch (hindcastErr) {
+        const msg = hindcastErr?.message || String(hindcastErr);
+        if (!/hdf|netcdf/i.test(msg)) {
+          setTransposeNotice(`Live OpenDrift unavailable (${msg}). Showing reconstructed drift on the scene.`);
+        } else {
+          setTransposeNotice("Forcing files on the live server are unreadable (NetCDF/HDF). Drift on the map is the reconstructed transport field.");
+        }
+      }
+
+      const region = hc?.source_region?.candidate_regions?.[0];
+      const bbox = region?.geometry
+        ? bboxFromGeometry(region.geometry, 0.6)
+        : [
+            slick.centroid.lon - 0.6,
+            slick.centroid.lat - 0.6,
+            slick.centroid.lon + 0.6,
+            slick.centroid.lat + 0.6,
+          ].join(",");
       const start = shiftIsoHours(region?.start_time_utc || slick.timestamp_utc, -12);
       const end = shiftIsoHours(region?.end_time_utc || slick.timestamp_utc, 12);
-      const vessels = await getCandidateVessels(bbox, start, end);
 
-      setBacktrackStatusText("Ranking candidates (backend attribution engine)...");
-      const attribution = await runAttribution(
-        slick.id || incident.id,
-        hc.source_region,
-        vessels,
-        15
-      );
-      let normalized = normalizeVessels(vessels, attribution);
+      let vessels = [];
+      let attribution = null;
+      try {
+        setBacktrackStatusText("Loading AIS candidates…");
+        vessels = await getCandidateVessels(bbox, start, end);
+        setBacktrackStatusText("Ranking candidates…");
+        attribution = await runAttribution(
+          slick.id || incident.id,
+          hc?.source_region || {
+            incident_id: slick.id || incident.id,
+            candidate_regions: [
+              {
+                id: "local-src",
+                geometry: slick.geometry,
+                centroid: slick.centroid,
+                start_time_utc: start,
+                end_time_utc: end,
+                probability: 0.7,
+              },
+            ],
+          },
+          vessels,
+          15
+        );
+      } catch (aisErr) {
+        setTransposeNotice((n) => n || aisErr.message);
+      }
+
+      let normalized = attribution ? normalizeVessels(vessels, attribution) : [];
 
       const top = attribution?.top_candidates?.[0];
-      if (top?.forward_request) {
+      try {
+        if (hc && top?.forward_request) {
         setBacktrackStatusText("Forward simulation from estimated release...");
         const fwd = await runForwardSimulation(top.forward_request);
         setForwardResult(fwd);
@@ -1411,16 +1411,22 @@ function App() {
         setForwardResult(null);
         setCounterfactualResult(null);
       }
+      } catch {
+        setForwardResult(null);
+        setCounterfactualResult(null);
+      }
 
-      setBackendVessels(
-        normalized.map((v) => ({
-          ...v,
-          scoring: buildFrontendScoring(v),
-        }))
-      );
+      if (normalized.length) {
+        setBackendVessels(
+          normalized.map((v) => ({
+            ...v,
+            scoring: buildFrontendScoring(v),
+          }))
+        );
+      }
       // Start the synced replay (particle cloud + vessels) from the top of
       // the simulation window.
-      const simTs = (hc.trajectory_timestamps_utc || [])
+      const simTs = (hc?.trajectory_timestamps_utc || [])
         .map((t) => Date.parse(t))
         .filter(Number.isFinite);
       if (simTs.length) {
@@ -1431,7 +1437,6 @@ function App() {
       setBackendHost(getActiveBackendUrl());
     } catch (err) {
       setBackendError(err?.message || String(err));
-      setBackendOnline(false);
     } finally {
       setIsBacktracking(false);
       setBacktrackStatusText("");
@@ -1565,17 +1570,9 @@ function App() {
 
   const handleNavigation = (item) => {
     setActiveItem(item);
-
-    // Backtrack graphics belong only to the Backtrack investigation mode.
-    // Opening Replay, Legend, Incident, Vessels, Evidence, or Map hides them.
-    if (item !== "backtrack") {
-      setBacktrackVisible(false);
-    }
-
     if (["map", "incident", "vessels", "legend", "evidence", "tools", "replay", "detect"].includes(item)) {
       setIsPlaying(false);
     }
-
     if (item === "map") {
       setSelectedVesselId(null);
     }
@@ -1586,7 +1583,7 @@ function App() {
     setActiveItem("map");
   };
 
-  const appThemeClass = darkMode ? "app-dark" : "app-light";
+  const appThemeClass = "app-light";
 
   // Backend investigation layers stay visible while replaying, not only in
   // the explicit Backtrack tool view.
@@ -1610,10 +1607,28 @@ function App() {
   ======================================================= */
 
   const showDetail = ["incident", "vessels", "legend", "replay", "evidence", "detect"].includes(activeItem);
-  const timelineStamps = (incident.timeline || []).map((event) => event.time);
+  const closePanel = () => setActiveItem("map");
+  const detectedAt = new Date(incident.detectedAt);
+  const timelineStamps = (incident.timeline || []).map((event) => {
+    const [hh, mm] = String(event.time).split(":").map(Number);
+    const d = new Date(detectedAt);
+    if (Number.isFinite(hh)) d.setUTCHours(hh, Number.isFinite(mm) ? mm : 0, 0, 0);
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }) + " UTC";
+  });
+  const timelineEvents = (incident.timeline || []).map((event, i) => ({
+    time: timelineStamps[i],
+    label: event.label,
+  }));
   const timelineIndex = simRange && Number.isFinite(simMs)
     ? Math.round(((simMs - simRange.t0) / (simRange.t1 - simRange.t0)) * Math.max(1, timelineStamps.length - 1))
-    : Math.round(replayProgress);
+    : Math.min(timelineStamps.length - 1, Math.max(0, Math.round(replayProgress)));
 
   return (
     <div className={`app command-center ${appThemeClass}`}>
@@ -1623,48 +1638,32 @@ function App() {
         onToggleLayer={toggleLayer}
         onSelect={handleNavigation}
         onTriggerBacktrack={handleRunBacktrack}
-        darkMode={darkMode}
         backendOnline={backendOnline}
       />
 
-      <InvestigationList
-        incident={incident}
-        vessels={scoredVessels}
-        detectionCount={detectionResult?.features?.length || 0}
-        selectedVesselId={selectedVesselId}
-        onSelectVessel={handleSelectVessel}
-        onOpenIncident={() => setActiveItem("incident")}
-        onOpenDetect={() => setActiveItem("detect")}
-        onRunHindcast={handleRunBacktrack}
-        isBacktracking={isBacktracking}
-        backendOnline={backendOnline}
-        backendHost={backendHost}
-      />
-
-      <div className="command-workspace">
-        <header className="command-workspace-head">
-          <div>
-            <p className="inv-kicker">{incident.id}</p>
-            <h1>{incident.spillType}</h1>
+      <div className={`command-stage ${showDetail ? "is-detail" : ""}`}>
+        <div className="command-stage-track">
+          <div className="command-stage-pane">
+            <InvestigationList
+              incident={incident}
+              vessels={scoredVessels}
+              detectionCount={detectionResult?.features?.length || 0}
+              selectedVesselId={selectedVesselId}
+              onSelectVessel={handleSelectVessel}
+              onOpenIncident={() => setActiveItem("incident")}
+              onOpenDetect={() => setActiveItem("detect")}
+              onRunHindcast={handleRunBacktrack}
+              isBacktracking={isBacktracking}
+              backendOnline={backendOnline}
+              backendHost={backendHost}
+            />
           </div>
-          <div className="command-head-actions">
-            <button type="button" className="head-chip" onClick={() => setDarkMode((v) => !v)}>
-              {darkMode ? "Dark map" : "Light map"}
-            </button>
-            <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
-              Layers
-            </button>
-          </div>
-        </header>
-
-        <div className="command-workspace-main">
-          {showDetail && (
-            <div className="command-detail">
+          <div className="command-stage-pane command-detail">
               {activeItem === "incident" && (
                 <IncidentPanel
                   vessels={scoredVessels}
                   onSelectVessel={handleSelectVessel}
-                  onClose={() => setActiveItem("map")}
+                  onClose={closePanel}
                   onTriggerBacktrack={handleRunBacktrack}
                   isBacktracking={isBacktracking}
                 />
@@ -1678,7 +1677,7 @@ function App() {
                 />
               )}
               {activeItem === "legend" && (
-                <LegendPanel onClose={() => setActiveItem("map")} />
+                <LegendPanel onClose={closePanel} />
               )}
               {activeItem === "replay" && (
                 <ReplayPanel
@@ -1703,7 +1702,7 @@ function App() {
                   windFieldDesc={simRange ? "Wind field from backend forcing" : undefined}
                   onClose={() => {
                     setIsPlaying(false);
-                    setActiveItem("map");
+                    closePanel();
                   }}
                 />
               )}
@@ -1716,16 +1715,45 @@ function App() {
               {activeItem === "detect" && (
                 <DetectionPanel
                   onDetectionResult={handleDetectionResult}
-                  onClose={() => setActiveItem("map")}
+                  onClose={closePanel}
                   onSeedOverride={handleSeedOverride}
                   onClearSeed={handleClearSeed}
                   activeSeedId={activeSeedId}
                   currentResult={detectionResult}
                 />
               )}
-            </div>
-          )}
+          </div>
+        </div>
+      </div>
 
+      <div className="command-workspace">
+        <header className="command-workspace-head">
+          <div>
+            <p className="inv-kicker">{incident.id}</p>
+            <h1>{incident.spillType}</h1>
+          </div>
+          <div className="command-head-actions">
+            <button
+              type="button"
+              className={`head-chip ${mapStyle === "map" ? "is-active" : ""}`}
+              onClick={() => setMapStyle("map")}
+            >
+              Map
+            </button>
+            <button
+              type="button"
+              className={`head-chip ${mapStyle === "satellite" ? "is-active" : ""}`}
+              onClick={() => setMapStyle("satellite")}
+            >
+              Satellite
+            </button>
+            <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
+              Layers
+            </button>
+          </div>
+        </header>
+
+        <div className="command-workspace-main">
           <div className="command-map-wrap">
       <MapContainer
         center={leafletCentroid}
@@ -1739,13 +1767,13 @@ function App() {
         {/* BASE MAP */}
         <TileLayer
           attribution={
-            darkMode
+            mapStyle === "satellite"
               ? "Tiles © Esri"
               : "© OpenStreetMap contributors"
           }
           url={
-            darkMode
-              ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+            mapStyle === "satellite"
+              ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           }
           maxZoom={19}
@@ -2037,11 +2065,11 @@ function App() {
           <Polygon
             positions={spillPolygon}
             pathOptions={{
-              color: "#ef4444",
-              weight: 2,
-              opacity: 0.9,
-              fillColor: "#ef4444",
-              fillOpacity: 0.08,
+              color: "#5c3a12",
+              weight: 1.5,
+              opacity: 0.55,
+              fillColor: "#1a1208",
+              fillOpacity: 0.18,
               lineCap: "round",
               lineJoin: "round",
             }}
@@ -2118,8 +2146,6 @@ function App() {
 
         {/* MAP TOOLBAR */}
         <MapToolbar
-          darkMode={darkMode}
-          onToggleTheme={() => setDarkMode((prev) => !prev)}
           onTriggerBacktrack={handleRunBacktrack}
           isBacktracking={isBacktracking}
           storyPoints={storyPoints}
@@ -2315,7 +2341,7 @@ function App() {
               }}
               playbackSpeed={replaySpeed}
               onSpeedChange={setReplaySpeed}
-              timelineEvents={incident.timeline || []}
+              timelineEvents={timelineEvents}
             />
 
             {isBacktracking && (
@@ -2333,7 +2359,7 @@ function App() {
 
             {transposeNotice && !isBacktracking && (
               <div className="ops-toast warn">
-                <strong>Demo transposition.</strong> {transposeNotice}
+                <strong>Note.</strong> {transposeNotice}
                 <button type="button" onClick={() => setTransposeNotice(null)}>Dismiss</button>
               </div>
             )}
