@@ -17,6 +17,7 @@ import {
   Circle,
   CircleMarker,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
@@ -162,7 +163,7 @@ function createVesselIcon({
 }) {
   const probabilityClass = getVesselProbabilityClass(attributionConfidence);
   const confidencePercent = getConfidencePercent(attributionConfidence);
-  const showNameplate = selected || candidateRank === 1;
+  const showNameplate = selected;
   const safeName = escapeHtml(name || "Vessel");
   const safeType = escapeHtml(typeLabel);
 
@@ -426,6 +427,19 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
     if (map.getMinZoom() < 6) map.setMinZoom(6);
   }, [map, storyPoints, scenePoints]);
 
+  return null;
+}
+
+function MapBackgroundClick({ onDeselect }) {
+  useMapEvents({
+    click(event) {
+      const target = event?.originalEvent?.target;
+      if (target?.closest?.(".oiltrace-vessel-icon-wrapper, .vessel-glass-tag, .leaflet-marker-icon")) {
+        return;
+      }
+      onDeselect?.();
+    },
+  });
   return null;
 }
 
@@ -1693,10 +1707,10 @@ function App() {
     setActiveItem("vessels");
   }, []);
 
-  const handleDeselect = () => {
+  const handleDeselect = useCallback(() => {
     setSelectedVesselId(null);
-    setActiveItem("map");
-  };
+    setActiveItem((item) => (item === "vessels" ? "map" : item));
+  }, []);
 
   const handleNavigation = (item) => {
     setActiveItem(item);
@@ -1710,7 +1724,7 @@ function App() {
 
   const handleSpillClick = () => {
     setBacktrackVisible(false);
-    setActiveItem("map");
+    handleDeselect();
   };
 
   const appThemeClass = "app-light";
@@ -1932,6 +1946,8 @@ function App() {
         fadeAnimation={false}
         markerZoomAnimation={false}
       >
+        <MapBackgroundClick onDeselect={handleDeselect} />
+
         {/* BASE MAP */}
         <TileLayer
           attribution={
@@ -2363,6 +2379,7 @@ function App() {
           }
 
           const handleVesselClick = (event) => {
+            L.DomEvent.stopPropagation(event);
             if (event?.originalEvent) {
               L.DomEvent.stopPropagation(event.originalEvent);
             }
