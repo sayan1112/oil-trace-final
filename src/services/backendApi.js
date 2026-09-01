@@ -437,8 +437,16 @@ export function assertWithinForcingCoverage(slick) {
 
 export function describeHindcastFailure(message) {
   const msg = String(message || "");
-  if (/Missing variables|first timestep|x_sea_water_velocity|x_wind|y_wind/i.test(msg)) {
+  if (isLocalBackend) {
+    // Local OilTrace uses Mediterranean AIS/forcing. Do not diagnose Modal's
+    // old North Sea NetCDF — that banner is wrong on localhost:8000.
+    return null;
+  }
+  if (/north\s*sea|norway|norkyst|nwshelf/i.test(msg)) {
     return "Live OpenDrift on this host still has North Sea forcing, so a Cyprus hindcast cannot read currents or wind. The slick stays in the Eastern Mediterranean with reconstructed drift.";
+  }
+  if (/Missing variables|first timestep|x_sea_water_velocity|x_wind|y_wind/i.test(msg)) {
+    return "OpenDrift on the remote host could not read current/wind variables for this scene. The map stays on the Eastern Mediterranean detection.";
   }
   if (/hdf|netcdf/i.test(msg)) {
     return "Forcing NetCDF on the live server is unreadable. Showing reconstructed drift on the Mediterranean scene.";
@@ -446,7 +454,7 @@ export function describeHindcastFailure(message) {
   if (/Unknown incident/i.test(msg)) {
     return "This backend has not published incident-mediterranean-001 yet.";
   }
-  return "Live OpenDrift is unavailable. Showing reconstructed drift on the Mediterranean scene.";
+  return null;
 }
 
 export function describeEmptyMediterraneanAis() {

@@ -13,6 +13,7 @@
 
 import { defaultCurrentField } from "./currentField.js";
 import { defaultWindField } from "./windField.js";
+import { displaySpillPolygon } from "./slickShape.js";
 
 function seededRandom(seed) {
   let s = seed % 2147483647;
@@ -30,11 +31,9 @@ function metersPerDegreeLng(latitude) {
 }
 
 function spillRing(incident) {
-  const ring = incident?.spillPolygon;
+  const ring = displaySpillPolygon(incident);
   if (!Array.isArray(ring) || ring.length < 4) return null;
-  return ring
-    .map((point) => [Number(point?.[0]), Number(point?.[1])])
-    .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+  return ring;
 }
 
 function ringBBox(ring) {

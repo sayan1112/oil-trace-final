@@ -70,6 +70,7 @@ import {
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
+import { displaySpillPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
@@ -216,17 +217,7 @@ function createVesselIcon({
 ========================================================= */
 
 function polygonFromIncident(inc) {
-  return Array.isArray(inc?.spillPolygon)
-    ? inc.spillPolygon
-        .filter(
-          (point) =>
-            Array.isArray(point) &&
-            point.length >= 2 &&
-            Number.isFinite(Number(point[0])) &&
-            Number.isFinite(Number(point[1]))
-        )
-        .map(([latitude, longitude]) => [Number(latitude), Number(longitude)])
-    : [];
+  return displaySpillPolygon(inc);
 }
 
 function centroidFromIncident(inc) {
@@ -1407,7 +1398,7 @@ function App() {
         hindcastNotice = [hindcastNotice, describeEmptyMediterraneanAis()].filter(Boolean).join(" ");
       }
 
-      setTransposeNotice(hindcastNotice);
+      setTransposeNotice(hindcastNotice || null);
 
       let normalized = vesselsNearCentroid(
         attribution ? normalizeVessels(vessels, attribution) : normalizeVessels(vessels, null),
@@ -2128,7 +2119,7 @@ function App() {
               weight: 2,
               opacity: 0.85,
               fillColor: "#1a0c04",
-              fillOpacity: 0.38,
+              fillOpacity: 0.12,
               lineCap: "round",
               lineJoin: "round",
             }}
