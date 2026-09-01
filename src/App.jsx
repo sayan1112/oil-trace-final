@@ -125,14 +125,64 @@ function getVesselProbabilityClass(confidence) {
    VESSEL ICON
 ========================================================= */
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function vesselTypeLabel(vessel) {
+  const raw = String(vessel?.type || "").trim();
+  const lower = raw.toLowerCase();
+  if (lower.includes("tanker") || lower.includes("oil")) return "Oil Tanker";
+  if (lower.includes("cargo") || lower.includes("bulk")) return "Cargo Vessel";
+  if (lower.includes("fish") || lower.includes("trawl")) return "Fishing Vessel";
+  if (lower.includes("pass")) return "Passenger";
+  if (raw) return raw;
+  return "Vessel";
+}
+
+const SHIP_GLYPH = `
+  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#ffffff" d="M12 4.2c.5 0 .9.3 1.1.7L16.2 12H7.8l3.1-7.1c.2-.4.6-.7 1.1-.7z"/>
+    <path fill="#ffffff" d="M4.4 13.2h15.2L17.8 19H6.2z"/>
+    <path fill="#dbe7f2" d="M9 8.2h2v2.2H9zM13 8.2h2v2.2h-2z"/>
+  </svg>
+`;
+
 function createVesselIcon({
   selected = false,
   replay = false,
   candidateRank = null,
   attributionConfidence = 0,
+  name = "",
+  typeLabel = "Vessel",
 }) {
   const probabilityClass = getVesselProbabilityClass(attributionConfidence);
   const confidencePercent = getConfidencePercent(attributionConfidence);
+  const showNameplate = selected || candidateRank === 1;
+  const safeName = escapeHtml(name || "Vessel");
+  const safeType = escapeHtml(typeLabel);
+
+  if (showNameplate) {
+    return L.divIcon({
+      className: "oiltrace-vessel-icon-wrapper",
+      html: `
+        <div class="vessel-glass-tag ${selected ? "is-selected" : ""} ${candidateRank === 1 ? "is-top" : ""} ${replay ? "is-replay" : ""}">
+          <span class="vessel-glass-badge">${SHIP_GLYPH}</span>
+          <span class="vessel-glass-copy">
+            <b>${safeName}</b>
+            <i>${safeType}</i>
+          </span>
+        </div>
+      `,
+      iconSize: [210, 48],
+      iconAnchor: [24, 24],
+      popupAnchor: [0, -26],
+    });
+  }
 
   if (replay) {
     // Sleek directional ship icon for replay animation
@@ -194,6 +244,7 @@ function createVesselIcon({
       <div
         class="
           oiltrace-vessel-marker
+          vessel-glass-dot
           ${selected ? "is-selected" : ""}
           ${candidateRank === 1 ? "is-top-candidate" : ""}
           ${probabilityClass}
@@ -902,14 +953,14 @@ function App() {
     const [clat, clng] = centroidFromIncident(incident);
     if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
     const vectors = [];
-    for (let lat = clat - 0.22; lat <= clat + 0.22; lat += 0.055) {
-      for (let lng = clng - 0.36; lng <= clng + 0.36; lng += 0.075) {
+    for (let lat = clat - 0.22; lat <= clat + 0.22; lat += 0.048) {
+      for (let lng = clng - 0.36; lng <= clng + 0.36; lng += 0.062) {
         const vel = defaultCurrentField.getVelocity(lat, lng, 0);
         const rad = ((90 - vel.direction) * Math.PI) / 180;
-        const len = 0.014;
+        const len = 0.0075;
         const endLat = lat + Math.sin(rad) * len * 0.9;
         const endLng = lng + Math.cos(rad) * len;
-        const headLen = 0.004;
+        const headLen = 0.0022;
         const headAngle1 = rad + Math.PI * 0.82;
         const headAngle2 = rad - Math.PI * 0.82;
         const h1 = [endLat + Math.sin(headAngle1) * headLen * 0.9, endLng + Math.cos(headAngle1) * headLen];
@@ -930,14 +981,14 @@ function App() {
     const [clat, clng] = centroidFromIncident(incident);
     if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
     const vectors = [];
-    for (let lat = clat - 0.2; lat <= clat + 0.2; lat += 0.055) {
-      for (let lng = clng - 0.32; lng <= clng + 0.32; lng += 0.075) {
+    for (let lat = clat - 0.2; lat <= clat + 0.2; lat += 0.048) {
+      for (let lng = clng - 0.32; lng <= clng + 0.32; lng += 0.062) {
         const wind = defaultWindField.getVelocity(lat, lng, 0);
         const rad = ((90 - wind.direction) * Math.PI) / 180;
-        const len = 0.015;
+        const len = 0.007;
         const endLat = lat + Math.sin(rad) * len * 0.9;
         const endLng = lng + Math.cos(rad) * len;
-        const headLen = 0.004;
+        const headLen = 0.0022;
         const headAngle1 = rad + Math.PI * 0.82;
         const headAngle2 = rad - Math.PI * 0.82;
         const h1 = [endLat + Math.sin(headAngle1) * headLen * 0.9, endLng + Math.cos(headAngle1) * headLen];
@@ -1237,7 +1288,7 @@ function App() {
   // instead of leaving the map on the untouched 10:00 release cluster.
   // Replay mode then takes over the exact same simulation clock and slider.
   const detectionOilFrame = useMemo(
-    () => oilSimulation.getFrameByProgress(0.6),
+    () => oilSimulation.getFrameByProgress(1),
     [oilSimulation]
   );
 
@@ -1883,11 +1934,11 @@ function App() {
             <Polyline
               positions={vec.positions}
               pathOptions={{
-                color: "#0284c7",
-                weight: 2.6,
-                opacity: 0.92,
-                lineCap: "round",
-              }}
+              color: "#1e3a5f",
+              weight: 1.15,
+              opacity: 0.42,
+              lineCap: "round",
+            }}
             >
               <Tooltip sticky direction="top">
                 <strong>Simulated Ocean Current</strong>
@@ -1900,11 +1951,11 @@ function App() {
             <Polyline
               positions={vec.arrowHead}
               pathOptions={{
-                color: "#0284c7",
-                weight: 2,
-                opacity: 0.85,
-                lineCap: "round",
-              }}
+              color: "#1e3a5f",
+              weight: 1,
+              opacity: 0.38,
+              lineCap: "round",
+            }}
             />
           </Fragment>
         ))}
@@ -1915,11 +1966,11 @@ function App() {
             <Polyline
               positions={vec.positions}
               pathOptions={{
-                color: "#f59e0b",
-                weight: 2.6,
-                opacity: 0.92,
-                lineCap: "round",
-              }}
+              color: "#334e6e",
+              weight: 1.05,
+              opacity: 0.38,
+              lineCap: "round",
+            }}
             >
               <Tooltip sticky direction="top">
                 <strong>Simulated Wind Field</strong>
@@ -1932,11 +1983,11 @@ function App() {
             <Polyline
               positions={vec.arrowHead}
               pathOptions={{
-                color: "#f59e0b",
-                weight: 2,
-                opacity: 0.85,
-                lineCap: "round",
-              }}
+              color: "#334e6e",
+              weight: 1,
+              opacity: 0.34,
+              lineCap: "round",
+            }}
             />
           </Fragment>
         ))}
@@ -1947,7 +1998,6 @@ function App() {
             enabled
             particles={currentOilParticles}
             trails={currentOilTrails}
-            polygon={spillPolygon}
           />
         )}
 
@@ -2163,11 +2213,11 @@ function App() {
           <Polygon
             positions={spillPolygon}
             pathOptions={{
-              color: "#ea580c",
-              weight: 2,
-              opacity: 0.9,
-              fillColor: "#9a3412",
-              fillOpacity: 0.12,
+              color: "#c2410c",
+              weight: 1,
+              opacity: 0.18,
+              fillOpacity: 0,
+              dashArray: "5 8",
               lineCap: "round",
               lineJoin: "round",
             }}
@@ -2217,10 +2267,10 @@ function App() {
               radius={7}
               pathOptions={{
                 color: "#b91c1c",
-                weight: 2,
-                opacity: 1,
+                weight: 1.2,
+                opacity: 0.55,
                 fillColor: "#ef4444",
-                fillOpacity: 0.9,
+                fillOpacity: 0.35,
               }}
             >
               <Tooltip direction="top" offset={[0, -7]}>
@@ -2373,6 +2423,8 @@ function App() {
                     selected: isSelected,
                     candidateRank: vessel.candidateRank,
                     attributionConfidence: vessel.attributionConfidence,
+                    name: vessel.name,
+                    typeLabel: vesselTypeLabel(vessel),
                   })}
                   interactive
                   zIndexOffset={
@@ -2397,6 +2449,8 @@ function App() {
                     replay: true,
                     candidateRank: vessel.candidateRank,
                     attributionConfidence: vessel.attributionConfidence,
+                    name: vessel.name,
+                    typeLabel: vesselTypeLabel(vessel),
                   })}
                   interactive
                   zIndexOffset={

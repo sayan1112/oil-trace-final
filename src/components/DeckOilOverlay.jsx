@@ -19,9 +19,9 @@ import "./DeckOilOverlay.css";
 ========================================================= */
 
 const CATEGORY_COLORS = {
-  initial: [245, 158, 11],
-  active: [234, 88, 12],
-  stranded: [124, 45, 18],
+  initial: [196, 140, 64],
+  active: [154, 82, 22],
+  stranded: [67, 32, 10],
 };
 
 class OilCanvasLayer {
@@ -87,7 +87,6 @@ class OilCanvasLayer {
     map.on("move", this._boundScheduleRedraw);
     map.on("moveend zoomend viewreset resize", this._boundOnSettled);
     window.addEventListener("resize", this._boundOnSettled);
-    this._animId = requestAnimationFrame(this._boundTick);
 
     return this;
   }
@@ -228,73 +227,8 @@ class OilCanvasLayer {
     return false;
   }
 
-  _drawObservedSlick(ctx, map, zoom) {
-    const ring = this._polygon;
-    if (!Array.isArray(ring) || ring.length < 3) return;
-
-    const points = [];
-    for (const pair of ring) {
-      const lat = Number(pair?.[0]);
-      const lng = Number(pair?.[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      points.push(map.latLngToContainerPoint(L.latLng(lat, lng)));
-    }
-    if (points.length < 3) return;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let cx = 0;
-    let cy = 0;
-    points.forEach((point) => {
-      minX = Math.min(minX, point.x);
-      minY = Math.min(minY, point.y);
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
-      cx += point.x;
-      cy += point.y;
-    });
-    cx /= points.length;
-    cy /= points.length;
-    const rx = Math.max(24, (maxX - minX) / 2);
-    const ry = Math.max(18, (maxY - minY) / 2);
-    const pulse = 0.5 + 0.5 * Math.sin(this._phase * Math.PI * 2);
-
-    ctx.save();
-    ctx.beginPath();
-    points.forEach((point, index) => {
-      if (index === 0) ctx.moveTo(point.x, point.y);
-      else ctx.lineTo(point.x, point.y);
-    });
-    ctx.closePath();
-
-    const fill = ctx.createRadialGradient(cx, cy, 4, cx, cy, Math.max(rx, ry) * 1.05);
-    fill.addColorStop(0, `rgba(67, 20, 7, ${0.88 + pulse * 0.04})`);
-    fill.addColorStop(0.28, `rgba(154, 52, 18, ${0.78 + pulse * 0.05})`);
-    fill.addColorStop(0.55, `rgba(234, 88, 12, ${0.62 + pulse * 0.06})`);
-    fill.addColorStop(0.78, `rgba(251, 146, 60, ${0.38 + pulse * 0.08})`);
-    fill.addColorStop(1, `rgba(253, 186, 116, ${0.08 + pulse * 0.04})`);
-    ctx.fillStyle = fill;
-    ctx.fill();
-
-    const shift = ((this._phase % 1) + 1) % 1;
-    const a = 0.2 + shift * 0.45;
-    const b = Math.min(0.92, a + 0.18);
-    const iridescence = ctx.createLinearGradient(minX, minY, maxX, maxY);
-    iridescence.addColorStop(0, "rgba(40, 180, 170, 0)");
-    iridescence.addColorStop(a, `rgba(56, 210, 190, ${0.08 + pulse * 0.05})`);
-    iridescence.addColorStop(b, `rgba(210, 170, 70, ${0.07 + pulse * 0.04})`);
-    iridescence.addColorStop(1, "rgba(90, 40, 140, 0)");
-    ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = iridescence;
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
-
-    ctx.strokeStyle = `rgba(251, 146, 60, ${0.75 + pulse * 0.15})`;
-    ctx.lineWidth = zoom < 9 ? 2.4 : 1.6;
-    ctx.stroke();
-    ctx.restore();
+  _drawObservedSlick() {
+    // Observed slick is the particle field — never a filled SAR blob.
   }
 
   _redraw() {
@@ -311,58 +245,41 @@ class OilCanvasLayer {
 
     ctx.clearRect(0, 0, cssWidth, cssHeight);
     const zoom = map.getZoom();
-    const zoomBoost = Math.pow(1.35, Math.max(0, 10.5 - zoom));
+    const zoomBoost = Math.pow(1.12, Math.max(0, 10.5 - zoom));
     const pad = 24 + 40 * zoomBoost;
-    this._drawObservedSlick(ctx, map, zoom);
 
-    /* -------------------------------------------------------
-       PARTICLE DRIFT TRAILS
-
-       Draw a restrained subset of the simulation's actual
-       particle histories. These are trails, not vessel paths.
-    ------------------------------------------------------- */
-    if (this._trails.length && zoom >= 11) {
+    if (this._trails.length && zoom >= 8) {
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-
-      // The simulation supplies roughly half the particles as trails.
-      // Rendering every historical segment would unnecessarily cover
-      // the basemap, so keep every 4th trail and the recent portion.
-      const stride = this._trails.length > 350 ? 4 : 2;
+      const stride = this._trails.length > 400 ? 3 : 1;
 
       for (let i = 0; i < this._trails.length; i += stride) {
         const trail = this._trails[i];
         if (!Array.isArray(trail?.path) || trail.path.length < 2) continue;
 
-        const start = Math.max(0, trail.path.length - 24);
+        const start = Math.max(0, trail.path.length - 18);
         const recent = trail.path.slice(start);
         if (recent.length < 2) continue;
 
-        ctx.beginPath();
-        let hasPoint = false;
-
+        const pts = [];
         for (let j = 0; j < recent.length; j += 1) {
           const pair = recent[j];
           if (!Array.isArray(pair) || pair.length < 2) continue;
-
           const lng = Number(pair[0]);
           const lat = Number(pair[1]);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-
-          const point = map.latLngToContainerPoint(L.latLng(lat, lng));
-
-          if (!hasPoint) {
-            ctx.moveTo(point.x, point.y);
-            hasPoint = true;
-          } else {
-            ctx.lineTo(point.x, point.y);
-          }
+          pts.push(map.latLngToContainerPoint(L.latLng(lat, lng)));
         }
+        if (pts.length < 2) continue;
 
-        if (hasPoint) {
-          ctx.strokeStyle = zoom < 11 ? "rgba(92, 54, 12, 0.08)" : "rgba(92, 54, 12, 0.16)";
-        ctx.lineWidth = zoom < 11 ? 2.4 : 1;
+        for (let j = 1; j < pts.length; j += 1) {
+          const fade = j / pts.length;
+          ctx.beginPath();
+          ctx.moveTo(pts[j - 1].x, pts[j - 1].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.strokeStyle = `rgba(92, 54, 12, ${0.04 + fade * 0.16})`;
+          ctx.lineWidth = 0.7 + fade * 0.5;
           ctx.stroke();
         }
       }
@@ -370,22 +287,11 @@ class OilCanvasLayer {
       ctx.restore();
     }
 
-    /* -------------------------------------------------------
-       ACTIVE OIL PARTICLES
-
-       The particle coordinates and categories come directly from
-       the current simulation frame. No independent animation is
-       applied here, so the map scrub and particle field stay synced.
-    ------------------------------------------------------- */
     if (this._particles.length) {
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
 
       const plotted = [];
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
 
       for (const particle of this._particles) {
         const lat = Number(particle?.latitude);
@@ -403,53 +309,34 @@ class OilCanvasLayer {
         }
 
         plotted.push({ point, particle });
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
       }
 
-      if (plotted.length && !this._polygon?.length) {
-        const cx = (minX + maxX) / 2;
-        const cy = (minY + maxY) / 2;
-        const rx = Math.max(22, (maxX - minX) / 2 + 16 * zoomBoost);
-        const ry = Math.max(16, (maxY - minY) / 2 + 12 * zoomBoost);
-        const sheen = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-        sheen.addColorStop(0, "rgba(18, 10, 4, 0.28)");
-        sheen.addColorStop(0.35, "rgba(92, 48, 12, 0.18)");
-        sheen.addColorStop(0.7, "rgba(176, 120, 36, 0.08)");
-        sheen.addColorStop(1, "rgba(176, 120, 36, 0)");
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.scale(1, Math.max(0.55, ry / rx));
-        ctx.beginPath();
-        ctx.fillStyle = sheen;
-        ctx.arc(0, 0, rx, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+      const cell = 9;
+      const counts = new Map();
+      for (const { point } of plotted) {
+        const key = `${Math.floor(point.x / cell)}|${Math.floor(point.y / cell)}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
       }
 
       for (const { point, particle } of plotted) {
         const [r, g, b] =
           CATEGORY_COLORS[particle.category] || CATEGORY_COLORS.active;
+        const key = `${Math.floor(point.x / cell)}|${Math.floor(point.y / cell)}`;
+        const dens = Math.min(1, (counts.get(key) || 1) / 12);
+        const baseR = Number(particle.radiusPixels) || 1.4;
         const radius = Math.max(
-          zoom < 9 ? 5 : 3,
-          Math.min(22, (Number(particle.radiusPixels) || 3.5) * 1.35 * zoomBoost)
+          0.7,
+          Math.min(3.4, baseR * zoomBoost * (0.7 + dens * 0.55)),
         );
-        const gradient = ctx.createRadialGradient(
-          point.x,
-          point.y,
-          0,
-          point.x,
-          point.y,
-          radius
-        );
-        const coreAlpha = (particle.category === "stranded" ? 0.72 : 0.42) * (zoom < 9 ? 1.15 : 1);
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${coreAlpha})`);
-        gradient.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${coreAlpha * 0.45})`);
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        const coreAlpha =
+          (particle.category === "stranded"
+            ? 0.55
+            : particle.category === "active"
+              ? 0.28
+              : 0.12) *
+          (0.55 + dens * 0.7);
         ctx.beginPath();
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${coreAlpha})`;
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         ctx.fill();
       }

@@ -7,8 +7,8 @@
   --action-dark: #10283f;
   --page: #e8edf2;
   --card: #ffffff;
-  --glass: rgba(255, 255, 255, 0.58);
-  --glass-border: rgba(255, 255, 255, 0.62);
+  --glass: rgba(255, 255, 255, 0.48);
+  --glass-border: rgba(255, 255, 255, 0.7);
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 0;
   padding: 0;
@@ -17,10 +17,32 @@
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav {
+  position: relative;
   width: 92px;
   border-radius: 0;
   background: linear-gradient(180deg, #1a2230 0%, #121826 100%);
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.stitch-rail-chevron {
+  position: absolute;
+  top: 50%;
+  right: -11px;
+  z-index: 8;
+  width: 22px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #173a5e;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-brand {
@@ -643,6 +665,7 @@
   text-overflow: ellipsis;
 }
 
+.oiltrace-map-toolbar,
 .stitch-topbar,
 .map-title-chip,
 .oil-legend-chip,
