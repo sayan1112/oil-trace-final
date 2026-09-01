@@ -213,6 +213,9 @@ class OilCanvasLayer {
     const cssHeight = this._height || canvas.height / this._dpr;
 
     ctx.clearRect(0, 0, cssWidth, cssHeight);
+    const zoom = map.getZoom();
+    const zoomBoost = Math.pow(1.55, Math.max(0, 12.2 - zoom));
+    const pad = 24 + 40 * zoomBoost;
 
     /* -------------------------------------------------------
        PARTICLE DRIFT TRAILS
@@ -220,7 +223,7 @@ class OilCanvasLayer {
        Draw a restrained subset of the simulation's actual
        particle histories. These are trails, not vessel paths.
     ------------------------------------------------------- */
-    if (this._trails.length) {
+    if (this._trails.length && zoom >= 11) {
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -260,8 +263,8 @@ class OilCanvasLayer {
         }
 
         if (hasPoint) {
-          ctx.strokeStyle = "rgba(92, 54, 12, 0.16)";
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = zoom < 11 ? "rgba(92, 54, 12, 0.08)" : "rgba(92, 54, 12, 0.16)";
+        ctx.lineWidth = zoom < 11 ? 2.4 : 1;
           ctx.stroke();
         }
       }
@@ -280,6 +283,12 @@ class OilCanvasLayer {
       ctx.save();
       ctx.globalCompositeOperation = "multiply";
 
+      const plotted = [];
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
       for (const particle of this._particles) {
         const lat = Number(particle?.latitude);
         const lng = Number(particle?.longitude);
@@ -287,19 +296,47 @@ class OilCanvasLayer {
 
         const point = map.latLngToContainerPoint(L.latLng(lat, lng));
         if (
-          point.x < -18 ||
-          point.x > cssWidth + 18 ||
-          point.y < -18 ||
-          point.y > cssHeight + 18
+          point.x < -pad ||
+          point.x > cssWidth + pad ||
+          point.y < -pad ||
+          point.y > cssHeight + pad
         ) {
           continue;
         }
 
+        plotted.push({ point, particle });
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+
+      if (plotted.length) {
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const rx = Math.max(22, (maxX - minX) / 2 + 16 * zoomBoost);
+        const ry = Math.max(16, (maxY - minY) / 2 + 12 * zoomBoost);
+        const sheen = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
+        sheen.addColorStop(0, "rgba(72, 28, 6, 0.42)");
+        sheen.addColorStop(0.35, "rgba(140, 72, 16, 0.28)");
+        sheen.addColorStop(0.7, "rgba(196, 140, 48, 0.14)");
+        sheen.addColorStop(1, "rgba(196, 140, 48, 0)");
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(1, Math.max(0.55, ry / rx));
+        ctx.beginPath();
+        ctx.fillStyle = sheen;
+        ctx.arc(0, 0, rx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (const { point, particle } of plotted) {
         const [r, g, b] =
           CATEGORY_COLORS[particle.category] || CATEGORY_COLORS.active;
         const radius = Math.max(
-          4,
-          Math.min(14, (Number(particle.radiusPixels) || 3.5) * 2.4)
+          zoom < 11 ? 7 : 4,
+          Math.min(28, (Number(particle.radiusPixels) || 3.5) * 2.2 * zoomBoost)
         );
         const gradient = ctx.createRadialGradient(
           point.x,
@@ -309,7 +346,7 @@ class OilCanvasLayer {
           point.y,
           radius
         );
-        const coreAlpha = particle.category === "stranded" ? 0.55 : 0.32;
+        const coreAlpha = (particle.category === "stranded" ? 0.58 : 0.34) * (zoom < 11 ? 1.25 : 1);
         gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${coreAlpha})`);
         gradient.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${coreAlpha * 0.45})`);
         gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
