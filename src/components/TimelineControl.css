@@ -411,3 +411,26 @@
     bottom: 16px;
   }
 }
+
+.command-map-wrap .timeline-card {
+  width: min(640px, calc(100% - 28px));
+  min-width: 260px;
+  background: rgba(22, 24, 29, 0.94);
+  border-color: #2a2e36;
+  color: #e8eaed;
+  bottom: 14px;
+}
+
+.command-map-wrap .status-label,
+.command-map-wrap .timestamp-text,
+.command-map-wrap .time-endpoint-label,
+.command-map-wrap .timeline-counter,
+.command-map-wrap .control-btn {
+  color: #d7dbe2;
+}
+
+.command-map-wrap .control-btn,
+.command-map-wrap .speed-btn {
+  background: #1c1f26;
+  border-color: #2f343c;
+}

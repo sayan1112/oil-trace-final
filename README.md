@@ -21,11 +21,13 @@ The map camera and oil particle layer are isolated from vessel-selection UI stat
 
 ## Backend integration (OilTrace)
 
-All analytical outputs are live from the OilTrace backend (`src/services/backendApi.js`):
-"Backtrack Oil" runs hindcast (OpenDrift) → AIS vessel query → attribution →
-forward simulation → counterfactual, and every score/region/trajectory shown
-afterwards comes from those responses. Configure the backend with
-`VITE_BACKEND_BASE_URL` (see `.env.example`; defaults to `http://127.0.0.1:8000`).
+All analytical outputs are live from the OilTrace backend (`src/services/api.js`
++ `src/services/backendApi.js`). Axios tries
+`https://sih-oil-spill-26143-backend.onrender.com`, then failovers to
+`https://vscimatic999--oiltrace-backend-web.modal.run`.
+"Run hindcast" executes hindcast (OpenDrift) → AIS query → attribution →
+forward simulation → counterfactual. Override hosts with
+`VITE_BACKEND_PRIMARY_URL` / `VITE_BACKEND_FALLBACK_URL` (see `.env.example`).
 
 The ML detection service has no CORS headers, so the browser reaches it through
 the `/ml-api` dev proxy (vite.config.js). In production, add CORS to the ML

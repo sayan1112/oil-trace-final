@@ -1,18 +1,53 @@
 /**
  * OilTrace Detection Service API client
- * BASE: https://vscimatic999--oiltrace-detection-web.modal.run
  *
- * All coordinates are WGS84, [lon, lat] order in GeoJSON geometry,
- * but centroid property uses {lat, lon} named keys.
- *
- * Cold-start note: first request after ~5 quiet minutes takes 20–40 s extra.
- * Always call warmDetectionService() on app mount and before live demos.
+ * Live GeoTIFF inference is preferred through the orchestration backend
+ * (`POST /api/v1/detect`) so the browser uses the same Axios failover as
+ * hindcast/attribution. The Modal ML service remains available for the
+ * cached demo scene (no CORS on that host — Vite proxies /ml-api).
  */
 
-// The ML service sends no CORS headers, so browsers cannot call it directly.
-// Dev: Vite proxies /ml-api → the Modal service (see vite.config.js).
-// Prod: set VITE_ML_BASE_URL, or configure the same rewrite on the host.
+import { apiClient, describeBackendError } from "./api";
+
 const BASE = import.meta.env.VITE_ML_BASE_URL || "/ml-api";
+
+export function slicksToGeoJSON(slicks) {
+  return {
+    type: "FeatureCollection",
+    features: (slicks || []).map((slick) => ({
+      type: "Feature",
+      id: slick.id,
+      properties: {
+        id: slick.id,
+        confidence: slick.confidence,
+        area_km2: slick.area_km2,
+        centroid: slick.centroid,
+        timestamp_utc: slick.timestamp_utc,
+        sensor: slick.sensor,
+        scene_id: slick.scene_id,
+      },
+      geometry: slick.geometry,
+    })),
+  };
+}
+
+export async function detectViaBackend(file, acquiredAtUtc) {
+  const formData = new FormData();
+  formData.append("image", file);
+  if (acquiredAtUtc) formData.append("acquired_at_utc", acquiredAtUtc);
+  try {
+    const response = await apiClient.post("/api/v1/detect", formData, {
+      timeout: 300000,
+    });
+    const payload = response.data;
+    if (payload?.type === "FeatureCollection") return payload;
+    if (Array.isArray(payload)) return slicksToGeoJSON(payload);
+    if (payload?.id && payload?.geometry) return slicksToGeoJSON([payload]);
+    return payload;
+  } catch (error) {
+    throw new Error(describeBackendError(error), { cause: error });
+  }
+}
 
 /**
  * Fire-and-forget liveness probe. Wakes the container so subsequent
