@@ -1608,27 +1608,29 @@ function App() {
 
   const showDetail = ["incident", "vessels", "legend", "replay", "evidence", "detect"].includes(activeItem);
   const closePanel = () => setActiveItem("map");
-  const detectedAt = new Date(incident.detectedAt);
-  const timelineStamps = (incident.timeline || []).map((event) => {
+  const detectedMs = Date.parse(incident.detectedAt);
+  const timelineEvents = (incident.timeline || []).map((event) => {
     const [hh, mm] = String(event.time).split(":").map(Number);
-    const d = new Date(detectedAt);
+    const d = new Date(detectedMs);
     if (Number.isFinite(hh)) d.setUTCHours(hh, Number.isFinite(mm) ? mm : 0, 0, 0);
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "UTC",
-    }) + " UTC";
+    return { ms: d.getTime(), label: event.label };
   });
-  const timelineEvents = (incident.timeline || []).map((event, i) => ({
-    time: timelineStamps[i],
-    label: event.label,
-  }));
-  const timelineIndex = simRange && Number.isFinite(simMs)
-    ? Math.round(((simMs - simRange.t0) / (simRange.t1 - simRange.t0)) * Math.max(1, timelineStamps.length - 1))
-    : Math.min(timelineStamps.length - 1, Math.max(0, Math.round(replayProgress)));
+  const clockStart = simRange?.t0 ?? Math.min(
+    detectedMs - 6 * 60 * 60 * 1000,
+    ...timelineEvents.map((event) => event.ms),
+  );
+  const clockEnd = simRange?.t1 ?? Math.max(detectedMs, ...timelineEvents.map((event) => event.ms));
+  const clockNow = Number.isFinite(simMs)
+    ? simMs
+    : clockStart + Math.max(0, Math.min(1, replayProgress / Math.max(1, totalReplayPoints - 1))) * (clockEnd - clockStart);
+
+  const seekClock = (ms) => {
+    if (simRange) setSimMs(ms);
+    else {
+      const span = Math.max(1, clockEnd - clockStart);
+      setReplayProgress(((ms - clockStart) / span) * Math.max(1, totalReplayPoints - 1));
+    }
+  };
 
   return (
     <div className={`app command-center ${appThemeClass}`}>
@@ -1641,6 +1643,7 @@ function App() {
         backendOnline={backendOnline}
       />
 
+      <div className="command-shell">
       <div className={`command-stage ${showDetail ? "is-detail" : ""}`}>
         <div className="command-stage-track">
           <div className="command-stage-pane">
@@ -1727,37 +1730,37 @@ function App() {
       </div>
 
       <div className="command-workspace">
-        <header className="command-workspace-head">
-          <div>
-            <p className="inv-kicker">{incident.id}</p>
-            <h1>{incident.spillType}</h1>
-          </div>
-          <div className="command-head-actions">
-            <button
-              type="button"
-              className={`head-chip ${mapStyle === "map" ? "is-active" : ""}`}
-              onClick={() => setMapStyle("map")}
-            >
-              Map
-            </button>
-            <button
-              type="button"
-              className={`head-chip ${mapStyle === "satellite" ? "is-active" : ""}`}
-              onClick={() => setMapStyle("satellite")}
-            >
-              Satellite
-            </button>
-            <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
-              Layers
-            </button>
-          </div>
-        </header>
-
         <div className="command-workspace-main">
           <div className="command-map-wrap">
+            <div className="map-floating-head">
+              <div>
+                <p className="inv-kicker">{incident.id}</p>
+                <h1>{incident.spillType}</h1>
+              </div>
+              <div className="command-head-actions">
+                <button
+                  type="button"
+                  className={`head-chip ${mapStyle === "map" ? "is-active" : ""}`}
+                  onClick={() => setMapStyle("map")}
+                >
+                  Map
+                </button>
+                <button
+                  type="button"
+                  className={`head-chip ${mapStyle === "satellite" ? "is-active" : ""}`}
+                  onClick={() => setMapStyle("satellite")}
+                >
+                  Satellite
+                </button>
+                <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
+                  Layers
+                </button>
+              </div>
+            </div>
       <MapContainer
         center={leafletCentroid}
         zoom={11}
+        zoomControl={false}
         className="map"
         preferCanvas={false}
         zoomAnimation={false}
@@ -2318,30 +2321,15 @@ function App() {
       </MapContainer>
 
             <TimelineControl
-              timestamps={timelineStamps}
-              currentIndex={Math.max(0, Math.min(timelineIndex, Math.max(0, timelineStamps.length - 1)))}
+              startMs={clockStart}
+              endMs={clockEnd}
+              currentMs={clockNow}
+              events={timelineEvents}
               isPlaying={isPlaying}
               onPlayPause={() => setIsPlaying((prev) => !prev)}
-              onSeek={(next) => {
-                const max = Math.max(1, timelineStamps.length - 1);
-                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
-                else setReplayProgress(next);
-              }}
-              onStepBack={() => {
-                const max = Math.max(1, timelineStamps.length - 1);
-                const next = Math.max(0, timelineIndex - 1);
-                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
-                else setReplayProgress(next);
-              }}
-              onStepForward={() => {
-                const max = Math.max(1, timelineStamps.length - 1);
-                const next = Math.min(max, timelineIndex + 1);
-                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
-                else setReplayProgress(next);
-              }}
+              onSeekMs={seekClock}
               playbackSpeed={replaySpeed}
               onSpeedChange={setReplaySpeed}
-              timelineEvents={timelineEvents}
             />
 
             {isBacktracking && (
@@ -2372,6 +2360,7 @@ function App() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

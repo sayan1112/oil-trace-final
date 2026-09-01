@@ -28,20 +28,28 @@ const NAV = [
 ];
 
 function NavIcon({ id }) {
-  const common = { viewBox: "0 0 24 24", "aria-hidden": true };
+  const common = {
+    viewBox: "0 0 24 24",
+    "aria-hidden": true,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
   switch (id) {
     case "incident":
       return (
         <svg {...common}>
-          <circle cx="12" cy="12" r="8" />
-          <circle cx="12" cy="12" r="2.4" />
+          <circle cx="12" cy="12" r="7.5" />
+          <circle cx="12" cy="12" r="2.2" />
         </svg>
       );
     case "detect":
       return (
         <svg {...common}>
-          <rect x="4" y="5" width="16" height="14" rx="2" />
-          <path d="M8 9h8M8 12h5M8 15h6" />
+          <rect x="5" y="6" width="14" height="12" rx="3.5" />
+          <path d="M8 10h8M8 13h5" />
         </svg>
       );
     case "backtrack":
@@ -61,29 +69,31 @@ function NavIcon({ id }) {
     case "evidence":
       return (
         <svg {...common}>
-          <path d="M7 4h8l4 4v12H7z" />
+          <path d="M8 4h7l4 4v12H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
           <path d="M15 4v4h4" />
         </svg>
       );
     case "replay":
       return (
         <svg {...common}>
-          <path d="M8 8v8l7-4z" />
+          <circle cx="12" cy="12" r="8" />
+          <path d="m10 9 6 3-6 3z" />
         </svg>
       );
     case "map":
       return (
         <svg {...common}>
-          <path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20V6.5Z" />
+          <path d="M4 7.2 9 5l6 2.4L20 5v12.6L15 20l-6-2.4L4 20Z" />
+          <path d="M9 5v12.6M15 7.4V20" />
         </svg>
       );
     default:
       return (
         <svg {...common}>
-          <circle cx="6" cy="7" r="1.4" />
-          <circle cx="6" cy="12" r="1.4" />
-          <circle cx="6" cy="17" r="1.4" />
-          <path d="M10 7h9M10 12h9M10 17h9" />
+          <circle cx="7" cy="7" r="1.3" />
+          <circle cx="7" cy="12" r="1.3" />
+          <circle cx="7" cy="17" r="1.3" />
+          <path d="M11 7h7M11 12h7M11 17h7" />
         </svg>
       );
   }
@@ -145,7 +155,7 @@ function Sidebar({
             aria-expanded={layersOpen}
           >
             <span className="sidebar-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 4 4 8.5 12 13 20 8.5 12 4Z" />
                 <path d="M4 12 12 16.5 20 12" />
                 <path d="M4 15.5 12 20 20 15.5" />

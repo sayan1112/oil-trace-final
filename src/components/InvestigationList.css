@@ -117,16 +117,24 @@
 .inv-case-card,
 .inv-vessel-card {
   display: block;
-  width: calc(100% - 36px);
-  margin: 0 18px 10px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid #eceff3;
-  border-radius: 16px;
+  border-radius: 22px;
   background: #fff;
   color: inherit;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.inv-case-card {
+  width: auto;
+  margin: 0 16px 10px;
+}
+
+.inv-vessel-card {
+  width: 100%;
+  margin: 0 0 10px;
 }
 
 .inv-vessel-card.is-selected,
@@ -201,13 +209,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding: 4px 18px 12px;
+  padding: 4px 16px 12px;
 }
 
 .inv-action {
-  height: 36px;
+  height: 40px;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 999px;
   background: #fff;
   color: #1a1d23;
   font-size: 12px;
@@ -241,7 +249,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-bottom: 12px;
+  padding: 0 16px 16px;
 }
 
 .inv-person {
