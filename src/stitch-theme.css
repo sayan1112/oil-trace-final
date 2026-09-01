@@ -1,16 +1,19 @@
 /* OilTrace Stitch command-center theme — navy rail, light workspace */
 
 .app.command-center {
-  --navy: #151b26;
+  --navy: #141820;
   --navy-2: #1c2433;
-  --action: #2f6fed;
-  --action-dark: #1d4ed8;
-  --page: #eef1f6;
+  --action: #173a5e;
+  --action-dark: #10283f;
+  --page: #e8edf2;
   --card: #ffffff;
+  --glass: rgba(255, 255, 255, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.62);
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 0;
   padding: 0;
   background: var(--navy);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav {
@@ -36,7 +39,7 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(160deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(160deg, #2a5d7c, #173a5e);
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
 }
 
@@ -71,19 +74,19 @@
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-item:hover {
-  background: rgba(47, 111, 237, 0.12);
+  background: rgba(255, 255, 255, 0.06);
   color: #e8eef8;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-item.active {
-  background: rgba(47, 111, 237, 0.18);
-  color: #7db2ff;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4f7fb;
   border-color: transparent;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-item.active::before {
-  background: #3b82f6;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+  background: #c9d6e2;
+  box-shadow: none;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-footer,
@@ -132,7 +135,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #2f6fed;
+  background: #173a5e;
   color: #fff;
   font-size: 9px;
   font-weight: 800;
@@ -271,7 +274,7 @@
 }
 
 .head-chip.is-active {
-  background: var(--action);
+  background: #173a5e;
   color: #fff;
 }
 
@@ -564,11 +567,169 @@
 .inv-action.primary {
   background: var(--action) !important;
   color: #fff !important;
+  border-color: var(--action) !important;
 }
 
 .inv-badge.high-sev {
   background: #fef2f2;
   color: #b91c1c;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.inv-case-top strong,
+.map-title-chip .inv-kicker,
+.incident-panel-header h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: -0.02em;
+}
+
+.inv-route,
+.inv-route span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.inv-route {
+  overflow: hidden;
+}
+
+.inv-assess {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.inv-assess div {
+  min-width: 0;
+  padding: 8px 6px;
+}
+
+.inv-assess strong {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.inv-assess strong i {
+  font-style: normal;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.inv-top-hit {
+  margin: 0 16px 12px;
+  background: rgba(23, 58, 94, 0.06);
+  border-color: rgba(23, 58, 94, 0.12);
+}
+
+.inv-top-hit p {
+  color: #173a5e;
+}
+
+.inv-top-hit strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stitch-topbar,
+.map-title-chip,
+.oil-legend-chip,
+.command-head-actions,
+.intel-card,
+.inv-case-card,
+.inv-vessel-card,
+.op-card,
+.env-chip,
+.timeline-card,
+.run-card,
+.inv-list {
+  background: var(--glass) !important;
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.08);
+}
+
+.inv-list {
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+.command-head-actions {
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.head-chip {
+  white-space: nowrap;
+}
+
+.stitch-mission {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8eef4;
+}
+
+.stitch-mission strong,
+.stitch-user strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.stitch-mission small,
+.stitch-user small {
+  display: block;
+  margin-top: 2px;
+  color: #9aa7b5;
+  font-size: 9px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.incident-header-top > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.incident-panel-header h2 {
+  font-size: 13px !important;
+  line-height: 1.3;
+}
+
+.incident-metrics {
+  gap: 6px !important;
+}
+
+.incident-metric {
+  padding: 10px 8px !important;
+}
+
+.incident-metric strong,
+.incident-metric small {
+  white-space: nowrap !important;
+}
+
+.intel-kv dd,
+.intel-env strong {
+  white-space: nowrap;
 }
 
 @media (max-width: 1180px) {

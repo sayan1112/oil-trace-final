@@ -24,10 +24,7 @@ function Sidebar({
   onSelect,
   onTriggerBacktrack,
   backendOnline,
-  backendHost,
 }) {
-  const host = String(backendHost || "localhost:8000").replace(/^https?:\/\//, "");
-  const shortHost = host.replace(/\/api\/v1\/?$/i, "");
 
   return (
     <aside className="oiltrace-sidebar command-nav stitch-nav" aria-label="OilTrace navigation">
@@ -63,19 +60,18 @@ function Sidebar({
       </nav>
 
       <div className="sidebar-footer command-user stitch-nav-foot">
-        <div className={`stitch-backend ${backendOnline === false ? "is-off" : backendOnline ? "is-on" : ""}`}>
+        <div className={`stitch-mission ${backendOnline === false ? "is-off" : ""}`}>
           <span className={`demo-dot ${backendOnline === false ? "offline" : ""}`} />
           <div>
-            <strong>Backend</strong>
-            <small>{backendOnline === false ? "Offline" : backendOnline ? "Local" : "Checking"}</small>
-            <em>{shortHost}</em>
+            <strong>SIH 26143</strong>
+            <small>{backendOnline === false ? "Watch floor offline" : "NTRO · E. Med"}</small>
           </div>
         </div>
         <div className="stitch-user">
           <span className="stitch-avatar" aria-hidden="true">SD</span>
           <div>
             <strong>Sayan D.</strong>
-            <small>Analyst</small>
+            <small>Duty analyst</small>
           </div>
         </div>
       </div>
