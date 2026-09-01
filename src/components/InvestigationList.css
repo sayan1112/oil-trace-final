@@ -1,10 +1,12 @@
 .inv-list {
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
   height: 100%;
   background: #ffffff;
   color: #1a1d23;
+  box-sizing: border-box;
 }
 
 .inv-list-header {

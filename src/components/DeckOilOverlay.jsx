@@ -281,7 +281,7 @@ class OilCanvasLayer {
     ------------------------------------------------------- */
     if (this._particles.length) {
       ctx.save();
-      ctx.globalCompositeOperation = "multiply";
+      ctx.globalCompositeOperation = "source-over";
 
       const plotted = [];
       let minX = Infinity;

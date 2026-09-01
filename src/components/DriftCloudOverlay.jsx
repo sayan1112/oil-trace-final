@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/particles";
@@ -18,13 +18,7 @@ import { buildCloud, cloudPositions, envelopeRadiusKm } from "../Simulation/part
 // responses; nothing is computed locally. The overlay owns no clock: the
 // Replay panel and the chip below both steer the same master clock.
 
-function fmtClock(ms) {
-  const d = new Date(ms);
-  const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
-}
-
-const RELEASE_PULSE_SIM_MS = 8 * 60 * 1000; // pulse lasts 8 simulated minutes
+const RELEASE_PULSE_SIM_MS = 8 * 60 * 1000;
 
 export default function DriftCloudOverlay({
   hindcast,
@@ -32,19 +26,12 @@ export default function DriftCloudOverlay({
   slickGeometry,
   visible,
   timeMs,
-  playing,
-  onPlayPause,
-  onRestart,
-  speed,
-  onSpeed,
 }) {
   const map = useMap();
   const canvasRef = useRef(null);
   const originRef = useRef(null);
   const backBufRef = useRef(null);
   const fwdBufRef = useRef(null);
-  // View mode: which cloud(s) to display — everything stays on the one clock.
-  const [mode, setMode] = useState("both"); // 'both' | 'back' | 'fwd'
 
   /* ── Clouds from backend outputs ─────────────────────────────────── */
 
@@ -87,7 +74,7 @@ export default function DriftCloudOverlay({
   /* ── Drawing (both clouds, one clock) ────────────────────────────── */
 
   const stateRef = useRef({});
-  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs, mode };
+  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs };
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -98,48 +85,50 @@ export default function DriftCloudOverlay({
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t, mode: md } =
+    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t } =
       stateRef.current;
     if (!vis || (!bc && !fc)) return;
     const tMs = Number.isFinite(t) ? t : (fc || bc).t1;
-    const r = map.getZoom() >= 10 ? 1.9 : 1.5;
+    const r = Math.max(7, Math.min(22, 5 * Math.pow(1.45, 12 - map.getZoom())));
 
-    const drawCloud = (cloud, style, bufRef) => {
+    const drawCloud = (cloud, colors, bufRef) => {
       const pos = cloudPositions(cloud, tMs, bufRef.current);
       bufRef.current = pos;
-      ctx.fillStyle = style;
-      for (let i = 0; i < cloud.count; i++) {
+      const step = cloud.count > 900 ? 2 : 1;
+      for (let i = 0; i < cloud.count; i += step) {
         const p = map.latLngToLayerPoint([pos[i * 2], pos[i * 2 + 1]]);
-        const x = p.x - origin.x, y = p.y - origin.y;
-        if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
+        const x = p.x - origin.x;
+        const y = p.y - origin.y;
+        if (x < -r || y < -r || x > w + r || y > h + r) continue;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, colors[0]);
+        g.addColorStop(0.5, colors[1]);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, 6.2832);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
     };
 
-    // Reconstruction cloud runs across the whole window.
-    if (bc && md !== "fwd") drawCloud(bc, "rgba(8,94,120,0.45)", backBufRef);
+    if (fc && tMs >= fc.t0) {
+      drawCloud(fc, ["rgba(28, 12, 4, 0.4)", "rgba(180, 83, 9, 0.16)"], fwdBufRef);
+    } else if (bc) {
+      drawCloud(bc, ["rgba(42, 22, 8, 0.28)", "rgba(146, 64, 14, 0.12)"], backBufRef);
+    }
 
-    // Released oil exists only from the estimated release time onward.
-    if (fc && md !== "back" && tMs >= fc.t0) {
-      drawCloud(fc, "rgba(15,19,25,0.62)", fwdBufRef);
-
-      // Release pulse: expanding red ring right after the release moment.
+    if (fc && rel && tMs >= fc.t0) {
       const since = tMs - fc.t0;
-      if (rel && since <= RELEASE_PULSE_SIM_MS) {
+      if (since <= RELEASE_PULSE_SIM_MS) {
         const f = since / RELEASE_PULSE_SIM_MS;
         const p = map.latLngToLayerPoint(rel);
-        const x = p.x - origin.x, y = p.y - origin.y;
-        ctx.strokeStyle = `rgba(217,47,35,${(1 - f) * 0.9})`;
-        ctx.lineWidth = 2.5;
+        const x = p.x - origin.x;
+        const y = p.y - origin.y;
+        ctx.strokeStyle = `rgba(180, 83, 9, ${(1 - f) * 0.7})`;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(x, y, 8 + f * 34, 0, 6.2832);
+        ctx.arc(x, y, 8 + f * 28, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = `rgba(217,47,35,${(1 - f) * 0.8})`;
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 6.2832);
-        ctx.fill();
       }
     }
   }, [map]);
@@ -186,105 +175,7 @@ export default function DriftCloudOverlay({
     };
   }, [map]);
 
-  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, mode, draw]);
+  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, draw]);
 
-  /* ── Control chip (steers the master clock) ──────────────────────── */
-
-  if (!visible || (!backCloud && !fwdCloud)) return null;
-  const t = Number.isFinite(timeMs) ? timeMs : (fwdCloud || backCloud).t1;
-  const released = fwdCloud && t >= fwdCloud.t0;
-
-  return (
-    <div
-      onMouseDown={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
-      style={{
-        position: "absolute",
-        bottom: "1.1rem",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 900,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.55rem",
-        background: "rgba(8,20,36,0.92)",
-        border: "1px solid rgba(148,163,184,0.25)",
-        borderRadius: "12px",
-        padding: "0.45rem 0.75rem",
-        color: "#e2e8f0",
-        fontSize: "0.75rem",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-      }}
-    >
-      <span style={{ fontWeight: 700, letterSpacing: "0.06em" }}>DRIFT REPLAY</span>
-      <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "72px" }}>{fmtClock(t)}</span>
-      <button
-        onClick={() => onPlayPause?.()}
-        style={{ background: "#2563eb", border: "none", borderRadius: "8px", color: "#fff", width: "30px", height: "26px", fontSize: "0.7rem" }}
-        title="Play / pause drift replay"
-      >
-        {playing ? "❚❚" : "▶"}
-      </button>
-      <button
-        onClick={() => onRestart?.()}
-        style={{ background: "none", border: "1px solid rgba(148,163,184,0.4)", borderRadius: "8px", color: "#cbd5e1", width: "28px", height: "26px", fontSize: "0.7rem" }}
-        title="Replay from the start of the window"
-      >
-        ↺
-      </button>
-      <select
-        value={speed}
-        onChange={(e) => onSpeed?.(Number(e.target.value))}
-        style={{ background: "rgba(15,30,52,0.9)", color: "#e2e8f0", border: "1px solid rgba(148,163,184,0.35)", borderRadius: "7px", height: "26px", fontSize: "0.72rem" }}
-      >
-        <option value={0.5}>0.5×</option>
-        <option value={1}>1×</option>
-        <option value={2}>2×</option>
-        <option value={4}>4×</option>
-      </select>
-      <span style={{ display: "inline-flex", gap: "2px", background: "rgba(15,30,52,0.9)", border: "1px solid rgba(148,163,184,0.35)", borderRadius: "8px", padding: "2px" }}>
-        {[
-          ["back", "◀ Backtrack", "#67e8f9"],
-          ["both", "Both", "#e2e8f0"],
-          ["fwd", "Forward ▶", "#cbd5e1"],
-        ].map(([key, label, color]) => (
-          <button
-            key={key}
-            onClick={() => setMode(key)}
-            disabled={key !== "back" && !fwdCloud}
-            style={{
-              background: mode === key ? "#2563eb" : "none",
-              border: "none",
-              borderRadius: "6px",
-              color: mode === key ? "#fff" : color,
-              padding: "0.15rem 0.5rem",
-              fontSize: "0.68rem",
-              opacity: key !== "back" && !fwdCloud ? 0.4 : 1,
-            }}
-            title={
-              key === "back"
-                ? "Teal cloud: backward hindcast reconstruction"
-                : key === "fwd"
-                  ? "Black cloud: released oil (appears at estimated release)"
-                  : "Show both clouds"
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </span>
-      {mode !== "back" && fwdCloud && (
-        <span
-          style={{
-            display: "inline-flex", alignItems: "center", gap: "0.3rem", fontSize: "0.68rem",
-            color: released ? "#e2e8f0" : "#64748b",
-          }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: released ? "#0f1319" : "#334155", outline: released ? "none" : "1px dashed #475569" }} />
-          {released ? "released oil" : "awaiting release"}
-        </span>
-      )}
-    </div>
-  );
+  return null;
 }

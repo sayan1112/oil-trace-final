@@ -275,6 +275,20 @@ function getIncidentPoints() {
    FIT MAP
 ========================================================= */
 
+function MapFill() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer()?.parentElement;
+    if (!container) return undefined;
+    const fit = () => map.invalidateSize({ pan: false });
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    fit();
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 function FitMapToIncident() {
   const map = useMap();
   const hasInitializedRef = useRef(false);
@@ -1588,6 +1602,9 @@ function App() {
   // Backend investigation layers stay visible while replaying, not only in
   // the explicit Backtrack tool view.
   const investigationVisible = backtrackVisible || activeItem === "replay";
+  const showBackendOil = Boolean(
+    investigationVisible && layers.backtrack && (backtrackResult?.backend || forwardResult)
+  );
 
   const mapSourceRegion = investigationVisible ? calculatedSourceRegion : incident.sourceRegion;
 
@@ -1847,16 +1864,15 @@ function App() {
         ))}
 
         {/* OIL PARTICLE FIELD (LAGRANGIAN PARTICLE DOTS — Leaflet canvas) */}
-        {layers.spill && (
+        {layers.spill && !showBackendOil && (
           <DeckOilOverlay
-            enabled={layers.spill}
+            enabled
             particles={currentOilParticles}
             trails={currentOilTrails}
           />
         )}
 
-        {/* OIL TRANSPORT FLOW LINES */}
-        {layers.oilTrajectory && currentOilFlowLines.map((line, index) => (
+        {layers.oilTrajectory && !showBackendOil && currentOilFlowLines.map((line, index) => (
           line.path.length >= 2 && (
             <Polyline
               key={line.id}
@@ -1933,20 +1949,12 @@ function App() {
           hindcast={backtrackResult?.backend}
           forward={forwardResult}
           slickGeometry={activeSlick?.geometry}
-          visible={investigationVisible && layers.backtrack}
+          visible={showBackendOil}
           timeMs={simMs}
-          playing={isPlaying}
-          onPlayPause={() => setIsPlaying((prev) => !prev)}
-          onRestart={() => {
-            if (simRange) setSimMs(simRange.t0);
-            setIsPlaying(true);
-          }}
-          speed={replaySpeed}
-          onSpeed={setReplaySpeed}
         />
 
         {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
-        {investigationVisible && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
+        {investigationVisible && layers.backtrack && !showBackendOil && forwardResult?.trajectory?.coordinates?.length >= 2 && (
           <Polyline
             positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
             pathOptions={{
@@ -1964,7 +1972,7 @@ function App() {
             </Tooltip>
           </Polyline>
         )}
-        {investigationVisible && layers.backtrack && forwardResult?.predicted_footprint && (
+        {investigationVisible && layers.backtrack && forwardResult?.predicted_footprint && !showBackendOil && (
           <Polygon
             positions={
               forwardResult.predicted_footprint.type === "Polygon"
@@ -2069,10 +2077,10 @@ function App() {
             positions={spillPolygon}
             pathOptions={{
               color: "#5c3a12",
-              weight: 1.5,
-              opacity: 0.55,
-              fillColor: "#1a1208",
-              fillOpacity: 0.18,
+              weight: 1.2,
+              opacity: 0.4,
+              fillColor: "#2a1608",
+              fillOpacity: showBackendOil ? 0.08 : 0.22,
               lineCap: "round",
               lineJoin: "round",
             }}
@@ -2157,6 +2165,7 @@ function App() {
 
         {/* INITIAL MAP FIT */}
         <FitMapToIncident />
+        <MapFill />
 
         {/* AUTO-REFIT + SOFT PAN BOUNDS AROUND THE INVESTIGATION */}
         <MapFocusController
@@ -2319,6 +2328,11 @@ function App() {
           );
         })}
       </MapContainer>
+
+            <div className="oil-legend-chip">
+              <span aria-hidden="true" />
+              {showBackendOil ? "Oil sheen from hindcast" : "Detected oil slick"}
+            </div>
 
             <TimelineControl
               startMs={clockStart}

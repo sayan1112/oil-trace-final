@@ -1968,6 +1968,46 @@ input[type="checkbox"]:checked {
   box-shadow: none;
 }
 
+.oiltrace-sidebar.command-nav .sidebar-brand {
+  justify-content: center;
+  height: 76px;
+  padding: 0;
+  background: #111318;
+  border-bottom: 1px solid #23262d;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-navigation {
+  padding: 8px 8px 0;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 62px;
+  margin-bottom: 2px;
+  padding: 8px 4px;
+  border-radius: 18px;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-label {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.oiltrace-sidebar.command-nav .nav-count,
+.oiltrace-sidebar.command-nav .nav-group-label,
+.oiltrace-sidebar.command-nav .layer-chevron,
+.oiltrace-sidebar.command-nav .sidebar-divider {
+  display: none;
+}
+
+.oiltrace-sidebar.command-nav .command-user {
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px;
+}
+
 .oiltrace-sidebar.command-nav:hover {
   width: 100%;
 }
