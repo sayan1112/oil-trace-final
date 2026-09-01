@@ -2,11 +2,11 @@ import axios from "axios";
 
 export const PRIMARY_HOST =
   import.meta.env.VITE_BACKEND_PRIMARY_URL ||
-  "https://sih-oil-spill-26143-backend.onrender.com";
+  "https://vscimatic999--oiltrace-backend-web.modal.run";
 
 export const FALLBACK_HOST =
   import.meta.env.VITE_BACKEND_FALLBACK_URL ||
-  "https://vscimatic999--oiltrace-backend-web.modal.run";
+  "https://sih-oil-spill-26143-backend.onrender.com";
 
 const useDevProxy = import.meta.env.DEV && !import.meta.env.VITE_BACKEND_DIRECT;
 

@@ -31,12 +31,12 @@ export class WindField {
    * @returns {{ u: number, v: number, speed: number, direction: number, driftU: number, driftV: number, dLatPerMin: number, dLngPerMin: number }}
    */
   getVelocity(latitude, longitude, timeMinutes = 0) {
-    const lat = Number(latitude) || 18.52;
-    const lng = Number(longitude) || 72.912;
+    const lat = Number(latitude) || 35.63533;
+    const lng = Number(longitude) || 34.8704;
     const t = Number(timeMinutes) || 0;
 
-    const dLat = lat - 18.52;
-    const dLng = lng - 72.912;
+    const dLat = lat - 35.63533;
+    const dLng = lng - 34.8704;
 
     const uSpatial = Math.cos(dLat * 50) * 0.4;
     const vSpatial = Math.sin(dLng * 60) * 0.5;

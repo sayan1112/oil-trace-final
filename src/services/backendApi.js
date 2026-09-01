@@ -46,7 +46,7 @@ export function detectOilSpills(file, acquiredAtUtc) {
   return request("/detect", { method: "POST", body: fd }, 300000);
 }
 
-export function runHindcast(slick, durationHours = 12) {
+export function runHindcast(slick, durationHours = 6) {
   return request(
     "/hindcast",
     {
@@ -63,7 +63,7 @@ export function getCandidateVessels(bbox, start, end) {
   return request(`/vessels?${q}`, {}, 120000);
 }
 
-export function runAttribution(incidentId, sourceRegion, vessels, uncertaintyRadiusKm = 15) {
+export function runAttribution(incidentId, sourceRegion, vessels, uncertaintyRadiusKm = 10) {
   return request(
     "/attribute",
     {
@@ -176,7 +176,7 @@ export function slickFromDetection(f) {
   if (!g) throw new Error("No slick geometry is available for hindcast.");
   return {
     id: p.id || "detected-slick",
-    timestamp_utc: p.timestamp_utc || new Date().toISOString(),
+    timestamp_utc: p.timestamp_utc || null,
     centroid: { lat: +p.centroid.lat, lon: +p.centroid.lon },
     geometry: g,
     area_km2: +(p.area_km2 || 0),
@@ -326,12 +326,97 @@ export function shiftIsoHours(iso, hours) {
   return new Date(new Date(iso).getTime() + hours * 3600 * 1000).toISOString();
 }
 
+export const CANONICAL_INCIDENT_ID = "incident-mediterranean-001";
+
+export const CANONICAL_AIS_BBOX = "33.5,34.5,36.0,36.5";
+export const CANONICAL_AIS_START = "2024-08-25T00:00:00Z";
+export const CANONICAL_AIS_END = "2024-08-26T18:00:00Z";
+
+export function latLngRingFromGeometry(g) {
+  const ring = rings(g)[0] || [];
+  return ring
+    .map(([lon, lat]) => [+lat, +lon])
+    .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+}
+
+export function incidentFromDetection(feature, seed) {
+  const slick = slickFromDetection(feature);
+  return {
+    ...seed,
+    areaKm2: slick.area_km2 || seed.areaKm2,
+    detectionConfidence: slick.confidence || seed.detectionConfidence,
+    detectedAt: slick.timestamp_utc || seed.detectedAt,
+    centroid: {
+      latitude: slick.centroid.lat,
+      longitude: slick.centroid.lon,
+    },
+    location: {
+      latitude: slick.centroid.lat,
+      longitude: slick.centroid.lon,
+    },
+    spillPolygon: latLngRingFromGeometry(slick.geometry).length
+      ? latLngRingFromGeometry(slick.geometry)
+      : seed.spillPolygon,
+    satellite: {
+      ...(seed.satellite || {}),
+      imageId: slick.scene_id || seed.satellite?.imageId,
+    },
+    vessels: [],
+  };
+}
+
+export function vesselsFromReplay(replay) {
+  const frames = replay?.frames || [];
+  const byMmsi = new Map();
+  for (const frame of frames) {
+    const time = frame.timestamp_utc;
+    for (const vessel of frame.vessels || []) {
+      const coords = vessel.position?.coordinates;
+      const lon = Number(coords?.[0]);
+      const lat = Number(coords?.[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      const id = String(vessel.mmsi);
+      if (!byMmsi.has(id)) {
+        byMmsi.set(id, {
+          id,
+          mmsi: id,
+          name: vessel.name || `MMSI ${id}`,
+          type: vessel.vessel_type || "Unknown",
+          flag: "AIS",
+          position: { latitude: lat, longitude: lon },
+          speedKnots: 0,
+          heading: 0,
+          candidateRank: 99,
+          attributionConfidence: 0,
+          evidence: {},
+          trajectory: [],
+        });
+      }
+      const row = byMmsi.get(id);
+      row.trajectory.push({ time, latitude: lat, longitude: lon });
+      row.position = { latitude: lat, longitude: lon };
+    }
+  }
+  return [...byMmsi.values()];
+}
+
+export function vesselsNearCentroid(vessels, centroid, maxDeg = 4) {
+  const lat0 = +centroid?.latitude || +centroid?.lat;
+  const lon0 = +centroid?.longitude || +centroid?.lon;
+  if (!Number.isFinite(lat0) || !Number.isFinite(lon0)) return vessels || [];
+  return (vessels || []).filter((vessel) => {
+    const lat = +vessel.position?.latitude;
+    const lon = +vessel.position?.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+    return Math.abs(lat - lat0) <= maxDeg && Math.abs(lon - lon0) <= maxDeg;
+  });
+}
+
 /* ── Forcing-data coverage guard ──────────────────────────────────── */
-// The demo backend ships OpenDrift forcing (currents/wind/waves) only for
-// this North Sea window. Hindcasts outside it abort with "Missing variables".
+// Canonical SIH demo: Eastern Mediterranean CMEMS/ERA5 window.
 export const FORCING_COVERAGE = {
-  minLon: 4.0, maxLon: 6.0, minLat: 59.0, maxLat: 61.0,
-  startUtc: "2025-08-20T00:00:00Z", endUtc: "2025-08-22T23:59:59Z",
+  minLon: 33.5, maxLon: 36.0, minLat: 34.5, maxLat: 36.5,
+  startUtc: "2024-08-25T00:00:00Z", endUtc: "2024-08-27T00:00:00Z",
 };
 
 export function assertWithinForcingCoverage(slick) {
@@ -343,48 +428,12 @@ export function assertWithinForcingCoverage(slick) {
   if (!inSpace || !inTime) {
     throw new Error(
       `This slick (${(+lat).toFixed(2)}°N, ${(+lon).toFixed(2)}°E, ${slick?.timestamp_utc}) is outside ` +
-      `the demo forcing-data coverage (${c.minLon}–${c.maxLon}°E, ${c.minLat}–${c.maxLat}°N, ` +
-      `20–22 Aug 2025 UTC) — the backend has no ocean-current/wind data there, so OpenDrift cannot run. ` +
-      `Note: the bundled ML demo scene is in the Eastern Mediterranean. Clear the backtrack seed in the ` +
-      `Detect panel to analyse the Norway demo incident instead.`
+      `the Mediterranean forcing-data coverage (${c.minLon}–${c.maxLon}°E, ${c.minLat}–${c.maxLat}°N, ` +
+      `25–26 Aug 2024 UTC). OpenDrift cannot run without currents/wind for that location and time.`
     );
   }
 }
 
 export function isWithinForcingCoverage(slick) {
   try { assertWithinForcingCoverage(slick); return true; } catch { return false; }
-}
-
-/**
- * Demo bridge: carry a detected slick's REAL polygon shape into the demo
- * forcing window (location + time shifted, shape preserved) so the physics
- * pipeline can run on it. Always label the result as transposed in the UI —
- * the location/time are no longer the detection's own.
- */
-export function transposeSlickToDemoWindow(slick) {
-  const target = { lat: 60.106, lon: 4.487 };
-  const dLat = target.lat - +slick.centroid.lat;
-  const dLon = target.lon - +slick.centroid.lon;
-  // Longitude degrees shrink with latitude; rescale so the shape keeps its
-  // physical width at the new latitude.
-  const lonScale =
-    Math.cos((+slick.centroid.lat * Math.PI) / 180) /
-    Math.cos((target.lat * Math.PI) / 180);
-  const shiftRing = (ring) =>
-    ring.map(([lon, lat]) => [
-      target.lon + (lon - +slick.centroid.lon) * lonScale,
-      lat + dLat,
-    ]);
-  const g = slick.geometry;
-  const geometry =
-    g.type === "Polygon"
-      ? { type: "Polygon", coordinates: g.coordinates.map(shiftRing) }
-      : { type: "MultiPolygon", coordinates: g.coordinates.map((p) => p.map(shiftRing)) };
-  return {
-    ...slick,
-    id: `${slick.id}-transposed`,
-    timestamp_utc: "2025-08-20T12:00:00Z",
-    centroid: target,
-    geometry,
-  };
 }

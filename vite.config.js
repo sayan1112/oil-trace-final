@@ -18,7 +18,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/ml-api/, ""),
       },
       "/api": {
-        target: "https://sih-oil-spill-26143-backend.onrender.com",
+        target: "https://vscimatic999--oiltrace-backend-web.modal.run",
         changeOrigin: true,
         timeout: 180000,
       },

@@ -1,70 +1,50 @@
 {
   "demoMode": true,
-  "dataStatus": "DEMO SCENARIO",
-  "demoNotice": "Norway demo scenario with synthetic AIS. The initial view is a static preview — Run Backtracking to replace all analytical values with live OilTrace backend outputs (OpenDrift hindcast, AIS query, attribution, forward simulation, counterfactual).",
+  "dataStatus": "CANONICAL SIH DEMO",
+  "demoNotice": "Eastern Mediterranean / Cyprus detection (Oil/00067). Map geometry comes from ML detection; source region, AIS ranking, forward drift, counterfactual, and replay come from the OilTrace backend — not from a second frontend mock.",
 
   "incident": {
-    "id": "norway-test-001",
+    "id": "incident-mediterranean-001",
     "status": "Under Investigation",
     "severity": "High",
 
-    "detectedAt": "2025-08-20T12:00:00Z",
+    "detectedAt": "2024-08-26T12:00:00Z",
 
     "location": {
-      "latitude": 60.106,
-      "longitude": 4.487
+      "latitude": 35.63533,
+      "longitude": 34.8704
     },
 
-    "areaKm2": 14.8,
+    "areaKm2": 266.926,
 
-    "detectionConfidence": 0.77,
+    "detectionConfidence": 0.768,
 
     "spillType": "Suspected oil slick",
 
     "spillPolygon": [
-      [60.093, 4.455],
-      [60.086, 4.487],
-      [60.095, 4.520],
-      [60.108, 4.531],
-      [60.121, 4.512],
-      [60.126, 4.478],
-      [60.113, 4.452],
-      [60.093, 4.455]
+      [35.558, 34.765],
+      [35.558, 34.949],
+      [35.742, 34.949],
+      [35.742, 34.765],
+      [35.558, 34.765]
     ],
 
     "centroid": {
-      "latitude": 60.106,
-      "longitude": 4.487
-    },
-
-    "sourceRegion": {
-      "type": "Uncertainty region (preliminary)",
-      "center": {
-        "latitude": 60.121,
-        "longitude": 4.479
-      },
-      "radiusMeters": 1800
+      "latitude": 35.63533,
+      "longitude": 34.8704
     },
 
     "satellite": {
       "platform": "Sentinel-1",
       "sensor": "SAR",
-      "productStatus": "Demo reference",
-      "imageId": "DEMO-NORWAY-S1-001"
+      "productStatus": "ML detection",
+      "imageId": "Oil/00067"
     },
 
     "timeline": [
       {
-        "time": "10:00",
+        "time": "06:00",
         "label": "Release window opens"
-      },
-      {
-        "time": "10:15",
-        "label": "Estimated release"
-      },
-      {
-        "time": "11:00",
-        "label": "Drift transport"
       },
       {
         "time": "12:00",
@@ -72,147 +52,6 @@
       }
     ],
 
-    "vessels": [
-      {
-        "id": "678901234",
-        "name": "NORWAY DEMO TANKER",
-        "type": "Tanker",
-        "flag": "Synthetic AIS",
-        "position": {
-          "latitude": 60.300,
-          "longitude": 4.482
-        },
-        "speedKnots": 6.0,
-        "heading": 0,
-
-        "candidateRank": 1,
-        "attributionConfidence": 0.0,
-
-        "evidence": {
-          "spatial": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "temporal": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "trajectory": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "drift": {
-            "score": 0,
-            "label": "Counterfactual simulation pending."
-          },
-          "aisReliability": {
-            "status": "Unknown",
-            "label": "Awaiting backend AIS analysis."
-          }
-        },
-
-        "trajectory": [
-          { "time": "10:00", "latitude": 60.100, "longitude": 4.482 },
-          { "time": "10:30", "latitude": 60.150, "longitude": 4.482 },
-          { "time": "11:00", "latitude": 60.200, "longitude": 4.482 },
-          { "time": "11:30", "latitude": 60.250, "longitude": 4.482 },
-          { "time": "12:00", "latitude": 60.300, "longitude": 4.482 }
-        ]
-      },
-
-      {
-        "id": "789012345",
-        "name": "NORWAY DEMO CARGO",
-        "type": "Cargo",
-        "flag": "Synthetic AIS",
-        "position": {
-          "latitude": 60.350,
-          "longitude": 4.900
-        },
-        "speedKnots": 11.0,
-        "heading": 90,
-
-        "candidateRank": 2,
-        "attributionConfidence": 0.0,
-
-        "evidence": {
-          "spatial": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "temporal": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "trajectory": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "drift": {
-            "score": 0,
-            "label": "Counterfactual simulation pending."
-          },
-          "aisReliability": {
-            "status": "Unknown",
-            "label": "Awaiting backend AIS analysis."
-          }
-        },
-
-        "trajectory": [
-          { "time": "10:00", "latitude": 60.350, "longitude": 4.300 },
-          { "time": "10:30", "latitude": 60.350, "longitude": 4.450 },
-          { "time": "11:00", "latitude": 60.350, "longitude": 4.600 },
-          { "time": "11:30", "latitude": 60.350, "longitude": 4.750 },
-          { "time": "12:00", "latitude": 60.350, "longitude": 4.900 }
-        ]
-      },
-
-      {
-        "id": "890123456",
-        "name": "NORWAY DEMO FISHER",
-        "type": "Fishing",
-        "flag": "Synthetic AIS",
-        "position": {
-          "latitude": 60.010,
-          "longitude": 4.620
-        },
-        "speedKnots": 3.5,
-        "heading": 210,
-
-        "candidateRank": 3,
-        "attributionConfidence": 0.0,
-
-        "evidence": {
-          "spatial": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "temporal": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "trajectory": {
-            "score": 0,
-            "label": "Awaiting backend attribution — run Backtracking."
-          },
-          "drift": {
-            "score": 0,
-            "label": "Counterfactual simulation pending."
-          },
-          "aisReliability": {
-            "status": "Unknown",
-            "label": "Awaiting backend AIS analysis."
-          }
-        },
-
-        "trajectory": [
-          { "time": "10:00", "latitude": 60.030, "longitude": 4.640 },
-          { "time": "10:30", "latitude": 60.025, "longitude": 4.632 },
-          { "time": "11:00", "latitude": 60.020, "longitude": 4.628 },
-          { "time": "11:30", "latitude": 60.015, "longitude": 4.624 },
-          { "time": "12:00", "latitude": 60.010, "longitude": 4.620 }
-        ]
-      }
-    ]
+    "vessels": []
   }
 }
