@@ -677,11 +677,11 @@ input[type="checkbox"]:active {
 }
 
 .vessel-color {
-  background: #d97706;
+  background: #ea580c;
 
   box-shadow:
     0 0 0 2px
-    rgba(217, 119, 6, 0.08);
+    rgba(234, 88, 12, 0.08);
 }
 
 
@@ -1631,7 +1631,7 @@ input[type="checkbox"]:checked {
 }
 
 .vessel-color {
-  background: #d97706;
+  background: #ea580c;
 }
 
 
@@ -2032,12 +2032,11 @@ input[type="checkbox"]:checked {
   color: #d7dbe2;
 }
 
-.oiltrace-sidebar.command-nav .sidebar-icon svg {
-  fill: none;
+.oiltrace-sidebar.command-nav.stitch-nav .sidebar-icon svg {
+  width: 20px;
+  height: 20px;
   stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  fill: none;
 }
 
 .oiltrace-sidebar.command-nav .sidebar-item {
@@ -2072,11 +2071,11 @@ input[type="checkbox"]:checked {
 .oiltrace-sidebar.command-nav .sidebar-item.active {
   background: #1c1f26;
   border-color: #3a3320;
-  color: #e8c547;
+  color: #fb923c;
 }
 
 .oiltrace-sidebar.command-nav .sidebar-item.active::before {
-  background: #c9a227;
+  background: #ea580c;
   box-shadow: none;
 }
 
@@ -2099,7 +2098,7 @@ input[type="checkbox"]:checked {
   margin-right: 10px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: #c9a227;
+  background: #ea580c;
   color: #1a1404;
   font-size: 9px;
   font-weight: 800;

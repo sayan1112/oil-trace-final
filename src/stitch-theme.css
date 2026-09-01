@@ -34,18 +34,14 @@
   height: 40px;
   border: 0;
   border-radius: 12px;
+  display: grid;
+  place-items: center;
   background: linear-gradient(160deg, #3b82f6, #1d4ed8);
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .brand-mark.stitch-drop span {
-  width: 10px;
-  height: 14px;
-  border: 0;
-  border-radius: 0 0 10px 10px;
-  background: #fff;
-  box-shadow: none;
-  clip-path: ellipse(45% 55% at 50% 45%);
+  display: none;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .brand-name {
@@ -56,6 +52,16 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   opacity: 1;
+}
+
+.oiltrace-sidebar.command-nav.stitch-nav .sidebar-icon {
+  width: auto;
+  min-width: 0;
+  height: auto;
+}
+
+.oiltrace-sidebar.command-nav.stitch-nav .sidebar-icon::before {
+  display: none;
 }
 
 .oiltrace-sidebar.command-nav.stitch-nav .sidebar-item {
@@ -382,7 +388,7 @@
 }
 
 .intel-sources b.high { color: #16a34a; }
-.intel-sources b.mid { color: #d97706; }
+.intel-sources b.mid { color: #ea580c; }
 .intel-sources b.low { color: #64748b; }
 
 .intel-bar {

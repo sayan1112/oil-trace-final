@@ -19,7 +19,36 @@ import {
   fetchDemoDetection,
   runLiveDetection,
 } from "../services/detectionApi";
+import incidentData from "../data/incident.json";
+import { displaySpillPolygon } from "../Simulation/slickShape";
 import "./DetectionPanel.css";
+
+function localMediterraneanDemo() {
+  const inc = incidentData.incident;
+  const ring = displaySpillPolygon(inc).map(([lat, lon]) => [lon, lat]);
+  if (ring.length && ring[0][0] !== ring[ring.length - 1][0]) {
+    ring.push(ring[0]);
+  }
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        id: inc.id,
+        properties: {
+          id: inc.id,
+          confidence: inc.detectionConfidence,
+          area_km2: inc.areaKm2,
+          centroid: { lat: inc.centroid.latitude, lon: inc.centroid.longitude },
+          timestamp_utc: inc.detectedAt,
+          sensor: inc.satellite?.sensor || "SAR",
+          scene_id: inc.satellite?.imageId || "Oil/00067",
+        },
+        geometry: { type: "Polygon", coordinates: [ring] },
+      },
+    ],
+  };
+}
 
 /* ── Confidence badge helper ─────────────────────────────── */
 function ConfidenceBadge({ confidence }) {
@@ -105,9 +134,11 @@ export function DetectionPanel({
     setError(null);
     try {
       if (import.meta.env.VITE_USE_MODAL_ML !== "true") {
-        throw new Error(
-          "Modal ML demo is off in local development. The Mediterranean incident is already loaded from incident.json. Set VITE_USE_MODAL_ML=true only if you want the Modal detection service.",
-        );
+        const geojson = localMediterraneanDemo();
+        setResult(geojson);
+        setStatus("success");
+        onDetectionResult(geojson);
+        return;
       }
       const geojson = await fetchDemoDetection();
       setResult(geojson);

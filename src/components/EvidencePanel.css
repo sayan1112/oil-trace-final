@@ -360,7 +360,7 @@
 }
 
 .evidence-confidence.moderate {
-  color: #d97706;
+  color: #ea580c;
 }
 
 .evidence-confidence.weak {
@@ -437,7 +437,7 @@
 .assessment-icon {
   background: #fef3c7;
 
-  color: #d97706;
+  color: #ea580c;
 }
 
 .evidence-assessment.weak
@@ -833,7 +833,7 @@
 }
 
 .evidence-score.moderate {
-  color: #d97706;
+  color: #ea580c;
 }
 
 .evidence-score.weak {
@@ -873,7 +873,7 @@
 }
 
 .evidence-bar-fill.moderate {
-  background: #d97706;
+  background: #ea580c;
 }
 
 .evidence-bar-fill.weak {
@@ -920,7 +920,7 @@
 }
 
 .evidence-strength.moderate {
-  color: #d97706;
+  color: #ea580c;
 }
 
 .evidence-strength.weak {
@@ -1049,7 +1049,7 @@
 .reason-icon.warning {
   background: #fef3c7;
 
-  color: #d97706;
+  color: #ea580c;
 }
 
 
@@ -1100,7 +1100,7 @@
 }
 
 .status-row strong.moderate {
-  color: #d97706;
+  color: #ea580c;
 }
 
 .status-row strong.weak {
@@ -1126,7 +1126,7 @@
 .status-pill.moderate {
   background: #fef3c7;
 
-  color: #d97706 !important;
+  color: #ea580c !important;
 }
 
 .status-pill.weak {
