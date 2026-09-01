@@ -1328,8 +1328,17 @@ function App() {
     replayProgress > 0.02 ||
     (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
 
-  const displayOilFrame = sceneLive ? currentOilFrame : observedSlickFrame;
-  const showLocalPlume = true;
+  const hasOpenDrift = Boolean(
+    forwardResult?.trajectory?.coordinates?.length >= 2 ||
+    backtrackResult?.backend?.backward_trajectory
+  );
+
+  const displayOilFrame = hasOpenDrift
+    ? (sceneLive ? { particles: [], trails: [], flowLines: [] } : observedSlickFrame)
+    : sceneLive
+      ? currentOilFrame
+      : observedSlickFrame;
+  const showLocalPlume = !hasOpenDrift || !sceneLive;
   const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
   const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
   const currentOilFlowLines = showLocalPlume ? displayOilFrame?.flowLines || [] : [];
@@ -1733,7 +1742,7 @@ function App() {
   // the explicit Backtrack tool view.
   const investigationVisible = backtrackVisible || activeItem === "replay";
   const showBackendOil = Boolean(
-    investigationVisible && layers.backtrack && (backtrackResult?.backend || forwardResult)
+    hasOpenDrift && layers.spill && (sceneLive || isPlaying)
   );
 
   const mapSourceRegion = investigationVisible ? calculatedSourceRegion : null;
@@ -2114,18 +2123,18 @@ function App() {
           forward={forwardResult}
           slickGeometry={activeSlick?.geometry}
           visible={showBackendOil}
-          timeMs={simMs}
+          timeMs={clockNow}
         />
 
         {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
-        {investigationVisible && layers.backtrack && !showBackendOil && forwardResult?.trajectory?.coordinates?.length >= 2 && (
+        {hasOpenDrift && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
           <Polyline
             positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
             pathOptions={{
-              color: "#7c3aed",
-              weight: 3,
-              opacity: 0.9,
-              dashArray: "2 7",
+              color: "#9a3412",
+              weight: 1.6,
+              opacity: 0.55,
+              dashArray: "3 7",
               lineCap: "round",
             }}
           >
