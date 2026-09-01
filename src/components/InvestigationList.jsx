@@ -56,11 +56,16 @@ export default function InvestigationList({
 
   const lat = Number(incident?.centroid?.latitude ?? incident?.location?.latitude);
   const lon = Number(incident?.centroid?.longitude ?? incident?.location?.longitude);
+  const isLocal = /localhost|127\.0\.0\.1/i.test(String(backendHost || ""));
   const linkLabel =
     backendOnline === true
-      ? "Live"
+      ? isLocal
+        ? "Local"
+        : "Live"
       : backendOnline === false
-        ? "Offline"
+        ? isLocal
+          ? "Local offline"
+          : "Offline"
         : "Checking";
 
   return (

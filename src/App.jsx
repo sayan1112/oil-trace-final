@@ -1112,32 +1112,38 @@ function App() {
 
   // Fire-and-forget warm-up on mount so both services are ready
   useEffect(() => {
-    warmDetectionService();
+    const useModalMl = import.meta.env.VITE_USE_MODAL_ML === "true";
+    if (useModalMl) warmDetectionService();
     warmBackend();
     getBackendHealth()
       .then(() => {
         setBackendOnline(true);
         setBackendHost(getActiveBackendUrl());
       })
-      .catch(() => setBackendOnline(false));
+      .catch(() => {
+        setBackendOnline(false);
+        setBackendHost(getActiveBackendUrl());
+      });
 
-    fetchDemoDetection()
-      .then((geojson) => {
-        setDetectionResult(geojson);
-        setLayers((prev) => ({ ...prev, detectedSlicks: true }));
-        const feature = geojson?.features?.[0];
-        if (!feature) return;
-        const next = incidentFromDetection(feature, INCIDENT_SEED);
-        setIncident(next);
-        const slick = slickFromDetection(feature);
-        setActiveSlick({
-          ...slick,
-          id: CANONICAL_INCIDENT_ID,
-          timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
-        });
-        setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
-      })
-      .catch(() => {});
+    if (useModalMl) {
+      fetchDemoDetection()
+        .then((geojson) => {
+          setDetectionResult(geojson);
+          setLayers((prev) => ({ ...prev, detectedSlicks: true }));
+          const feature = geojson?.features?.[0];
+          if (!feature) return;
+          const next = incidentFromDetection(feature, INCIDENT_SEED);
+          setIncident(next);
+          const slick = slickFromDetection(feature);
+          setActiveSlick({
+            ...slick,
+            id: CANONICAL_INCIDENT_ID,
+            timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
+          });
+          setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
+        })
+        .catch(() => {});
+    }
 
     getReplay(CANONICAL_INCIDENT_ID)
       .then((replay) => {

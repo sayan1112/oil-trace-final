@@ -1,16 +1,17 @@
 /**
  * OilTrace Backend API client + frontend-shape adapters.
  *
- * Live requests go through `src/services/api.js` (Axios + Render → Modal failover).
- * Optional override: VITE_BACKEND_PRIMARY_URL / VITE_BACKEND_FALLBACK_URL.
+ * Live requests go through `src/services/api.js`.
+ * Development: localhost:8000 (no Modal failover).
+ * Production: Modal, optional Render fallback.
  *
  * All analytical outputs (source regions, rankings, trajectories, footprints,
  * counterfactual verdicts) come from these endpoints — never computed locally.
  */
 
-import { apiClient, describeBackendError, getActiveBackendUrl } from "./api";
+import { apiClient, describeBackendError, getActiveBackendUrl, isLocalBackend } from "./api";
 
-export { getActiveBackendUrl };
+export { getActiveBackendUrl, isLocalBackend };
 export const BACKEND_BASE = getActiveBackendUrl();
 
 async function request(path, options = {}, timeoutMs = 120000) {
