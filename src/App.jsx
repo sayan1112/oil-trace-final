@@ -73,8 +73,8 @@ import {
   vesselsFromReplay,
   vesselsNearCentroid,
 } from "./services/backendApi";
-import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
+import { buildCloud, overlayFrameFromCloud } from "./Simulation/particles";
 import { displaySpillPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
@@ -1328,20 +1328,55 @@ function App() {
     replayProgress > 0.02 ||
     (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
 
-  const hasOpenDrift = Boolean(
-    forwardResult?.trajectory?.coordinates?.length >= 2 ||
-    backtrackResult?.backend?.backward_trajectory
+  const openDriftCloud = useMemo(() => {
+    if (
+      forwardResult?.trajectory?.coordinates?.length >= 2 &&
+      forwardResult?.trajectory_timestamps_utc?.length
+    ) {
+      return buildCloud({
+        points: forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon]),
+        timesUtc: forwardResult.trajectory_timestamps_utc,
+        count: 720,
+        startSpreadKm: 0.18,
+        endSpreadKm: 0.6,
+        seed: "oiltrace-fwd",
+      });
+    }
+    const hindcast = backtrackResult?.backend;
+    if (
+      hindcast?.backward_trajectory?.coordinates?.length >= 2 &&
+      hindcast?.trajectory_timestamps_utc?.length
+    ) {
+      return buildCloud({
+        points: hindcast.backward_trajectory.coordinates.map(([lon, lat]) => [lat, lon]),
+        timesUtc: hindcast.trajectory_timestamps_utc,
+        count: 720,
+        startSpreadKm: 0.2,
+        endSpreadKm: 0.65,
+        seed: "oiltrace-back",
+      });
+    }
+    return null;
+  }, [forwardResult, backtrackResult]);
+
+  const hasOpenDrift = Boolean(openDriftCloud);
+  const driftTimeMs = Number.isFinite(simMs)
+    ? simMs
+    : openDriftCloud
+      ? openDriftCloud.t0 + oilProgressRatio * (openDriftCloud.t1 - openDriftCloud.t0)
+      : null;
+  const openDriftFrame = useMemo(
+    () => (openDriftCloud ? overlayFrameFromCloud(openDriftCloud, driftTimeMs) : null),
+    [openDriftCloud, driftTimeMs],
   );
 
-  const displayOilFrame = hasOpenDrift
-    ? (sceneLive ? { particles: [], trails: [], flowLines: [] } : observedSlickFrame)
-    : sceneLive
-      ? currentOilFrame
-      : observedSlickFrame;
-  const showLocalPlume = !hasOpenDrift || !sceneLive;
-  const currentOilParticles = showLocalPlume ? displayOilFrame?.particles || [] : [];
-  const currentOilTrails = showLocalPlume ? displayOilFrame?.trails || [] : [];
-  const currentOilFlowLines = showLocalPlume ? displayOilFrame?.flowLines || [] : [];
+  // No fake local leak. Rest = detected slick. Play + OpenDrift = packet
+  // travelling along the backend centroid path (ship/source → slick).
+  const displayOilFrame =
+    hasOpenDrift && sceneLive && openDriftFrame ? openDriftFrame : observedSlickFrame;
+  const currentOilParticles = displayOilFrame?.particles || [];
+  const currentOilTrails = displayOilFrame?.trails || [];
+  const currentOilFlowLines = [];
 
   /* =======================================================
      REPLAY ENGINE
@@ -1578,7 +1613,6 @@ function App() {
         .filter(Number.isFinite);
       if (simTs.length) {
         setSimMs(Math.min(...simTs));
-        setIsPlaying(true);
       }
       setBackendOnline(true);
       setBackendHost(getActiveBackendUrl());
@@ -1741,9 +1775,7 @@ function App() {
   // Backend investigation layers stay visible while replaying, not only in
   // the explicit Backtrack tool view.
   const investigationVisible = backtrackVisible || activeItem === "replay";
-  const showBackendOil = Boolean(
-    hasOpenDrift && layers.spill && (sceneLive || isPlaying)
-  );
+  const showBackendOil = false;
 
   const mapSourceRegion = investigationVisible ? calculatedSourceRegion : null;
 
@@ -2071,7 +2103,7 @@ function App() {
         ))}
 
         {/* BACKTRACKED TRANSPORT PATH */}
-        {investigationVisible && layers.backtrack && backtrackedCenterline.length >= 2 && (
+        {layers.backtrack && backtrackedCenterline.length >= 2 && (
           <Polyline
             positions={backtrackedCenterline}
             pathOptions={{
@@ -2091,7 +2123,7 @@ function App() {
         )}
 
         {/* BACKTRACKED SUSPECT INTERSECTION LINK */}
-        {investigationVisible && layers.backtrack && backtrackResult && scoredVessels.find((v) => v.candidateRank === 1) && (
+        {layers.backtrack && backtrackResult && scoredVessels.find((v) => v.candidateRank === 1) && (
           <Polyline
             positions={[
               sourceCenter,
@@ -2117,24 +2149,17 @@ function App() {
           </Polyline>
         )}
 
-        {/* BACKEND DRIFT PARTICLE CLOUD (OpenDrift-style) */}
-        <DriftCloudOverlay
-          hindcast={backtrackResult?.backend}
-          forward={forwardResult}
-          slickGeometry={activeSlick?.geometry}
-          visible={showBackendOil}
-          timeMs={clockNow}
-        />
+        {/* OpenDrift paths are drawn as polylines below — no fake particle cloud. */}
 
-        {/* BACKEND FORWARD SIMULATION: trajectory + predicted footprint */}
+        {/* BACKEND FORWARD SIMULATION: trajectory from suspected ship */}
         {hasOpenDrift && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
           <Polyline
             positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
             pathOptions={{
-              color: "#9a3412",
-              weight: 1.6,
-              opacity: 0.55,
-              dashArray: "3 7",
+              color: "#173a5e",
+              weight: 2.4,
+              opacity: 0.85,
+              dashArray: "5 6",
               lineCap: "round",
             }}
           >
@@ -2144,45 +2169,6 @@ function App() {
               Release {forwardResult.release_time_utc} · MMSI {forwardResult.vessel_mmsi}
             </Tooltip>
           </Polyline>
-        )}
-        {investigationVisible && layers.backtrack && forwardResult?.predicted_footprint && !showBackendOil && (
-          <Polygon
-            positions={
-              forwardResult.predicted_footprint.type === "Polygon"
-                ? [forwardResult.predicted_footprint.coordinates[0].map(([lon, lat]) => [lat, lon])]
-                : forwardResult.predicted_footprint.coordinates.map((poly) =>
-                    poly[0].map(([lon, lat]) => [lat, lon])
-                  )
-            }
-            pathOptions={{
-              color: "#0d9488",
-              weight: 2,
-              opacity: 0.9,
-              fillColor: "#0d9488",
-              fillOpacity: 0.16,
-            }}
-          >
-            <Tooltip sticky direction="top">
-              <strong>Predicted Footprint (backend)</strong>
-              <br />
-              Simulated particle envelope — not an observed slick
-              {counterfactualResult && (
-                <>
-                  <br />
-                  Counterfactual: {counterfactualResult.trajectory_reaches_slick ? "reaches slick" : "misses slick"}
-                  {counterfactualResult.centroid_distance_km != null
-                    ? ` · ${Number(counterfactualResult.centroid_distance_km).toFixed(2)} km`
-                    : ""}
-                  {counterfactualResult.spatial_agreement != null
-                    ? ` · Jaccard ${Number(counterfactualResult.spatial_agreement).toFixed(3)}`
-                    : ""}
-                  {counterfactualResult.evidence_strength
-                    ? ` · ${counterfactualResult.evidence_strength}`
-                    : ""}
-                </>
-              )}
-            </Tooltip>
-          </Polygon>
         )}
 
         {/* API DETECTED SLICK POLYGONS (from Detection Service) */}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import { buildCloud, cloudPositions, cloudTrail, envelopeRadiusKm } from "../Simulation/particles";
+import { buildCloud, cloudPositions, overlayFrameFromCloud, envelopeRadiusKm } from "../Simulation/particles";
 
 // OpenDrift-style particle clouds for the BACKEND simulations, all driven by
 // the app's ONE master simulation clock (`timeMs`):
@@ -95,7 +95,7 @@ export default function DriftCloudOverlay({
     const drawCloud = (cloud, fill, bufRef) => {
       const pos = cloudPositions(cloud, tMs, bufRef.current);
       bufRef.current = pos;
-      const trail = cloudTrail(cloud, tMs);
+      const trail = overlayFrameFromCloud(cloud, tMs).trails[0]?.path || [];
       if (trail.length >= 2) {
         ctx.beginPath();
         trail.forEach((pair, index) => {
