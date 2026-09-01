@@ -59,19 +59,17 @@ function Sidebar({
         })}
       </nav>
 
+      <button type="button" className="stitch-rail-chevron" tabIndex={-1} aria-hidden="true">
+        <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+          <path d="M8 2 L4 6 L8 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
       <div className="sidebar-footer command-user stitch-nav-foot">
         <div className={`stitch-mission ${backendOnline === false ? "is-off" : ""}`}>
           <span className={`demo-dot ${backendOnline === false ? "offline" : ""}`} />
           <div>
             <strong>SIH 26143</strong>
             <small>{backendOnline === false ? "Watch floor offline" : "NTRO · E. Med"}</small>
-          </div>
-        </div>
-        <div className="stitch-user">
-          <span className="stitch-avatar" aria-hidden="true">SD</span>
-          <div>
-            <strong>Sayan D.</strong>
-            <small>Duty analyst</small>
           </div>
         </div>
       </div>

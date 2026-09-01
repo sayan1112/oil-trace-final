@@ -116,14 +116,23 @@ function classifyParticle(distanceFromSource, elapsedMinutes, slickSpanKm) {
   return "initial";
 }
 
+function advectStep(lat, lng, minute, currentField, windField, dtMinutes, sign) {
+  const current = currentField.getVelocity(lat, lng, minute);
+  const wind = windField.getVelocity(lat, lng, minute);
+  return {
+    lat: lat + sign * (current.dLatPerMin + wind.dLatPerMin) * dtMinutes,
+    lng: lng + sign * (current.dLngPerMin + wind.dLngPerMin) * dtMinutes,
+  };
+}
+
 export function generateOilSimulation({
   incident,
   currentField = defaultCurrentField,
   windField = defaultWindField,
-  particleCount = 2800,
-  startMinutes = -45,
-  endMinutes = 30,
-  stepMinutes = 2,
+  particleCount = 2600,
+  startMinutes = 0,
+  endMinutes = 360,
+  stepMinutes = 6,
   seed = 26143,
 } = {}) {
   const centerLat = Number(
@@ -159,56 +168,58 @@ export function generateOilSimulation({
 
     baseParticles.push({
       id: i,
-      initLat: spawn.lat,
-      initLng: spawn.lng,
-      speedMultiplier: isCore
-        ? 0.04 + prng() * 0.12
-        : 0.18 + prng() * 0.28,
-      spreadMultiplier: 0.35 + prng() * 0.45,
-      radiusPixels: (isCore ? 4.2 : 2.8) + prng() * 2.4,
+      endLat: spawn.lat,
+      endLng: spawn.lng,
+      spreadMultiplier: isCore ? 0.18 + prng() * 0.16 : 0.55 + prng() * 0.7,
+      radiusPixels: (isCore ? 1.8 : isEdge ? 1.15 : 1.4) + prng() * 0.7,
       turbulencePhase: prng() * Math.PI * 2,
       isCore,
+      isEdge,
     });
   }
 
   const totalDurationMinutes = endMinutes - startMinutes;
+  const dt = 2;
 
   const particleHistories = baseParticles.map((particle) => {
-    const history = [[particle.initLng, particle.initLat]];
-    let lat = particle.initLat;
-    let lng = particle.initLng;
+    // Observed slick samples are the *detection-time* positions. Reverse
+    // the current+wind field so the Replay clock can start at the release
+    // cluster and drift into the SAR footprint.
+    let lat = particle.endLat;
+    let lng = particle.endLng;
+    for (let minute = totalDurationMinutes; minute > 0; minute -= dt) {
+      const next = advectStep(
+        lat,
+        lng,
+        startMinutes + minute,
+        currentField,
+        windField,
+        dt,
+        -1,
+      );
+      lat = next.lat;
+      lng = next.lng;
+    }
 
-    for (let minute = 1; minute <= totalDurationMinutes; minute += 1) {
-      if (particle.isCore) {
-        // Small stochastic movement keeps the red source area alive
-        // without pulling the concentration core away from the release.
-        lat += Math.sin(minute * 0.16 + particle.turbulencePhase) * 0.000035;
-        lng += Math.cos(minute * 0.14 + particle.turbulencePhase) * 0.000035;
-      } else {
-        const absoluteMinute = startMinutes + minute;
-        const current = currentField.getVelocity(lat, lng, absoluteMinute);
-        const wind = windField.getVelocity(lat, lng, absoluteMinute);
-
-        // Diffusion grows with time so the plume visibly widens as it travels.
-        const diffusion =
-          0.000012 * Math.sqrt(minute) * particle.spreadMultiplier;
-        const turbLat =
-          Math.sin(minute * 0.19 + particle.turbulencePhase) * diffusion;
-        const turbLng =
-          Math.cos(minute * 0.23 + particle.turbulencePhase) * diffusion * 0.72;
-
-        lat +=
-          (current.dLatPerMin + wind.dLatPerMin) *
-            particle.speedMultiplier *
-            0.22 +
-          turbLat;
-        lng +=
-          (current.dLngPerMin + wind.dLngPerMin) *
-            particle.speedMultiplier *
-            0.22 +
-          turbLng;
-      }
-
+    const history = [[lng, lat]];
+    for (let minute = dt; minute <= totalDurationMinutes; minute += dt) {
+      const diffusion =
+        0.000004 * Math.sqrt(minute) * particle.spreadMultiplier;
+      const turbLat =
+        Math.sin(minute * 0.11 + particle.turbulencePhase) * diffusion;
+      const turbLng =
+        Math.cos(minute * 0.14 + particle.turbulencePhase) * diffusion * 0.78;
+      const next = advectStep(
+        lat,
+        lng,
+        startMinutes + minute,
+        currentField,
+        windField,
+        dt,
+        1,
+      );
+      lat = next.lat + turbLat;
+      lng = next.lng + turbLng;
       history.push([lng, lat]);
     }
 
@@ -290,7 +301,8 @@ export function generateOilSimulation({
   for (let step = 0; step <= totalSteps; step += 1) {
     const timeMinutes = startMinutes + step * stepMinutes;
     const elapsedMinutes = Math.max(0, timeMinutes - startMinutes);
-    const minuteIndex = Math.min(elapsedMinutes, totalDurationMinutes);
+    const historyCap = particleHistories[0]?.length ? particleHistories[0].length - 1 : 0;
+    const historyIndex = Math.min(Math.floor(elapsedMinutes / dt), historyCap);
 
     let sumLat = 0;
     let sumLng = 0;
@@ -301,30 +313,18 @@ export function generateOilSimulation({
 
     baseParticles.forEach((particle, index) => {
       const history = particleHistories[index];
-      const position = history[minuteIndex];
+      const position = history[historyIndex];
       const lng = position[0];
       const lat = position[1];
 
-      const distanceFromSource = distanceMeters(
-        centerLat,
-        centerLng,
-        lat,
-        lng,
-      );
+      const category = particle.isCore
+        ? "stranded"
+        : particle.isEdge
+          ? "initial"
+          : "active";
 
-      const category = classifyParticle(
-        distanceFromSource,
-        elapsedMinutes,
-        slickSpanKm,
-      );
-
-      // Weight the centreline toward actual high-concentration parcels.
       const concentrationWeight =
-        category === "stranded"
-          ? 3.5
-          : category === "active"
-            ? 1.4
-            : 0.55;
+        category === "stranded" ? 3.5 : category === "active" ? 1.4 : 0.55;
 
       sumLat += lat * concentrationWeight;
       sumLng += lng * concentrationWeight;
@@ -339,11 +339,9 @@ export function generateOilSimulation({
         category,
       });
 
-      // Draw enough historical trails to make the transport direction
-      // obvious, but not so many that the map becomes a solid mass.
-      if (index % 5 === 0 && minuteIndex >= 2) {
-        const start = Math.max(0, minuteIndex - 18);
-        const trailPath = history.slice(start, minuteIndex + 1);
+      if (index % 4 === 0 && historyIndex >= 2) {
+        const start = Math.max(0, historyIndex - 16);
+        const trailPath = history.slice(start, historyIndex + 1);
         if (trailPath.length >= 2) {
           frameTrails.push({
             id: particle.id,
@@ -356,9 +354,9 @@ export function generateOilSimulation({
     const centerlineLat = sumWeight ? sumLat / sumWeight : centerLat;
     const centerlineLng = sumWeight ? sumLng / sumWeight : centerLng;
 
-    const baseHour = 10;
-    const baseMin = 45;
-    const absoluteMinutes = baseHour * 60 + baseMin + timeMinutes;
+    const baseHour = 6;
+    const baseMin = 0;
+    const absoluteMinutes = baseHour * 60 + baseMin + elapsedMinutes;
     const hh = String(Math.floor((absoluteMinutes / 60) % 24)).padStart(2, "0");
     const mm = String(Math.floor(absoluteMinutes % 60)).padStart(2, "0");
     const timeLabel = `${hh}:${mm}`;
