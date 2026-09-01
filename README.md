@@ -23,9 +23,9 @@ The map camera and oil particle layer are isolated from vessel-selection UI stat
 
 All analytical outputs are live from the OilTrace backend (`src/services/api.js`
 + `src/services/backendApi.js`). Axios tries
-`https://sih-oil-spill-26143-backend.onrender.com`, then failovers to
-`https://vscimatic999--oiltrace-backend-web.modal.run`.
-"Run hindcast" executes hindcast (OpenDrift) → AIS query → attribution →
+`https://vscimatic999--oiltrace-backend-web.modal.run`, then failovers to
+`https://sih-oil-spill-26143-backend.onrender.com`.
+"Run hindcast" executes hindcast (OpenDrift, 6 hours) → AIS query → attribution →
 forward simulation → counterfactual. Override hosts with
 `VITE_BACKEND_PRIMARY_URL` / `VITE_BACKEND_FALLBACK_URL` (see `.env.example`).
 
@@ -33,6 +33,7 @@ The ML detection service has no CORS headers, so the browser reaches it through
 the `/ml-api` dev proxy (vite.config.js). In production, add CORS to the ML
 service or replicate the rewrite on the static host (or set `VITE_ML_BASE_URL`).
 
-The demo incident (`src/data/incident.json`) is the Norway scenario — it must
-stay inside the backend's forcing-data window (lon 4–6, lat 59–61,
-20–22 Aug 2025) or OpenDrift has no currents/wind to work with.
+The canonical SIH demo is Eastern Mediterranean / Cyprus (`incident-mediterranean-001`,
+centroid 35.63533°N, 34.87040°E). The map is seeded from ML detection (Oil/00067);
+source region, AIS ranking, forward drift, and replay come from the backend API.
+Do not use Norway/Mumbai regression fixtures as the frontend demo.

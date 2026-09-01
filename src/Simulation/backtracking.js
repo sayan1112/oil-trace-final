@@ -39,7 +39,7 @@ export function backtrackOil({
   particleCount = 600,
   seed = 42,
 } = {}) {
-  const targetCentroid = centroid || incident?.centroid || incident?.location || { latitude: 18.52, longitude: 72.912 };
+  const targetCentroid = centroid || incident?.centroid || incident?.location || { latitude: 35.63533, longitude: 34.8704 };
   const lat = Number(targetCentroid.latitude);
   const lng = Number(targetCentroid.longitude);
 

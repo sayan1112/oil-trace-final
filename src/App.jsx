@@ -39,7 +39,6 @@ import "./components/InvestigationList.css";
 
 import "./App.css";
 
-import { scoreAllVessels } from "./utils/attributionScoring";
 import {
   warmBackend,
   getBackendHealth,
@@ -48,6 +47,7 @@ import {
   runAttribution,
   runForwardSimulation,
   runCounterfactual,
+  getReplay,
   bboxFromGeometry,
   trajectoryPoints,
   sourceRegionForFrontend,
@@ -57,16 +57,21 @@ import {
   buildFrontendScoring,
   shiftIsoHours,
   assertWithinForcingCoverage,
-  isWithinForcingCoverage,
-  transposeSlickToDemoWindow,
   getActiveBackendUrl,
+  CANONICAL_INCIDENT_ID,
+  CANONICAL_AIS_BBOX,
+  CANONICAL_AIS_START,
+  CANONICAL_AIS_END,
+  incidentFromDetection,
+  vesselsFromReplay,
+  vesselsNearCentroid,
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
-import { warmDetectionService } from "./services/detectionApi";
+import { warmDetectionService, fetchDemoDetection } from "./services/detectionApi";
 
 /* =========================================================
    LEAFLET MARKER FIX
@@ -87,7 +92,7 @@ L.Icon.Default.mergeOptions({
    INCIDENT DATA
 ========================================================= */
 
-const incident = incidentData.incident;
+const INCIDENT_SEED = incidentData.incident;
 
 /* =========================================================
    HELPERS
@@ -208,35 +213,36 @@ function createVesselIcon({
    GEOGRAPHIC DATA
 ========================================================= */
 
-const leafletCentroid = [
-  Number(incident.centroid.latitude),
-  Number(incident.centroid.longitude),
-];
+function polygonFromIncident(inc) {
+  return Array.isArray(inc?.spillPolygon)
+    ? inc.spillPolygon
+        .filter(
+          (point) =>
+            Array.isArray(point) &&
+            point.length >= 2 &&
+            Number.isFinite(Number(point[0])) &&
+            Number.isFinite(Number(point[1]))
+        )
+        .map(([latitude, longitude]) => [Number(latitude), Number(longitude)])
+    : [];
+}
 
-const spillPolygon = Array.isArray(incident.spillPolygon)
-  ? incident.spillPolygon
-      .filter(
-        (point) =>
-          Array.isArray(point) &&
-          point.length >= 2 &&
-          Number.isFinite(Number(point[0])) &&
-          Number.isFinite(Number(point[1]))
-      )
-      .map(([latitude, longitude]) => [
-        Number(latitude),
-        Number(longitude),
-      ])
-  : [];
+function centroidFromIncident(inc) {
+  return [
+    Number(inc?.centroid?.latitude ?? inc?.location?.latitude),
+    Number(inc?.centroid?.longitude ?? inc?.location?.longitude),
+  ];
+}
 
 /* =========================================================
    MAP HELPERS
 ========================================================= */
 
-function getIncidentPoints() {
+function getIncidentPoints(inc = INCIDENT_SEED) {
   const points = [];
 
-  if (Array.isArray(incident?.spillPolygon)) {
-    incident.spillPolygon.forEach((point) => {
+  if (Array.isArray(inc?.spillPolygon)) {
+    inc.spillPolygon.forEach((point) => {
       if (Array.isArray(point) && point.length >= 2) {
         const latitude = Number(point[0]);
         const longitude = Number(point[1]);
@@ -248,18 +254,18 @@ function getIncidentPoints() {
   }
 
   if (
-    incident?.centroid &&
-    Number.isFinite(Number(incident.centroid.latitude)) &&
-    Number.isFinite(Number(incident.centroid.longitude))
+    inc?.centroid &&
+    Number.isFinite(Number(inc.centroid.latitude)) &&
+    Number.isFinite(Number(inc.centroid.longitude))
   ) {
     points.push([
-      Number(incident.centroid.latitude),
-      Number(incident.centroid.longitude),
+      Number(inc.centroid.latitude),
+      Number(inc.centroid.longitude),
     ]);
   }
 
-  if (Array.isArray(incident?.vessels)) {
-    incident.vessels.forEach((vessel) => {
+  if (Array.isArray(inc?.vessels)) {
+    inc.vessels.forEach((vessel) => {
       const latitude = Number(vessel?.position?.latitude);
       const longitude = Number(vessel?.position?.longitude);
       if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
@@ -554,7 +560,7 @@ function VesselPopup({ vessel, show = true }) {
    INCIDENT PANEL
 ========================================================= */
 
-function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, isBacktracking }) {
+function IncidentPanel({ incident, vessels, onSelectVessel, onClose, onTriggerBacktrack, isBacktracking }) {
   const topCandidate =
     vessels.find((vessel) => vessel.candidateRank === 1) || vessels[0];
 
@@ -791,10 +797,10 @@ function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, i
       <section className="context-section">
         <span className="context-section-label">TIMELINE</span>
         <div className="incident-timeline">
-          {incident.timeline.map((event, index) => (
+          {(incident.timeline || []).map((event, index) => (
             <div
               className={`incident-timeline-item ${
-                index === incident.timeline.length - 1 ? "timeline-final" : ""
+                index === (incident.timeline || []).length - 1 ? "timeline-final" : ""
               }`}
               key={`${event.time}-${index}`}
             >
@@ -885,23 +891,21 @@ function LegendPanel({ onClose }) {
 ========================================================= */
 
 function App() {
-  /* =======================================================
-     FORWARD OIL SIMULATION ENGINE
-  ======================================================= */
+  const [incident, setIncident] = useState(INCIDENT_SEED);
+  const leafletCentroid = centroidFromIncident(incident);
+  const spillPolygon = polygonFromIncident(incident);
 
   const oilSimulation = useMemo(
     () => generateOilSimulation({ incident }),
-    []
+    [incident]
   );
 
-  /* =======================================================
-     SIMULATED OCEAN CURRENT & WIND FIELD VECTORS
-  ======================================================= */
-
   const simulatedCurrentVectors = useMemo(() => {
+    const [clat, clng] = centroidFromIncident(incident);
+    if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
     const vectors = [];
-    for (let lat = 59.95; lat <= 60.42; lat += 0.055) {
-      for (let lng = 4.25; lng <= 4.98; lng += 0.075) {
+    for (let lat = clat - 0.22; lat <= clat + 0.22; lat += 0.055) {
+      for (let lng = clng - 0.36; lng <= clng + 0.36; lng += 0.075) {
         const vel = defaultCurrentField.getVelocity(lat, lng, 0);
         const rad = ((90 - vel.direction) * Math.PI) / 180;
         const len = 0.014;
@@ -922,12 +926,14 @@ function App() {
       }
     }
     return vectors;
-  }, []);
+  }, [incident]);
 
   const simulatedWindVectors = useMemo(() => {
+    const [clat, clng] = centroidFromIncident(incident);
+    if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
     const vectors = [];
-    for (let lat = 59.97; lat <= 60.40; lat += 0.055) {
-      for (let lng = 4.28; lng <= 4.95; lng += 0.075) {
+    for (let lat = clat - 0.2; lat <= clat + 0.2; lat += 0.055) {
+      for (let lng = clng - 0.32; lng <= clng + 0.32; lng += 0.075) {
         const wind = defaultWindField.getVelocity(lat, lng, 0);
         const rad = ((90 - wind.direction) * Math.PI) / 180;
         const len = 0.015;
@@ -948,7 +954,7 @@ function App() {
       }
     }
     return vectors;
-  }, []);
+  }, [incident]);
 
   /* =======================================================
      DYNAMIC BACKTRACK ENGINE STATE
@@ -967,25 +973,14 @@ function App() {
   const [backendOnline, setBackendOnline] = useState(null); // null=checking
   const [backendHost, setBackendHost] = useState("");
   const [transposeNotice, setTransposeNotice] = useState(null);
+  const [replayMeta, setReplayMeta] = useState(null);
   const [activeSlick, setActiveSlick] = useState(null); // slick sent to the backend
 
-  const calculatedSourceRegion = useMemo(() => {
-    if (backtrackResult?.sourceRegion) {
-      return backtrackResult.sourceRegion;
-    }
-    return incident.sourceRegion;
-  }, [backtrackResult]);
+  const calculatedSourceRegion = backtrackResult?.sourceRegion || null;
 
-  /* =======================================================
-     VESSEL SCORING
-  ======================================================= */
-
-  // Backend-attributed vessels take over as soon as the live pipeline has
-  // run; the static incident.json list is only the initial preview.
   const scoredVessels = useMemo(
-    () =>
-      backendVessels ?? scoreAllVessels(incident.vessels, calculatedSourceRegion),
-    [backendVessels, calculatedSourceRegion]
+    () => vesselsNearCentroid(backendVessels || [], incident.centroid),
+    [backendVessels, incident]
   );
 
   /* =======================================================
@@ -1051,10 +1046,13 @@ function App() {
     (forwardResult?.trajectory_timestamps_utc || []).forEach((t) =>
       ts.push(Date.parse(t))
     );
+    if (replayMeta?.start_time_utc) ts.push(Date.parse(replayMeta.start_time_utc));
+    if (replayMeta?.end_time_utc) ts.push(Date.parse(replayMeta.end_time_utc));
+    (replayMeta?.frames || []).forEach((frame) => ts.push(Date.parse(frame.timestamp_utc)));
     const valid = ts.filter(Number.isFinite);
     if (valid.length < 2) return null;
     return { t0: Math.min(...valid), t1: Math.max(...valid) };
-  }, [backtrackResult, forwardResult]);
+  }, [backtrackResult, forwardResult, replayMeta]);
 
   const [simMs, setSimMs] = useState(null);
 
@@ -1120,6 +1118,47 @@ function App() {
         setBackendHost(getActiveBackendUrl());
       })
       .catch(() => setBackendOnline(false));
+
+    fetchDemoDetection()
+      .then((geojson) => {
+        setDetectionResult(geojson);
+        setLayers((prev) => ({ ...prev, detectedSlicks: true }));
+        const feature = geojson?.features?.[0];
+        if (!feature) return;
+        const next = incidentFromDetection(feature, INCIDENT_SEED);
+        setIncident(next);
+        const slick = slickFromDetection(feature);
+        setActiveSlick({
+          ...slick,
+          id: CANONICAL_INCIDENT_ID,
+          timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
+        });
+        setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
+      })
+      .catch(() => {});
+
+    getReplay(CANONICAL_INCIDENT_ID)
+      .then((replay) => {
+        setReplayMeta(replay);
+        const fromReplay = vesselsNearCentroid(
+          vesselsFromReplay(replay),
+          INCIDENT_SEED.centroid
+        );
+        if (fromReplay.length) {
+          setBackendVessels((current) => current || fromReplay);
+        }
+      })
+      .catch(() => {});
+
+    getCandidateVessels(CANONICAL_AIS_BBOX, CANONICAL_AIS_START, CANONICAL_AIS_END)
+      .then((vessels) => {
+        const normalized = vesselsNearCentroid(
+          normalizeVessels(vessels, null),
+          INCIDENT_SEED.centroid
+        );
+        if (normalized.length) setBackendVessels(normalized);
+      })
+      .catch(() => {});
   }, []);
 
   const handleDetectionResult = useCallback((geojson) => {
@@ -1154,11 +1193,12 @@ function App() {
   const [replaySpeed, setReplaySpeed] = useState(1);
 
   const totalReplayPoints = useMemo(() => {
-    if (!scoredVessels.length) return 1;
-    return Math.max(
-      ...scoredVessels.map((vessel) => vessel.trajectory?.length || 1)
-    );
-  }, [scoredVessels]);
+    const fromReplay = replayMeta?.frames?.length || 0;
+    const fromTracks = scoredVessels.length
+      ? Math.max(...scoredVessels.map((vessel) => vessel.trajectory?.length || 1))
+      : 0;
+    return Math.max(1, fromReplay, fromTracks);
+  }, [scoredVessels, replayMeta]);
 
   const replayProgressRatio = useMemo(() => {
     const maxP = Math.max(1, totalReplayPoints - 1);
@@ -1246,10 +1286,7 @@ function App() {
     setBackendError(null);
 
     try {
-      // The slick to hindcast: an ML-detected slick if the user picked one
-      // as seed, otherwise the demo incident slick.
       let slick = null;
-      let transposed = false;
       if (activeSeedId && detectionResult?.features?.length) {
         const feature = detectionResult.features.find(
           (f) => String(f?.properties?.id) === String(activeSeedId)
@@ -1262,37 +1299,15 @@ function App() {
           centroid: { lat: apiSeedOverride.lat, lon: apiSeedOverride.lon },
         };
       }
-      if (slick && !isWithinForcingCoverage(slick)) {
-        // The detected slick lies outside the backend's forcing-data window
-        // (the ML demo scene is in the Eastern Mediterranean; forcing covers
-        // only the North Sea demo window). Offer to carry its real shape
-        // into the demo window so the physics can run — clearly labeled.
-        const ok = window.confirm(
-          "The detected slick is outside the backend's forcing-data coverage " +
-            "(North Sea 4–6°E / 59–61°N, 20–22 Aug 2025 UTC), so OpenDrift has no " +
-            "currents or wind there.\n\n" +
-            "Run it as a DEMO TRANSPOSITION instead? The slick's real detected " +
-            "shape is kept, but its location and time are moved into the demo " +
-            "window. Results will be labeled accordingly.\n\n" +
-            "Cancel to keep the seed unused (the Norway demo incident runs instead)."
-        );
-        if (ok) {
-          slick = transposeSlickToDemoWindow(slick);
-          transposed = true;
-        } else {
-          slick = null;
-        }
-      }
       if (!slick) slick = slickFromIncident(incident);
+      slick = {
+        ...slick,
+        id: CANONICAL_INCIDENT_ID,
+        timestamp_utc: slick.timestamp_utc || incident.detectedAt,
+      };
 
-      // Fail fast with a clear message when the slick lies outside the demo
-      // forcing-data window — OpenDrift has no currents/wind anywhere else.
       assertWithinForcingCoverage(slick);
-      setTransposeNotice(
-        transposed
-          ? "The ML-detected slick's real shape was moved into the North Sea demo forcing window (location/time are not the detection's own). All results below are computed by the backend on the transposed slick."
-          : null
-      );
+      setTransposeNotice(null);
       setActiveSlick(slick);
       setForwardResult(null);
       setCounterfactualResult(null);
@@ -1313,7 +1328,7 @@ function App() {
       let hc = null;
       try {
         setBacktrackStatusText("OpenDrift hindcast…");
-        hc = await runHindcast(slick, 1);
+        hc = await runHindcast(slick, 6);
         const sourceRegion = sourceRegionForFrontend(hc.source_region);
         setBacktrackResult({
           sourceRegion,
@@ -1331,6 +1346,7 @@ function App() {
           trajectory: trajectoryPoints(hc.backward_trajectory),
           backend: hc,
         });
+        setIncident((prev) => ({ ...prev, sourceRegion }));
       } catch (hindcastErr) {
         const msg = hindcastErr?.message || String(hindcastErr);
         if (!/hdf|netcdf/i.test(msg)) {
@@ -1343,14 +1359,13 @@ function App() {
       const region = hc?.source_region?.candidate_regions?.[0];
       const bbox = region?.geometry
         ? bboxFromGeometry(region.geometry, 0.6)
-        : [
-            slick.centroid.lon - 0.6,
-            slick.centroid.lat - 0.6,
-            slick.centroid.lon + 0.6,
-            slick.centroid.lat + 0.6,
-          ].join(",");
-      const start = shiftIsoHours(region?.start_time_utc || slick.timestamp_utc, -12);
-      const end = shiftIsoHours(region?.end_time_utc || slick.timestamp_utc, 12);
+        : CANONICAL_AIS_BBOX;
+      const start = region?.start_time_utc
+        ? shiftIsoHours(region.start_time_utc, -12)
+        : CANONICAL_AIS_START;
+      const end = region?.end_time_utc
+        ? shiftIsoHours(region.end_time_utc, 12)
+        : CANONICAL_AIS_END;
 
       let vessels = [];
       let attribution = null;
@@ -1359,9 +1374,11 @@ function App() {
         vessels = await getCandidateVessels(bbox, start, end);
         setBacktrackStatusText("Ranking candidates…");
         attribution = await runAttribution(
-          slick.id || incident.id,
+          CANONICAL_INCIDENT_ID,
           hc?.source_region || {
-            incident_id: slick.id || incident.id,
+            id: "sr-med",
+            slick_id: CANONICAL_INCIDENT_ID,
+            generated_at_utc: new Date().toISOString(),
             candidate_regions: [
               {
                 id: "local-src",
@@ -1374,13 +1391,16 @@ function App() {
             ],
           },
           vessels,
-          15
+          10
         );
       } catch (aisErr) {
         setTransposeNotice((n) => n || aisErr.message);
       }
 
-      let normalized = attribution ? normalizeVessels(vessels, attribution) : [];
+      let normalized = vesselsNearCentroid(
+        attribution ? normalizeVessels(vessels, attribution) : normalizeVessels(vessels, null),
+        { lat: slick.centroid.lat, lon: slick.centroid.lon }
+      );
 
       const top = attribution?.top_candidates?.[0];
       try {
@@ -1391,7 +1411,7 @@ function App() {
 
         setBacktrackStatusText("Counterfactual: comparing with observed slick...");
         const cf = await runCounterfactual(
-          slick.id || incident.id,
+          CANONICAL_INCIDENT_ID,
           fwd.vessel_mmsi,
           fwd,
           slick
@@ -1409,7 +1429,8 @@ function App() {
                     label:
                       cf.explanation ||
                       `Counterfactual: ${Math.round((cf.spatial_agreement || 0) * 100)}% spatial agreement, ` +
-                        `${cf.trajectory_reaches_slick ? "trajectory reaches slick" : "trajectory misses slick"}.`,
+                        `${cf.trajectory_reaches_slick ? "trajectory reaches slick" : "trajectory misses slick"}` +
+                        (cf.centroid_distance_km != null ? `, ${Number(cf.centroid_distance_km).toFixed(2)} km.` : "."),
                   },
                 },
               }
@@ -1432,8 +1453,6 @@ function App() {
           }))
         );
       }
-      // Start the synced replay (particle cloud + vessels) from the top of
-      // the simulation window.
       const simTs = (hc?.trajectory_timestamps_utc || [])
         .map((t) => Date.parse(t))
         .filter(Number.isFinite);
@@ -1443,13 +1462,19 @@ function App() {
       }
       setBackendOnline(true);
       setBackendHost(getActiveBackendUrl());
+      try {
+        const replay = await getReplay(CANONICAL_INCIDENT_ID);
+        setReplayMeta(replay);
+      } catch {
+        /* replay is optional until the backend publishes the Mediterranean incident */
+      }
     } catch (err) {
       setBackendError(err?.message || String(err));
     } finally {
       setIsBacktracking(false);
       setBacktrackStatusText("");
     }
-  }, [isBacktracking, activeSeedId, detectionResult, apiSeedOverride]);
+  }, [isBacktracking, activeSeedId, detectionResult, apiSeedOverride, incident]);
 
   /* =======================================================
      REPLAY POSITION & TRAJECTORY COMPUTATION
@@ -1600,13 +1625,13 @@ function App() {
     investigationVisible && layers.backtrack && (backtrackResult?.backend || forwardResult)
   );
 
-  const mapSourceRegion = investigationVisible ? calculatedSourceRegion : incident.sourceRegion;
+  const mapSourceRegion = investigationVisible ? calculatedSourceRegion : null;
 
   const sourceCenter = [
     Number(mapSourceRegion?.center?.latitude ?? leafletCentroid[0]),
     Number(mapSourceRegion?.center?.longitude ?? leafletCentroid[1]),
   ];
-  const sourceRadiusMeters = Number(mapSourceRegion?.radiusMeters ?? 1800);
+  const sourceRadiusMeters = Number(mapSourceRegion?.radiusMeters || 0);
 
   const backtrackedCenterline = useMemo(() => {
     if (!backtrackResult?.trajectory) return [];
@@ -1675,6 +1700,7 @@ function App() {
           <div className="command-stage-pane command-detail">
               {activeItem === "incident" && (
                 <IncidentPanel
+                  incident={incident}
                   vessels={scoredVessels}
                   onSelectVessel={handleSelectVessel}
                   onClose={closePanel}
@@ -1996,8 +2022,16 @@ function App() {
               {counterfactualResult && (
                 <>
                   <br />
-                  Counterfactual: {Math.round((counterfactualResult.spatial_agreement || 0) * 100)}%
-                  overlap · {counterfactualResult.evidence_strength}
+                  Counterfactual: {counterfactualResult.trajectory_reaches_slick ? "reaches slick" : "misses slick"}
+                  {counterfactualResult.centroid_distance_km != null
+                    ? ` · ${Number(counterfactualResult.centroid_distance_km).toFixed(2)} km`
+                    : ""}
+                  {counterfactualResult.spatial_agreement != null
+                    ? ` · Jaccard ${Number(counterfactualResult.spatial_agreement).toFixed(3)}`
+                    : ""}
+                  {counterfactualResult.evidence_strength
+                    ? ` · ${counterfactualResult.evidence_strength}`
+                    : ""}
                 </>
               )}
             </Tooltip>
@@ -2097,7 +2131,7 @@ function App() {
         )}
 
         {/* SOURCE UNCERTAINTY REGION */}
-        {layers.sourceRegion && sourceRadiusMeters > 0 && (
+        {layers.sourceRegion && mapSourceRegion && sourceRadiusMeters > 0 && (
           <Circle
             center={sourceCenter}
             radius={sourceRadiusMeters}
@@ -2115,7 +2149,7 @@ function App() {
                 {backtrackVisible && backtrackResult ? "Calculated Source Region" : "Probable Source Region"}
               </strong>
               <br />
-              Confidence: {(backtrackVisible ? calculatedSourceRegion : incident.sourceRegion)?.confidence ?? 78}%
+              Confidence: {mapSourceRegion?.confidence ?? "—"}%
               <br />
               Uncertainty Radius: {(sourceRadiusMeters / 1000).toFixed(2)} km
             </Tooltip>

@@ -55,10 +55,10 @@ export function generateOilSimulation({
   seed = 26143,
 } = {}) {
   const centerLat = Number(
-    incident?.centroid?.latitude ?? incident?.location?.latitude ?? 18.52,
+    incident?.centroid?.latitude ?? incident?.location?.latitude ?? 35.63533,
   );
   const centerLng = Number(
-    incident?.centroid?.longitude ?? incident?.location?.longitude ?? 72.912,
+    incident?.centroid?.longitude ?? incident?.location?.longitude ?? 34.8704,
   );
 
   const prng = seededRandom(seed);

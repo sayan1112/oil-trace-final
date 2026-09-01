@@ -25,12 +25,12 @@ export class OceanCurrentField {
   }
 
   getVelocity(latitude, longitude, timeMinutes = 0) {
-    const lat = Number(latitude) || 18.52;
-    const lng = Number(longitude) || 72.912;
+    const lat = Number(latitude) || 35.63533;
+    const lng = Number(longitude) || 34.8704;
     const t = Number(timeMinutes) || 0;
 
-    const dLat = lat - 18.52;
-    const dLng = lng - 72.912;
+    const dLat = lat - 35.63533;
+    const dLng = lng - 34.8704;
 
     // Curved current streamlines creating a sweeping arc across the ocean
     const uSpatial = Math.sin(dLat * 40 + dLng * 20) * 0.45;
