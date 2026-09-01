@@ -410,7 +410,7 @@ class OilCanvasLayer {
         maxY = Math.max(maxY, point.y);
       }
 
-      if (plotted.length) {
+      if (plotted.length && !this._polygon?.length) {
         const cx = (minX + maxX) / 2;
         const cy = (minY + maxY) / 2;
         const rx = Math.max(22, (maxX - minX) / 2 + 16 * zoomBoost);
