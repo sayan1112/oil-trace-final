@@ -18,9 +18,9 @@ export function TimelineControl({
   onSpeedChange,
   timelineEvents = []
 }) {
-  const currentTimestamp = timestamps[currentIndex] || "10:00";
-  const startTime = timestamps[0] || "10:00";
-  const endTime = timestamps[timestamps.length - 1] || "11:15";
+  const currentTimestamp = timestamps[currentIndex] || "—";
+  const startTime = timestamps[0] || "—";
+  const endTime = timestamps[timestamps.length - 1] || "—";
 
   // Find if current timestamp has an associated event milestone label from incident.json
   const currentEvent = timelineEvents.find((e) => e.time === currentTimestamp);

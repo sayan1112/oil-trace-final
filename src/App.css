@@ -3128,7 +3128,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .app.command-center {
   display: grid;
-  grid-template-columns: 220px 360px minmax(0, 1fr);
+  grid-template-columns: 232px 360px minmax(0, 1fr);
   background: #eef1f4;
   font-family: "IBM Plex Sans", Inter, "Segoe UI", sans-serif;
 }
@@ -3242,7 +3242,9 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .command-center .oiltrace-replay-panel,
 .command-center .oiltrace-vessel-panel,
 .command-center .evidence-panel,
-.command-center .suspect-panel {
+.command-center .suspect-panel,
+.command-center .detection-panel,
+.command-center .incident-panel {
   position: relative !important;
   inset: auto !important;
   top: auto !important;
