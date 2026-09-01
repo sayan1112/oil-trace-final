@@ -32,8 +32,12 @@ export default function InvestigationList({
   isBacktracking = false,
   backendOnline,
   backendHost,
+  query: queryProp,
+  onQueryChange,
 }) {
-  const [query, setQuery] = useState("");
+  const [queryLocal, setQueryLocal] = useState("");
+  const query = queryProp ?? queryLocal;
+  const setQuery = onQueryChange || setQueryLocal;
   const [filter, setFilter] = useState("all");
 
   const ranked = useMemo(
@@ -114,8 +118,9 @@ export default function InvestigationList({
       <button type="button" className="inv-case-card" onClick={onOpenIncident}>
         <div className="inv-case-top">
           <strong>#{incident?.id || "incident"}</strong>
-          <span className="inv-badge investigating">{incident?.status || "Open"}</span>
+          <span className="inv-badge high-sev">{incident?.severity || "HIGH"}</span>
         </div>
+        <p className="inv-status-line">{incident?.status || "Under Investigation"}</p>
         <div className="inv-route">
           <span>{incident?.satellite?.platform || "Sentinel-1"}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -123,12 +128,33 @@ export default function InvestigationList({
           </svg>
           <span>{formatCoord(lat, lon)}</span>
         </div>
-        <div className="inv-case-meta">
-          <span>{incident?.areaKm2 ?? "—"} km²</span>
-          <span>{confidencePct(incident?.detectionConfidence)}% SAR</span>
-          {detectionCount > 0 && <span>{detectionCount} live mask{detectionCount === 1 ? "" : "s"}</span>}
+        <div className="inv-assess">
+          <div>
+            <span>Area</span>
+            <strong>{incident?.areaKm2 ?? "—"} km²</strong>
+          </div>
+          <div>
+            <span>Confidence</span>
+            <strong>{confidencePct(incident?.detectionConfidence)}%</strong>
+          </div>
+          <div>
+            <span>Sensor</span>
+            <strong>{incident?.satellite?.sensor || "SAR"}</strong>
+          </div>
         </div>
       </button>
+
+      {ranked[0] && (
+        <div className="inv-top-hit">
+          <div>
+            <p>Top candidate</p>
+            <strong>{ranked[0].name || ranked[0].mmsi}</strong>
+          </div>
+          <button type="button" className="inv-action" onClick={() => onSelectVessel?.(ranked[0])}>
+            {confidencePct(ranked[0].attributionConfidence)}% inspect
+          </button>
+        </div>
+      )}
 
       <div className="inv-actions">
         <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>

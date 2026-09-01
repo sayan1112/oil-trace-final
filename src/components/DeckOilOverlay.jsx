@@ -19,9 +19,9 @@ import "./DeckOilOverlay.css";
 ========================================================= */
 
 const CATEGORY_COLORS = {
-  initial: [212, 168, 48],
-  active: [176, 92, 18],
-  stranded: [92, 36, 8],
+  initial: [245, 158, 11],
+  active: [234, 88, 12],
+  stranded: [124, 45, 18],
 };
 
 class OilCanvasLayer {
@@ -270,12 +270,11 @@ class OilCanvasLayer {
     ctx.closePath();
 
     const fill = ctx.createRadialGradient(cx, cy, 4, cx, cy, Math.max(rx, ry) * 1.05);
-    fill.addColorStop(0, `rgba(4, 3, 2, ${0.94 + pulse * 0.03})`);
-    fill.addColorStop(0.22, `rgba(18, 10, 4, ${0.92 + pulse * 0.03})`);
-    fill.addColorStop(0.48, `rgba(42, 22, 8, ${0.88 + pulse * 0.04})`);
-    fill.addColorStop(0.72, `rgba(72, 40, 12, ${0.76 + pulse * 0.05})`);
-    fill.addColorStop(0.88, `rgba(110, 72, 18, ${0.42 + pulse * 0.06})`);
-    fill.addColorStop(1, `rgba(28, 48, 42, ${0.18 + pulse * 0.05})`);
+    fill.addColorStop(0, `rgba(67, 20, 7, ${0.88 + pulse * 0.04})`);
+    fill.addColorStop(0.28, `rgba(154, 52, 18, ${0.78 + pulse * 0.05})`);
+    fill.addColorStop(0.55, `rgba(234, 88, 12, ${0.62 + pulse * 0.06})`);
+    fill.addColorStop(0.78, `rgba(251, 146, 60, ${0.38 + pulse * 0.08})`);
+    fill.addColorStop(1, `rgba(253, 186, 116, ${0.08 + pulse * 0.04})`);
     ctx.fillStyle = fill;
     ctx.fill();
 
@@ -292,7 +291,7 @@ class OilCanvasLayer {
     ctx.fill();
     ctx.globalCompositeOperation = "source-over";
 
-    ctx.strokeStyle = `rgba(232, 196, 96, ${0.55 + pulse * 0.2})`;
+    ctx.strokeStyle = `rgba(251, 146, 60, ${0.75 + pulse * 0.15})`;
     ctx.lineWidth = zoom < 9 ? 2.4 : 1.6;
     ctx.stroke();
     ctx.restore();

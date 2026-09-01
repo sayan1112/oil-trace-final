@@ -35,9 +35,13 @@ import DeckOilOverlay from "./components/DeckOilOverlay";
 import { DetectionPanel } from "./components/DetectionPanel";
 import InvestigationList from "./components/InvestigationList";
 import { TimelineControl } from "./components/TimelineControl";
+import CommandTopBar from "./components/CommandTopBar";
+import IntelRail from "./components/IntelRail";
+import OperationCard from "./components/OperationCard";
 import "./components/InvestigationList.css";
 
 import "./App.css";
+import "./stitch-theme.css";
 
 import {
   warmBackend,
@@ -74,7 +78,7 @@ import { displaySpillPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
-import { warmDetectionService, fetchDemoDetection } from "./services/detectionApi";
+import { compassLabel, msToKnots } from "./utils/compass";
 
 /* =========================================================
    LEAFLET MARKER FIX
@@ -976,6 +980,24 @@ function App() {
     [backendVessels, incident]
   );
 
+  const envSnapshot = useMemo(() => {
+    const [lat, lng] = leafletCentroid;
+    const wind = defaultWindField.getVelocity(lat, lng, 0);
+    const current = defaultCurrentField.getVelocity(lat, lng, 0);
+    const windKn = msToKnots(wind.speed);
+    const currentKn = msToKnots(current.speed);
+    return {
+      windKn,
+      windDir: wind.direction,
+      currentKn,
+      currentDir: current.direction,
+      waveM: Math.max(0.5, Math.min(2.4, 0.02 * windKn * windKn)),
+      tempC: 26,
+    };
+  }, [leafletCentroid]);
+
+  const topVessel = scoredVessels[0] || null;
+
   /* =======================================================
      LIVE FOCUS GEOMETRY (what the camera should frame)
   ======================================================= */
@@ -1068,6 +1090,7 @@ function App() {
   ======================================================= */
 
   const [selectedVesselId, setSelectedVesselId] = useState(null);
+  const [queueQuery, setQueueQuery] = useState("");
 
   const selectedVessel = scoredVessels.find(
     (vessel) => vessel.id === selectedVesselId
@@ -1084,8 +1107,8 @@ function App() {
     sourceRegion: true,
     trajectories: true,
     vessels: true,
-    oceanCurrent: false,
-    windField: false,
+    oceanCurrent: true,
+    windField: true,
     detectedSlicks: true,
   });
 
@@ -1680,9 +1703,17 @@ function App() {
         onSelect={handleNavigation}
         onTriggerBacktrack={handleRunBacktrack}
         backendOnline={backendOnline}
+        backendHost={backendHost}
       />
 
       <div className="command-shell">
+      <CommandTopBar
+        incidentId={incident.id}
+        search={queueQuery}
+        onSearch={setQueueQuery}
+        onNewIncident={() => setActiveItem("detect")}
+      />
+      <div className="command-body">
       <div className={`command-stage ${showDetail ? "is-detail" : ""}`}>
         <div className="command-stage-track">
           <div className="command-stage-pane">
@@ -1698,6 +1729,8 @@ function App() {
               isBacktracking={isBacktracking}
               backendOnline={backendOnline}
               backendHost={backendHost}
+              query={queueQuery}
+              onQueryChange={setQueueQuery}
             />
           </div>
           <div className="command-stage-pane command-detail">
@@ -1799,6 +1832,20 @@ function App() {
                 >
                   Satellite
                 </button>
+                <button
+                  type="button"
+                  className={`head-chip ${layers.oceanCurrent ? "is-active" : ""}`}
+                  onClick={() => toggleLayer("oceanCurrent")}
+                >
+                  Current
+                </button>
+                <button
+                  type="button"
+                  className={`head-chip ${layers.windField ? "is-active" : ""}`}
+                  onClick={() => toggleLayer("windField")}
+                >
+                  Wind
+                </button>
                 <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
                   Layers
                 </button>
@@ -1824,7 +1871,7 @@ function App() {
           url={
             mapStyle === "satellite"
               ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           }
           maxZoom={19}
         />
@@ -1836,8 +1883,8 @@ function App() {
               positions={vec.positions}
               pathOptions={{
                 color: "#0284c7",
-                weight: 2,
-                opacity: 0.8,
+                weight: 2.6,
+                opacity: 0.92,
                 lineCap: "round",
               }}
             >
@@ -1868,8 +1915,8 @@ function App() {
               positions={vec.positions}
               pathOptions={{
                 color: "#f59e0b",
-                weight: 2,
-                opacity: 0.8,
+                weight: 2.6,
+                opacity: 0.92,
                 lineCap: "round",
               }}
             >
@@ -2115,10 +2162,10 @@ function App() {
           <Polygon
             positions={spillPolygon}
             pathOptions={{
-              color: "#d4a017",
+              color: "#ea580c",
               weight: 2,
-              opacity: 0.85,
-              fillColor: "#1a0c04",
+              opacity: 0.9,
+              fillColor: "#9a3412",
               fillOpacity: 0.12,
               lineCap: "round",
               lineJoin: "round",
@@ -2368,6 +2415,36 @@ function App() {
         })}
       </MapContainer>
 
+            <div className="command-ops-row">
+              <OperationCard
+                vessel={selectedVessel || topVessel}
+                photoSrc="/vessels/mt-cyprus-sun.png"
+              />
+            </div>
+
+            <div className="env-strip" aria-label="Environmental conditions">
+              <div className="env-chip">
+                <span>Wind</span>
+                <strong>
+                  {envSnapshot.windKn.toFixed(0)} kn {compassLabel(envSnapshot.windDir)}
+                </strong>
+              </div>
+              <div className="env-chip">
+                <span>Current</span>
+                <strong>
+                  {envSnapshot.currentKn.toFixed(1)} kn {compassLabel(envSnapshot.currentDir)}
+                </strong>
+              </div>
+              <div className="env-chip">
+                <span>Waves</span>
+                <strong>{envSnapshot.waveM.toFixed(1)} m</strong>
+              </div>
+              <div className="env-chip">
+                <span>Temp</span>
+                <strong>{envSnapshot.tempC}°C</strong>
+              </div>
+            </div>
+
             <TimelineControl
               startMs={clockStart}
               endMs={clockEnd}
@@ -2415,6 +2492,19 @@ function App() {
             )}
           </div>
         </div>
+      </div>
+      <IntelRail
+        incident={incident}
+        vessels={scoredVessels}
+        env={envSnapshot}
+        selectedVesselId={selectedVesselId}
+        onSelectVessel={(id) => {
+          const hit = scoredVessels.find(
+            (vessel) => String(vessel.id) === String(id) || String(vessel.mmsi) === String(id)
+          );
+          if (hit) handleSelectVessel(hit);
+        }}
+      />
       </div>
       </div>
     </div>
