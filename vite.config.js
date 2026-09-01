@@ -17,6 +17,17 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ml-api/, ""),
       },
+      "/api": {
+        target: "https://sih-oil-spill-26143-backend.onrender.com",
+        changeOrigin: true,
+        timeout: 180000,
+      },
+      "/__backend-fallback": {
+        target: "https://vscimatic999--oiltrace-backend-web.modal.run",
+        changeOrigin: true,
+        timeout: 180000,
+        rewrite: (path) => path.replace(/^\/__backend-fallback/, ""),
+      },
     },
   },
 });

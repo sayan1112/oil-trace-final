@@ -1,39 +1,32 @@
 /**
  * OilTrace Backend API client + frontend-shape adapters.
  *
- * BASE resolution:
- *   1. VITE_BACKEND_BASE_URL from .env (use this to point at the deployed
- *      Modal/Render backend, e.g. https://sih-oil-spill-26143-backend.onrender.com)
- *   2. Falls back to the local dev backend.
+ * Live requests go through `src/services/api.js` (Axios + Render → Modal failover).
+ * Optional override: VITE_BACKEND_PRIMARY_URL / VITE_BACKEND_FALLBACK_URL.
  *
  * All analytical outputs (source regions, rankings, trajectories, footprints,
  * counterfactual verdicts) come from these endpoints — never computed locally.
  */
 
-export const BACKEND_BASE =
-  import.meta.env.VITE_BACKEND_BASE_URL || "http://127.0.0.1:8000";
+import { apiClient, describeBackendError, getActiveBackendUrl } from "./api";
 
-const API = `${BACKEND_BASE}/api/v1`;
+export { getActiveBackendUrl };
+export const BACKEND_BASE = getActiveBackendUrl();
 
 async function request(path, options = {}, timeoutMs = 120000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const method = (options.method || "GET").toUpperCase();
+  const headers = { ...(options.headers || {}) };
   try {
-    const r = await fetch(`${API}${path}`, { ...options, signal: controller.signal });
-    const text = await r.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (!r.ok) {
-      throw new Error(`${r.status}: ${data?.detail ?? data?.message ?? r.statusText}`);
-    }
-    return data;
-  } catch (e) {
-    if (e?.name === "AbortError") {
-      throw new Error(`Backend request timed out after ${Math.round(timeoutMs / 1000)}s.`);
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
+    const response = await apiClient.request({
+      url: `/api/v1${path}`,
+      method,
+      data: options.body,
+      headers,
+      timeout: timeoutMs,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(describeBackendError(error), { cause: error });
   }
 }
 

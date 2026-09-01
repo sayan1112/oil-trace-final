@@ -33,6 +33,9 @@ import Sidebar from "./Sidebar";
 
 import DeckOilOverlay from "./components/DeckOilOverlay";
 import { DetectionPanel } from "./components/DetectionPanel";
+import InvestigationList from "./components/InvestigationList";
+import { TimelineControl } from "./components/TimelineControl";
+import "./components/InvestigationList.css";
 
 import "./App.css";
 
@@ -56,6 +59,7 @@ import {
   assertWithinForcingCoverage,
   isWithinForcingCoverage,
   transposeSlickToDemoWindow,
+  getActiveBackendUrl,
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
 import { generateOilSimulation } from "./Simulation/oilSimulation";
@@ -186,7 +190,10 @@ function createVesselIcon({
         <div class="vessel-probability-label">${confidencePercent}%</div>
         <div class="vessel-probability-ring"></div>
         <div class="vessel-marker-body">
-          <span class="vessel-marker-symbol">⚓</span>
+          <svg class="vessel-marker-symbol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 15h16l-2 4H6l-2-4Z" />
+            <path d="M8 15V9h8v6" />
+          </svg>
         </div>
       </div>
     `,
@@ -294,8 +301,8 @@ function FitMapToIncident() {
         return;
       }
       map.fitBounds(L.latLngBounds(points), {
-        paddingTopLeft: [70, 70],
-        paddingBottomRight: [390, 70],
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, 80],
         maxZoom: 13,
         animate: false,
       });
@@ -325,8 +332,8 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
     const pts = stageKey === "1-1-0" ? scenePoints : storyPoints;
     if (!pts.length) return;
     map.fitBounds(L.latLngBounds(pts), {
-      paddingTopLeft: [70, 70],
-      paddingBottomRight: [390, 70],
+      paddingTopLeft: [24, 24],
+      paddingBottomRight: [24, 80],
       maxZoom: 12,
       animate: true,
       duration: 0.9,
@@ -355,8 +362,8 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
     if (!points?.length) points = getIncidentPoints();
     if (!points.length) return;
     map.fitBounds(L.latLngBounds(points), {
-      paddingTopLeft: [70, 70],
-      paddingBottomRight: [390, 70],
+      paddingTopLeft: [24, 24],
+      paddingBottomRight: [24, 80],
       maxZoom: 12,
       animate: true,
       duration: 0.7,
@@ -397,8 +404,7 @@ function MapToolbar({ darkMode, onToggleTheme, onTriggerBacktrack, isBacktrackin
           boxShadow: "0 2px 8px rgba(2, 132, 199, 0.4)",
         }}
       >
-        <span style={{ fontSize: "1rem" }}>{isBacktracking ? "⌛" : "↺"}</span>
-        <span>{isBacktracking ? "BACKTRACKING..." : "BACKTRACK OIL"}</span>
+        <span>{isBacktracking ? "Running" : "Hindcast"}</span>
       </button>
 
       <span className="map-tool-divider" />
@@ -731,7 +737,6 @@ function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, i
         <span className="context-section-label">INCIDENT</span>
         <h3 className="incident-title">{incident.spillType}</h3>
         <div style={{ marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(37, 99, 235, 0.08)", padding: "4px 8px", borderRadius: "5px", fontSize: "11px", fontWeight: "700", fontFamily: "ui-monospace, monospace", color: "#1d4ed8" }}>
-          <span>📍</span>
           <span>{formattedCoordinates}</span>
         </div>
         <p className="incident-time" style={{ marginTop: "6px" }}>
@@ -991,6 +996,7 @@ function App() {
   const [counterfactualResult, setCounterfactualResult] = useState(null);
   const [backendError, setBackendError] = useState(null);
   const [backendOnline, setBackendOnline] = useState(null); // null=checking
+  const [backendHost, setBackendHost] = useState("");
   const [transposeNotice, setTransposeNotice] = useState(null);
   const [activeSlick, setActiveSlick] = useState(null); // slick sent to the backend
 
@@ -1096,13 +1102,7 @@ function App() {
 
   const [activeItem, setActiveItem] = useState("map");
 
-  const [darkMode, setDarkMode] = useState(() => {
-    try {
-      return localStorage.getItem("oiltrace-theme") === "dark";
-    } catch {
-      return false;
-    }
-  });
+  const [darkMode, setDarkMode] = useState(true);
 
   useEffect(() => {
     try {
@@ -1157,7 +1157,10 @@ function App() {
     warmDetectionService();
     warmBackend();
     getBackendHealth()
-      .then(() => setBackendOnline(true))
+      .then(() => {
+        setBackendOnline(true);
+        setBackendHost(getActiveBackendUrl());
+      })
       .catch(() => setBackendOnline(false));
   }, []);
 
@@ -1295,6 +1298,12 @@ function App() {
         );
         if (feature) slick = slickFromDetection(feature);
       }
+      if (slick && apiSeedOverride) {
+        slick = {
+          ...slick,
+          centroid: { lat: apiSeedOverride.lat, lon: apiSeedOverride.lon },
+        };
+      }
       if (slick && !isWithinForcingCoverage(slick)) {
         // The detected slick lies outside the backend's forcing-data window
         // (the ML demo scene is in the Eastern Mediterranean; forcing covers
@@ -1419,6 +1428,7 @@ function App() {
         setIsPlaying(true);
       }
       setBackendOnline(true);
+      setBackendHost(getActiveBackendUrl());
     } catch (err) {
       setBackendError(err?.message || String(err));
       setBackendOnline(false);
@@ -1426,7 +1436,7 @@ function App() {
       setIsBacktracking(false);
       setBacktrackStatusText("");
     }
-  }, [isBacktracking, activeSeedId, detectionResult]);
+  }, [isBacktracking, activeSeedId, detectionResult, apiSeedOverride]);
 
   /* =======================================================
      REPLAY POSITION & TRAJECTORY COMPUTATION
@@ -1599,9 +1609,14 @@ function App() {
      RENDER (SINGLE MapContainer STRICTLY ENFORCED)
   ======================================================= */
 
+  const showDetail = ["incident", "vessels", "legend", "replay", "evidence", "detect"].includes(activeItem);
+  const timelineStamps = (incident.timeline || []).map((event) => event.time);
+  const timelineIndex = simRange && Number.isFinite(simMs)
+    ? Math.round(((simMs - simRange.t0) / (simRange.t1 - simRange.t0)) * Math.max(1, timelineStamps.length - 1))
+    : Math.round(replayProgress);
+
   return (
-    <div className={`app ${appThemeClass}`}>
-      {/* SIDEBAR */}
+    <div className={`app command-center ${appThemeClass}`}>
       <Sidebar
         activeItem={activeItem}
         layers={layers}
@@ -1609,9 +1624,109 @@ function App() {
         onSelect={handleNavigation}
         onTriggerBacktrack={handleRunBacktrack}
         darkMode={darkMode}
+        backendOnline={backendOnline}
       />
 
-      {/* SINGLE MAP CONTAINER */}
+      <InvestigationList
+        incident={incident}
+        vessels={scoredVessels}
+        detectionCount={detectionResult?.features?.length || 0}
+        selectedVesselId={selectedVesselId}
+        onSelectVessel={handleSelectVessel}
+        onOpenIncident={() => setActiveItem("incident")}
+        onOpenDetect={() => setActiveItem("detect")}
+        onRunHindcast={handleRunBacktrack}
+        isBacktracking={isBacktracking}
+        backendOnline={backendOnline}
+        backendHost={backendHost}
+      />
+
+      <div className="command-workspace">
+        <header className="command-workspace-head">
+          <div>
+            <p className="inv-kicker">{incident.id}</p>
+            <h1>{incident.spillType}</h1>
+          </div>
+          <div className="command-head-actions">
+            <button type="button" className="head-chip" onClick={() => setDarkMode((v) => !v)}>
+              {darkMode ? "Dark map" : "Light map"}
+            </button>
+            <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
+              Layers
+            </button>
+          </div>
+        </header>
+
+        <div className="command-workspace-main">
+          {showDetail && (
+            <div className="command-detail">
+              {activeItem === "incident" && (
+                <IncidentPanel
+                  vessels={scoredVessels}
+                  onSelectVessel={handleSelectVessel}
+                  onClose={() => setActiveItem("map")}
+                  onTriggerBacktrack={handleRunBacktrack}
+                  isBacktracking={isBacktracking}
+                />
+              )}
+              {activeItem === "vessels" && (
+                <SuspectPanel
+                  selectedVessel={selectedVessel}
+                  allVessels={scoredVessels}
+                  onSelectVessel={handleSelectVessel}
+                  onClose={handleDeselect}
+                />
+              )}
+              {activeItem === "legend" && (
+                <LegendPanel onClose={() => setActiveItem("map")} />
+              )}
+              {activeItem === "replay" && (
+                <ReplayPanel
+                  vessels={scoredVessels}
+                  isPlaying={isPlaying}
+                  setIsPlaying={setIsPlaying}
+                  replayProgress={panelProgress}
+                  setReplayProgress={setPanelProgress}
+                  replaySpeed={replaySpeed}
+                  setReplaySpeed={setReplaySpeed}
+                  totalPoints={totalReplayPoints}
+                  timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : currentOilFrame?.timeLabel}
+                  startLabel={simRange
+                    ? `${fmtSimClock(simRange.t0)} UTC`
+                    : undefined}
+                  endLabel={simRange
+                    ? `${fmtSimClock(simRange.t1)} UTC`
+                    : undefined}
+                  releaseFrac={simRange ? releaseFrac : undefined}
+                  forcingTag={simRange ? "OpenDrift forcing" : undefined}
+                  currentFieldDesc={simRange ? "Ocean currents from backend forcing" : undefined}
+                  windFieldDesc={simRange ? "Wind field from backend forcing" : undefined}
+                  onClose={() => {
+                    setIsPlaying(false);
+                    setActiveItem("map");
+                  }}
+                />
+              )}
+              {activeItem === "evidence" && (
+                <EvidencePanel
+                  vessel={selectedVessel}
+                  onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
+                />
+              )}
+              {activeItem === "detect" && (
+                <DetectionPanel
+                  onDetectionResult={handleDetectionResult}
+                  onClose={() => setActiveItem("map")}
+                  onSeedOverride={handleSeedOverride}
+                  onClearSeed={handleClearSeed}
+                  activeSeedId={activeSeedId}
+                  currentResult={detectionResult}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="command-map-wrap">
       <MapContainer
         center={leafletCentroid}
         zoom={11}
@@ -1623,8 +1738,16 @@ function App() {
       >
         {/* BASE MAP */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={
+            darkMode
+              ? "Tiles © Esri"
+              : "© OpenStreetMap contributors"
+          }
+          url={
+            darkMode
+              ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          }
           maxZoom={19}
         />
 
@@ -2168,302 +2291,62 @@ function App() {
         })}
       </MapContainer>
 
-      {/* BACKTRACK ANALYSIS PANEL */}
-      {isBacktracking && (
-        <div style={{
-          position: "fixed",
-          bottom: "2rem",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 3000,
-          width: "340px",
-          background: "linear-gradient(135deg, rgba(6,18,42,0.97) 0%, rgba(8,28,60,0.97) 100%)",
-          border: "1px solid rgba(6,182,212,0.35)",
-          borderRadius: "16px",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(6,182,212,0.12), inset 0 1px 0 rgba(255,255,255,0.06)",
-          backdropFilter: "blur(20px)",
-          overflow: "hidden",
-          animation: "backtrackPanelIn 0.35s cubic-bezier(0.16,1,0.3,1)",
-        }}>
-          {/* Animated cyan scan line */}
-          <div style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "2px",
-            background: "linear-gradient(90deg, transparent, #06b6d4, #22d3ee, transparent)",
-            animation: "scanLine 1.8s ease-in-out infinite",
-          }} />
+            <TimelineControl
+              timestamps={timelineStamps}
+              currentIndex={Math.max(0, Math.min(timelineIndex, Math.max(0, timelineStamps.length - 1)))}
+              isPlaying={isPlaying}
+              onPlayPause={() => setIsPlaying((prev) => !prev)}
+              onSeek={(next) => {
+                const max = Math.max(1, timelineStamps.length - 1);
+                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
+                else setReplayProgress(next);
+              }}
+              onStepBack={() => {
+                const max = Math.max(1, timelineStamps.length - 1);
+                const next = Math.max(0, timelineIndex - 1);
+                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
+                else setReplayProgress(next);
+              }}
+              onStepForward={() => {
+                const max = Math.max(1, timelineStamps.length - 1);
+                const next = Math.min(max, timelineIndex + 1);
+                if (simRange) setSimMs(simRange.t0 + (next / max) * (simRange.t1 - simRange.t0));
+                else setReplayProgress(next);
+              }}
+              playbackSpeed={replaySpeed}
+              onSpeedChange={setReplaySpeed}
+              timelineEvents={incident.timeline || []}
+            />
 
-          <div style={{ padding: "1.25rem 1.25rem 1rem" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-              {/* Sonar pulse ring */}
-              <div style={{ position: "relative", width: "36px", height: "36px", flexShrink: 0 }}>
-                <div style={{
-                  position: "absolute",
-                  inset: 0,
-                  borderRadius: "50%",
-                  border: "2px solid #06b6d4",
-                  animation: "sonarPulse 1.4s ease-out infinite",
-                }} />
-                <div style={{
-                  position: "absolute",
-                  inset: "6px",
-                  borderRadius: "50%",
-                  background: "rgba(6,182,212,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "13px",
-                }}>🔍</div>
+            {isBacktracking && (
+              <div className="pipeline-status" role="status">
+                <strong>Pipeline running</strong>
+                <span>{backtrackStatusText || "Connecting to orchestration…"}</span>
+                <ol>
+                  <li>Hindcast</li>
+                  <li>AIS query</li>
+                  <li>Attribution</li>
+                  <li>Forward check</li>
+                </ol>
               </div>
-              <div>
-                <div style={{
-                  color: "#e2e8f0",
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                }}>Backtrack Analysis</div>
-                <div style={{
-                  color: "#06b6d4",
-                  fontSize: "0.7rem",
-                  fontWeight: 500,
-                  marginTop: "1px",
-                }}>Lagrangian Backward Transport</div>
+            )}
+
+            {transposeNotice && !isBacktracking && (
+              <div className="ops-toast warn">
+                <strong>Demo transposition.</strong> {transposeNotice}
+                <button type="button" onClick={() => setTransposeNotice(null)}>Dismiss</button>
               </div>
-            </div>
+            )}
 
-            {/* Current step */}
-            <div style={{
-              background: "rgba(6,182,212,0.08)",
-              border: "1px solid rgba(6,182,212,0.2)",
-              borderRadius: "10px",
-              padding: "0.6rem 0.85rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.6rem",
-              marginBottom: "0.9rem",
-            }}>
-              <span style={{
-                display: "inline-block",
-                width: "14px",
-                height: "14px",
-                border: "2px solid #06b6d4",
-                borderTopColor: "transparent",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-                flexShrink: 0,
-              }} />
-              <span style={{ color: "#94a3b8", fontSize: "0.78rem", lineHeight: 1.4 }}>
-                {backtrackStatusText || "Initialising backward transport engine..."}
-              </span>
-            </div>
-
-            {/* Progress steps */}
-            {[
-              "OpenDrift backward hindcast (backend)",
-              "AIS vessel query near source region",
-              "Attribution engine ranking",
-              "Forward simulation + counterfactual",
-            ].map((step, i) => (
-              <div key={step} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.55rem",
-                marginBottom: "0.4rem",
-                opacity: 0.55 + i * 0.1,
-              }}>
-                <div style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: "#06b6d4",
-                  flexShrink: 0,
-                  animation: `dotPulse ${0.6 + i * 0.25}s ease-in-out infinite alternate`,
-                }} />
-                <span style={{ color: "#64748b", fontSize: "0.72rem" }}>{step}</span>
+            {backendError && (
+              <div className="ops-toast error">
+                <strong>Request failed.</strong> {backendError}
+                <button type="button" onClick={() => setBackendError(null)}>Dismiss</button>
               </div>
-            ))}
-          </div>
-
-          {/* Animated progress bar */}
-          <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", position: "relative" }}>
-            <div style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              height: "100%",
-              width: "60%",
-              background: "linear-gradient(90deg, #06b6d4, #22d3ee)",
-              borderRadius: "0 2px 2px 0",
-              animation: "progressBar 1.4s ease-in-out infinite alternate",
-              boxShadow: "0 0 8px rgba(6,182,212,0.6)",
-            }} />
+            )}
           </div>
         </div>
-      )}
-
-      {/* DEMO TRANSPOSITION NOTICE */}
-      {transposeNotice && !isBacktracking && (
-        <div
-          style={{
-            position: "fixed",
-            top: "5.2rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 2900,
-            maxWidth: "520px",
-            background: "rgba(45,30,4,0.95)",
-            border: "1px solid rgba(245,158,11,0.5)",
-            borderRadius: "12px",
-            padding: "0.7rem 1rem",
-            color: "#fde68a",
-            fontSize: "0.78rem",
-            lineHeight: 1.45,
-            boxShadow: "0 14px 36px rgba(0,0,0,0.45)",
-          }}
-        >
-          <strong style={{ color: "#fbbf24" }}>Demo transposition.</strong>{" "}
-          {transposeNotice}
-          <button
-            onClick={() => setTransposeNotice(null)}
-            style={{
-              marginLeft: "0.6rem",
-              background: "none",
-              border: "1px solid rgba(251,191,36,0.5)",
-              borderRadius: "7px",
-              color: "#fcd34d",
-              padding: "0.12rem 0.5rem",
-              fontSize: "0.7rem",
-            }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* BACKEND ERROR TOAST */}
-      {backendError && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "2rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 3000,
-            maxWidth: "440px",
-            background: "rgba(40,10,12,0.96)",
-            border: "1px solid rgba(239,68,68,0.45)",
-            borderRadius: "12px",
-            padding: "0.8rem 1rem",
-            color: "#fecaca",
-            fontSize: "0.8rem",
-            lineHeight: 1.45,
-            boxShadow: "0 18px 44px rgba(0,0,0,0.5)",
-          }}
-        >
-          <strong style={{ color: "#f87171" }}>Backend request failed.</strong>{" "}
-          {backendError}
-          {backendOnline === false && (
-            <>
-              {" "}Check that the OilTrace backend is running and reachable
-              (VITE_BACKEND_BASE_URL).
-            </>
-          )}
-          <button
-            onClick={() => setBackendError(null)}
-            style={{
-              marginLeft: "0.7rem",
-              background: "none",
-              border: "1px solid rgba(248,113,113,0.5)",
-              borderRadius: "7px",
-              color: "#fca5a5",
-              padding: "0.15rem 0.55rem",
-              fontSize: "0.72rem",
-            }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* INCIDENT PANEL */}
-      {activeItem === "incident" && (
-        <IncidentPanel
-          vessels={scoredVessels}
-          onSelectVessel={handleSelectVessel}
-          onClose={() => setActiveItem("map")}
-          onTriggerBacktrack={handleRunBacktrack}
-          isBacktracking={isBacktracking}
-        />
-      )}
-
-      {/* VESSEL / SUSPECT PANEL */}
-      {activeItem === "vessels" && (
-        <SuspectPanel
-          selectedVessel={selectedVessel}
-          allVessels={scoredVessels}
-          onSelectVessel={handleSelectVessel}
-          onClose={handleDeselect}
-        />
-      )}
-
-      {/* LEGEND */}
-      {activeItem === "legend" && (
-        <LegendPanel onClose={() => setActiveItem("map")} />
-      )}
-
-      {/* REPLAY PANEL */}
-      {activeItem === "replay" && (
-        <ReplayPanel
-          vessels={scoredVessels}
-          isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
-          replayProgress={panelProgress}
-          setReplayProgress={setPanelProgress}
-          replaySpeed={replaySpeed}
-          setReplaySpeed={setReplaySpeed}
-          totalPoints={totalReplayPoints}
-          timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : currentOilFrame?.timeLabel}
-          startLabel={simRange
-            ? `${fmtSimClock(simRange.t0)} (window opens${releaseFrac !== null && releaseFrac <= 0.03 ? " · est. release" : ""})`
-            : undefined}
-          endLabel={simRange
-            ? `${fmtSimClock(simRange.t1)} (observed${releaseFrac !== null && releaseFrac >= 0.97 ? " · est. release" : ""})`
-            : undefined}
-          releaseFrac={simRange ? releaseFrac : undefined}
-          forcingTag={simRange ? "BACKEND (OpenDrift)" : undefined}
-          currentFieldDesc={simRange ? "Ocean currents - backend forcing data (OpenDrift)" : undefined}
-          windFieldDesc={simRange ? "Wind field - backend forcing data (OpenDrift)" : undefined}
-          onClose={() => {
-            setIsPlaying(false);
-            setActiveItem("map");
-          }}
-        />
-      )}
-
-      {/* EVIDENCE PANEL */}
-      {activeItem === "evidence" && (
-        <EvidencePanel
-          vessel={selectedVessel}
-          onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
-        />
-      )}
-
-      {/* DETECTION SERVICE PANEL */}
-      {activeItem === "detect" && (
-        <DetectionPanel
-          onDetectionResult={handleDetectionResult}
-          onClose={() => setActiveItem("map")}
-          onSeedOverride={handleSeedOverride}
-          onClearSeed={handleClearSeed}
-          activeSeedId={activeSeedId}
-          currentResult={detectionResult}
-        />
-      )}
+      </div>
     </div>
   );
 }

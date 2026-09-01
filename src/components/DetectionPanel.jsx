@@ -15,6 +15,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import {
+  detectViaBackend,
   fetchDemoDetection,
   runLiveDetection,
 } from "../services/detectionApi";
@@ -64,7 +65,7 @@ function SlickCard({ feature, activeSeedId, onUseSeed }) {
       </div>
 
       <div className="detection-slick-coords">
-        📍 {centroid.lat.toFixed(5)}°N {centroid.lon.toFixed(5)}°E
+        {centroid.lat.toFixed(5)}°N {centroid.lon.toFixed(5)}°E
       </div>
 
       <button
@@ -121,7 +122,12 @@ export function DetectionPanel({
       setStatus("loading-live");
       setError(null);
       try {
-        const geojson = await runLiveDetection(file);
+        let geojson;
+        try {
+          geojson = await detectViaBackend(file);
+        } catch {
+          geojson = await runLiveDetection(file);
+        }
         setResult(geojson);
         setStatus("success");
         onDetectionResult(geojson);
@@ -214,7 +220,7 @@ export function DetectionPanel({
       {status === "idle" && (
         <>
           <div className="detection-intro-card">
-            <span className="detection-intro-icon">🛰️</span>
+            <span className="detection-intro-icon">SAR</span>
             <p className="detection-intro-text">
               Load the pre-computed demo scene (Eastern Mediterranean, 267 km²
               slick) for an instant result, or upload your own Sentinel-1
@@ -250,7 +256,7 @@ export function DetectionPanel({
                 onChange={handleInputChange}
                 aria-label="Upload GeoTIFF scene"
               />
-              <span className="detection-upload-icon">📂</span>
+              <span className="detection-upload-icon">TIFF</span>
               <p className="detection-upload-title">Drop GeoTIFF here</p>
               <p className="detection-upload-hint">
                 2-band VV+VH · georeferenced · ≤ 80 MB
@@ -365,7 +371,7 @@ export function DetectionPanel({
           {/* No slick case */}
           {features.length === 0 ? (
             <div className="detection-empty-card">
-              <span className="detection-empty-icon">🌊</span>
+              <span className="detection-empty-icon">0</span>
               <p className="detection-empty-text">
                 No oil slicks detected in this scene. An empty result on clean
                 water is a valid, common outcome.

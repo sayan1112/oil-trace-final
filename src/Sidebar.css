@@ -1954,3 +1954,86 @@ input[type="checkbox"]:checked {
     width: 58px;
   }
 }
+
+.oiltrace-sidebar.command-nav {
+  position: relative;
+  inset: auto;
+  width: 232px;
+  height: 100%;
+  flex-shrink: 0;
+  background: #111318;
+  border-right: 1px solid #23262d;
+  box-shadow: none;
+}
+
+.oiltrace-sidebar.command-nav:hover {
+  width: 232px;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-brand,
+.oiltrace-sidebar.command-nav .sidebar-footer {
+  background: #111318;
+  border-color: #23262d;
+}
+
+.oiltrace-sidebar.command-nav .brand-text,
+.oiltrace-sidebar.command-nav .sidebar-label,
+.oiltrace-sidebar.command-nav .layer-chevron,
+.oiltrace-sidebar.command-nav .demo-text {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.oiltrace-sidebar.command-nav .brand-name,
+.oiltrace-sidebar.command-nav .sidebar-item {
+  color: #d7dbe2;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-item.active {
+  background: #1c1f26;
+  border-color: #3a3320;
+  color: #e8c547;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-item.active::before {
+  background: #c9a227;
+  box-shadow: none;
+}
+
+.oiltrace-sidebar.command-nav .sidebar-item:hover {
+  background: #191c22;
+  color: #f3f4f6;
+}
+
+.nav-group-label {
+  margin: 8px 12px 4px;
+  color: #7a818c;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nav-count {
+  margin-left: auto;
+  margin-right: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #c9a227;
+  color: #1a1404;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.oiltrace-sidebar.command-nav .command-user {
+  height: auto;
+  min-height: 72px;
+  padding: 14px 16px;
+}
+
+.demo-dot.offline {
+  background: #c45b5b;
+  box-shadow: none;
+  animation: none;
+}
