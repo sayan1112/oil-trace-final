@@ -29,26 +29,99 @@ function metersPerDegreeLng(latitude) {
   return Math.cos((latitude * Math.PI) / 180) * METERS_PER_DEGREE_LAT;
 }
 
+function spillRing(incident) {
+  const ring = incident?.spillPolygon;
+  if (!Array.isArray(ring) || ring.length < 4) return null;
+  return ring
+    .map((point) => [Number(point?.[0]), Number(point?.[1])])
+    .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+}
+
+function ringBBox(ring) {
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  ring.forEach(([lat, lng]) => {
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+  });
+  return { minLat, maxLat, minLng, maxLng };
+}
+
+function pointInRing(lat, lng, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i][0];
+    const xi = ring[i][1];
+    const yj = ring[j][0];
+    const xj = ring[j][1];
+    const crosses = yi > lat !== yj > lat;
+    if (!crosses) continue;
+    const xAtLat = ((xj - xi) * (lat - yi)) / (yj - yi || 1e-12) + xi;
+    if (lng < xAtLat) inside = !inside;
+  }
+  return inside;
+}
+
+function sampleInRing(ring, bbox, prng, centerLat, centerLng, mode) {
+  if (!ring) {
+    const angle = prng() * Math.PI * 2;
+    const radius = Math.sqrt(prng()) * 0.08;
+    return {
+      lat: centerLat + Math.sin(angle) * radius * 0.65,
+      lng: centerLng + Math.cos(angle) * radius,
+    };
+  }
+
+  const latSpan = Math.max(0.002, bbox.maxLat - bbox.minLat);
+  const lngSpan = Math.max(0.002, bbox.maxLng - bbox.minLng);
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    let lat;
+    let lng;
+    if (mode === "core") {
+      const angle = prng() * Math.PI * 2;
+      const radius = Math.sqrt(prng()) * 0.28;
+      lat = centerLat + Math.sin(angle) * radius * latSpan * 0.45;
+      lng = centerLng + Math.cos(angle) * radius * lngSpan * 0.45;
+    } else if (mode === "edge") {
+      lat = bbox.minLat + prng() * latSpan;
+      lng = bbox.minLng + prng() * lngSpan;
+    } else {
+      const angle = prng() * Math.PI * 2;
+      const radius = Math.sqrt(prng());
+      lat = centerLat + Math.sin(angle) * radius * latSpan * 0.55;
+      lng = centerLng + Math.cos(angle) * radius * lngSpan * 0.55;
+    }
+    if (pointInRing(lat, lng, ring)) return { lat, lng };
+  }
+
+  return { lat: centerLat, lng: centerLng };
+}
+
 function distanceMeters(lat1, lng1, lat2, lng2) {
   const dLat = (lat2 - lat1) * METERS_PER_DEGREE_LAT;
   const dLng = (lng2 - lng1) * metersPerDegreeLng((lat1 + lat2) / 2);
   return Math.sqrt(dLat * dLat + dLng * dLng);
 }
 
-function classifyParticle(distanceFromSource, elapsedMinutes) {
-  // Keep a small green release signature at the first few frames,
-  // then let concentration determine the color of the plume.
-  if (elapsedMinutes <= 8 && distanceFromSource < 700) return "initial";
-  if (distanceFromSource <= 900) return "stranded"; // red core / highest concentration
-  if (distanceFromSource <= 2800) return "active"; // blue active plume
-  return "initial"; // green dispersed / leading edge
+function classifyParticle(distanceFromSource, elapsedMinutes, slickSpanKm) {
+  const coreM = Math.max(2200, slickSpanKm * 220);
+  const midM = Math.max(6000, slickSpanKm * 550);
+  if (distanceFromSource <= coreM) return "stranded";
+  if (distanceFromSource <= midM) return "active";
+  if (elapsedMinutes <= 8) return "stranded";
+  return "initial";
 }
 
 export function generateOilSimulation({
   incident,
   currentField = defaultCurrentField,
   windField = defaultWindField,
-  particleCount = 2200,
+  particleCount = 2800,
   startMinutes = -45,
   endMinutes = 30,
   stepMinutes = 2,
@@ -60,28 +133,40 @@ export function generateOilSimulation({
   const centerLng = Number(
     incident?.centroid?.longitude ?? incident?.location?.longitude ?? 34.8704,
   );
+  const ring = spillRing(incident);
+  const bbox = ring ? ringBBox(ring) : null;
+  const slickSpanKm = bbox
+    ? Math.max(
+        (bbox.maxLat - bbox.minLat) * 111,
+        (bbox.maxLng - bbox.minLng) * 85,
+      )
+    : 8;
 
   const prng = seededRandom(seed);
   const baseParticles = [];
 
   for (let i = 0; i < particleCount; i += 1) {
-    const angle = prng() * Math.PI * 2;
-    const radius = Math.sqrt(prng()) * 0.0028;
-
     const coreFraction = prng();
-    const isCore = coreFraction < 0.30;
+    const isCore = coreFraction < 0.22;
+    const isEdge = !isCore && coreFraction > 0.78;
+    const spawn = sampleInRing(
+      ring,
+      bbox,
+      prng,
+      centerLat,
+      centerLng,
+      isCore ? "core" : isEdge ? "edge" : "mid",
+    );
 
     baseParticles.push({
       id: i,
-      initLat: centerLat + Math.sin(angle) * radius,
-      initLng: centerLng + Math.cos(angle) * radius,
-      // Core particles move much more slowly, maintaining the dense
-      // red source pool while the remaining particles advect away.
+      initLat: spawn.lat,
+      initLng: spawn.lng,
       speedMultiplier: isCore
-        ? 0.08 + prng() * 0.24
-        : 0.72 + prng() * 0.46,
-      spreadMultiplier: 0.65 + prng() * 0.8,
-      radiusPixels: 2.0 + prng() * 1.8,
+        ? 0.04 + prng() * 0.12
+        : 0.18 + prng() * 0.28,
+      spreadMultiplier: 0.35 + prng() * 0.45,
+      radiusPixels: (isCore ? 4.2 : 2.8) + prng() * 2.4,
       turbulencePhase: prng() * Math.PI * 2,
       isCore,
     });
@@ -107,7 +192,7 @@ export function generateOilSimulation({
 
         // Diffusion grows with time so the plume visibly widens as it travels.
         const diffusion =
-          0.000075 * Math.sqrt(minute) * particle.spreadMultiplier;
+          0.000012 * Math.sqrt(minute) * particle.spreadMultiplier;
         const turbLat =
           Math.sin(minute * 0.19 + particle.turbulencePhase) * diffusion;
         const turbLng =
@@ -115,11 +200,13 @@ export function generateOilSimulation({
 
         lat +=
           (current.dLatPerMin + wind.dLatPerMin) *
-            particle.speedMultiplier +
+            particle.speedMultiplier *
+            0.22 +
           turbLat;
         lng +=
           (current.dLngPerMin + wind.dLngPerMin) *
-            particle.speedMultiplier +
+            particle.speedMultiplier *
+            0.22 +
           turbLng;
       }
 
@@ -137,7 +224,15 @@ export function generateOilSimulation({
      by the particles. Every line starts INSIDE the dense source
      area and then follows the particle plume.
   ---------------------------------------------------------- */
-  const flowLineOffsets = [-0.0045, -0.002, 0, 0.002, 0.0045];
+  const flowLineOffsets = bbox
+    ? [
+        -(bbox.maxLng - bbox.minLng) * 0.08,
+        -(bbox.maxLng - bbox.minLng) * 0.03,
+        0,
+        (bbox.maxLng - bbox.minLng) * 0.03,
+        (bbox.maxLng - bbox.minLng) * 0.08,
+      ]
+    : [-0.0045, -0.002, 0, 0.002, 0.0045];
 
   function buildFlowLines(elapsedMinutes) {
     const paths = flowLineOffsets.map((offset, lineIndex) => {
@@ -221,6 +316,7 @@ export function generateOilSimulation({
       const category = classifyParticle(
         distanceFromSource,
         elapsedMinutes,
+        slickSpanKm,
       );
 
       // Weight the centreline toward actual high-concentration parcels.

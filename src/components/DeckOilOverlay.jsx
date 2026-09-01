@@ -28,6 +28,7 @@ class OilCanvasLayer {
   constructor() {
     this._particles = [];
     this._trails = [];
+    this._polygon = [];
     this._canvas = null;
     this._ctx = null;
     this._map = null;
@@ -35,12 +36,16 @@ class OilCanvasLayer {
     this._width = 0;
     this._height = 0;
     this._rafId = null;
+    this._animId = null;
+    this._needsRedraw = false;
     this._lastViewKey = null;
+    this._phase = 0;
 
     // Stable bound callbacks — created once in constructor so
     // map.on / map.off always get the exact same function reference.
     this._boundScheduleRedraw = this._scheduleRedraw.bind(this);
     this._boundOnSettled = this._onSettled.bind(this);
+    this._boundTick = this._tick.bind(this);
   }
 
   addTo(map) {
@@ -82,6 +87,7 @@ class OilCanvasLayer {
     map.on("move", this._boundScheduleRedraw);
     map.on("moveend zoomend viewreset resize", this._boundOnSettled);
     window.addEventListener("resize", this._boundOnSettled);
+    this._animId = requestAnimationFrame(this._boundTick);
 
     return this;
   }
@@ -90,6 +96,10 @@ class OilCanvasLayer {
     if (this._rafId) {
       cancelAnimationFrame(this._rafId);
       this._rafId = null;
+    }
+    if (this._animId) {
+      cancelAnimationFrame(this._animId);
+      this._animId = null;
     }
 
     if (this._map) {
@@ -110,20 +120,35 @@ class OilCanvasLayer {
     this._trails = [];
   }
 
-  setFrame({ particles = [], trails = [] } = {}) {
+  setFrame({ particles = [], trails = [], polygon = [] } = {}) {
     const nextParticles = Array.isArray(particles) ? particles : [];
     const nextTrails = Array.isArray(trails) ? trails : [];
+    const nextPolygon = Array.isArray(polygon) ? polygon : [];
 
     // Do absolutely nothing when React re-renders for an unrelated UI
     // action (for example selecting a vessel). The oil field must remain
     // pixel-stable until the actual simulation frame changes.
-    if (nextParticles === this._particles && nextTrails === this._trails) {
+    if (
+      nextParticles === this._particles &&
+      nextTrails === this._trails &&
+      nextPolygon === this._polygon
+    ) {
       return;
     }
 
     this._particles = nextParticles;
     this._trails = nextTrails;
+    this._polygon = nextPolygon;
     this._scheduleRedraw(true);
+  }
+
+  _tick(now) {
+    this._phase = now / 3200;
+    if (!this._lastAnim || now - this._lastAnim > 50) {
+      this._lastAnim = now;
+      this._redraw();
+    }
+    this._animId = requestAnimationFrame(this._boundTick);
   }
 
   // Called when the map fully settles (moveend/zoomend/resize/setFrame).
@@ -161,10 +186,13 @@ class OilCanvasLayer {
   // Called on every "move" event during panning / setView animation.
   // Batches into at most one redraw per animation frame.
   _scheduleRedraw(force = false) {
+    if (force) this._needsRedraw = true;
     if (this._rafId) return;
     this._rafId = requestAnimationFrame(() => {
       this._rafId = null;
-      if (force || this._hasViewChanged()) {
+      const must = this._needsRedraw;
+      this._needsRedraw = false;
+      if (must || force || this._hasViewChanged()) {
         this._redraw();
       }
     });
@@ -200,6 +228,76 @@ class OilCanvasLayer {
     return false;
   }
 
+  _drawObservedSlick(ctx, map, zoom) {
+    const ring = this._polygon;
+    if (!Array.isArray(ring) || ring.length < 3) return;
+
+    const points = [];
+    for (const pair of ring) {
+      const lat = Number(pair?.[0]);
+      const lng = Number(pair?.[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      points.push(map.latLngToContainerPoint(L.latLng(lat, lng)));
+    }
+    if (points.length < 3) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let cx = 0;
+    let cy = 0;
+    points.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+      cx += point.x;
+      cy += point.y;
+    });
+    cx /= points.length;
+    cy /= points.length;
+    const rx = Math.max(24, (maxX - minX) / 2);
+    const ry = Math.max(18, (maxY - minY) / 2);
+    const pulse = 0.5 + 0.5 * Math.sin(this._phase * Math.PI * 2);
+
+    ctx.save();
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.closePath();
+
+    const fill = ctx.createRadialGradient(cx, cy, 8, cx, cy, Math.max(rx, ry) * 1.15);
+    fill.addColorStop(0, `rgba(12, 8, 4, ${0.78 + pulse * 0.08})`);
+    fill.addColorStop(0.28, `rgba(48, 24, 8, ${0.72 + pulse * 0.06})`);
+    fill.addColorStop(0.55, `rgba(92, 48, 12, ${0.58 + pulse * 0.08})`);
+    fill.addColorStop(0.78, `rgba(164, 108, 28, ${0.38 + pulse * 0.1})`);
+    fill.addColorStop(0.9, `rgba(48, 92, 92, ${0.22 + pulse * 0.08})`);
+    fill.addColorStop(1, `rgba(72, 48, 120, ${0.12 + pulse * 0.06})`);
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    const shift = ((this._phase % 1) + 1) % 1;
+    const a = 0.2 + shift * 0.45;
+    const b = Math.min(0.92, a + 0.18);
+    const iridescence = ctx.createLinearGradient(minX, minY, maxX, maxY);
+    iridescence.addColorStop(0, "rgba(40, 180, 170, 0)");
+    iridescence.addColorStop(a, `rgba(56, 210, 190, ${0.16 + pulse * 0.1})`);
+    iridescence.addColorStop(b, `rgba(210, 170, 70, ${0.14 + pulse * 0.08})`);
+    iridescence.addColorStop(1, "rgba(90, 40, 140, 0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = iridescence;
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    ctx.strokeStyle = `rgba(232, 196, 96, ${0.55 + pulse * 0.2})`;
+    ctx.lineWidth = zoom < 9 ? 2.4 : 1.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   _redraw() {
     const canvas = this._canvas;
     const ctx = this._ctx;
@@ -214,8 +312,9 @@ class OilCanvasLayer {
 
     ctx.clearRect(0, 0, cssWidth, cssHeight);
     const zoom = map.getZoom();
-    const zoomBoost = Math.pow(1.55, Math.max(0, 12.2 - zoom));
+    const zoomBoost = Math.pow(1.35, Math.max(0, 10.5 - zoom));
     const pad = 24 + 40 * zoomBoost;
+    this._drawObservedSlick(ctx, map, zoom);
 
     /* -------------------------------------------------------
        PARTICLE DRIFT TRAILS
@@ -317,10 +416,10 @@ class OilCanvasLayer {
         const rx = Math.max(22, (maxX - minX) / 2 + 16 * zoomBoost);
         const ry = Math.max(16, (maxY - minY) / 2 + 12 * zoomBoost);
         const sheen = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
-        sheen.addColorStop(0, "rgba(72, 28, 6, 0.42)");
-        sheen.addColorStop(0.35, "rgba(140, 72, 16, 0.28)");
-        sheen.addColorStop(0.7, "rgba(196, 140, 48, 0.14)");
-        sheen.addColorStop(1, "rgba(196, 140, 48, 0)");
+        sheen.addColorStop(0, "rgba(18, 10, 4, 0.28)");
+        sheen.addColorStop(0.35, "rgba(92, 48, 12, 0.18)");
+        sheen.addColorStop(0.7, "rgba(176, 120, 36, 0.08)");
+        sheen.addColorStop(1, "rgba(176, 120, 36, 0)");
         ctx.save();
         ctx.translate(cx, cy);
         ctx.scale(1, Math.max(0.55, ry / rx));
@@ -335,8 +434,8 @@ class OilCanvasLayer {
         const [r, g, b] =
           CATEGORY_COLORS[particle.category] || CATEGORY_COLORS.active;
         const radius = Math.max(
-          zoom < 11 ? 7 : 4,
-          Math.min(28, (Number(particle.radiusPixels) || 3.5) * 2.2 * zoomBoost)
+          zoom < 9 ? 5 : 3,
+          Math.min(22, (Number(particle.radiusPixels) || 3.5) * 1.35 * zoomBoost)
         );
         const gradient = ctx.createRadialGradient(
           point.x,
@@ -346,7 +445,7 @@ class OilCanvasLayer {
           point.y,
           radius
         );
-        const coreAlpha = (particle.category === "stranded" ? 0.58 : 0.34) * (zoom < 11 ? 1.25 : 1);
+        const coreAlpha = (particle.category === "stranded" ? 0.72 : 0.42) * (zoom < 9 ? 1.15 : 1);
         gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${coreAlpha})`);
         gradient.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${coreAlpha * 0.45})`);
         gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
@@ -365,6 +464,7 @@ function DeckOilOverlay({
   enabled = true,
   particles = [],
   trails = [],
+  polygon = [],
 }) {
   const map = useMap();
   const layerRef = useRef(null);
@@ -389,8 +489,8 @@ function DeckOilOverlay({
      every replay tick; that caused unnecessary flicker and made the
      vessel/oil stacking unreliable. */
   useEffect(() => {
-    layerRef.current?.setFrame({ particles, trails });
-  }, [particles, trails]);
+    layerRef.current?.setFrame({ particles, trails, polygon });
+  }, [particles, trails, polygon]);
 
   return null;
 }
@@ -402,5 +502,6 @@ function DeckOilOverlay({
 export default memo(DeckOilOverlay, (prev, next) =>
   prev.enabled === next.enabled &&
   prev.particles === next.particles &&
-  prev.trails === next.trails
+  prev.trails === next.trails &&
+  prev.polygon === next.polygon
 );
