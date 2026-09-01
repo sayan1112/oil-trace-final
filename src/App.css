@@ -3472,7 +3472,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1300;
-  max-width: 480px;
+  max-width: min(560px, calc(100% - 48px));
   padding: 10px 12px;
   border-radius: 16px;
   font-size: 12px;

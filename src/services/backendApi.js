@@ -434,6 +434,20 @@ export function assertWithinForcingCoverage(slick) {
   }
 }
 
-export function isWithinForcingCoverage(slick) {
-  try { assertWithinForcingCoverage(slick); return true; } catch { return false; }
+export function describeHindcastFailure(message) {
+  const msg = String(message || "");
+  if (/Missing variables|first timestep|x_sea_water_velocity|x_wind|y_wind/i.test(msg)) {
+    return "Live OpenDrift on this host still has North Sea forcing, so a Cyprus hindcast cannot read currents or wind. The slick stays in the Eastern Mediterranean with reconstructed drift.";
+  }
+  if (/hdf|netcdf/i.test(msg)) {
+    return "Forcing NetCDF on the live server is unreadable. Showing reconstructed drift on the Mediterranean scene.";
+  }
+  if (/Unknown incident/i.test(msg)) {
+    return "This backend has not published incident-mediterranean-001 yet.";
+  }
+  return "Live OpenDrift is unavailable. Showing reconstructed drift on the Mediterranean scene.";
+}
+
+export function describeEmptyMediterraneanAis() {
+  return "GET /vessels for 33.5–36°E / 34.5–36.5°N (25–26 Aug 2024) returned no ships. The deployed AIS sample is still Norway-only, so none are drawn here.";
 }
