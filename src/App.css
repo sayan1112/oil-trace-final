@@ -3334,7 +3334,8 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .oil-legend-chip {
   position: absolute;
   left: 14px;
-  bottom: 118px;
+  top: 72px;
+  bottom: auto;
   z-index: 1200;
   display: flex;
   align-items: center;
@@ -3355,38 +3356,73 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   background: radial-gradient(circle, #3a1a08 0%, #b45309 55%, rgba(180, 83, 9, 0) 100%);
 }
 
-.pipeline-status {
+.run-card {
   position: absolute;
-  left: 16px;
-  bottom: 118px;
+  left: 14px;
+  bottom: 150px;
   z-index: 1200;
-  width: 280px;
-  padding: 14px;
+  width: 248px;
+  padding: 12px 14px;
   border: 0;
   border-radius: 22px;
   background: #ffffff;
-  color: #1a1d23;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 16px 36px rgba(17, 19, 24, 0.14);
+  color: #17181c;
 }
 
-.pipeline-status strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
+.run-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.pipeline-status span {
-  display: block;
+.run-card-head strong {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.run-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #157a3c;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.run-card p {
+  margin: 8px 0 12px;
   color: #6b7280;
   font-size: 12px;
   line-height: 1.4;
 }
 
-.pipeline-status ol {
-  margin: 10px 0 0;
-  padding-left: 18px;
-  color: #8a9099;
-  font-size: 11px;
+.run-rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.run-rail span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #9aa0a8;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.run-rail span.is-on {
+  background: #f0c14b;
+  color: #1a1404;
+}
+
+.pipeline-status {
+  display: none;
 }
 
 .ops-toast {
@@ -3424,10 +3460,10 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-center .oiltrace-map-toolbar {
-  top: auto;
+  top: 72px;
   left: auto;
   right: 14px;
-  bottom: 118px;
+  bottom: auto;
   transform: none;
   flex-direction: column;
   gap: 6px;
@@ -3462,13 +3498,13 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-center .map-tool-button.backtrack-tool-button {
-  width: auto;
+  width: 40px;
   height: 40px;
-  padding: 0 12px;
-  border-radius: 999px;
+  padding: 0;
+  border-radius: 50%;
   background: #111318;
   color: #fff;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -3486,4 +3522,142 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   .command-stage {
     display: none;
   }
+}
+
+.command-stage .suspect-panel,
+.command-stage .oiltrace-context-panel,
+.command-stage .oiltrace-replay-panel,
+.command-stage .evidence-panel,
+.command-stage .detection-panel {
+  background: #ffffff !important;
+  color: #1a1d23 !important;
+  font-family: "Plus Jakarta Sans", Inter, sans-serif !important;
+}
+
+.command-stage .panel-header,
+.command-stage .context-panel-header,
+.command-stage .replay-panel-header,
+.command-stage .evidence-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #eceff3 !important;
+  color: #1a1d23 !important;
+}
+
+.command-stage .panel-header h2,
+.command-stage .context-panel-header h2,
+.command-stage .replay-panel-header h2 {
+  color: #1a1d23 !important;
+  font-size: 20px !important;
+  letter-spacing: -0.02em !important;
+}
+
+.command-stage .panel-kicker,
+.command-stage .context-kicker,
+.command-stage .replay-kicker,
+.command-stage .inv-kicker {
+  color: #8a9099 !important;
+}
+
+.command-stage .investigation-metrics-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.command-stage .investigation-metric-card {
+  min-width: 0 !important;
+  padding: 10px 8px !important;
+  border: 1px solid #eceff3 !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.command-stage .metric-val,
+.command-stage .metric-label,
+.command-stage .metric-sub {
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.command-stage .primary-suspect-spotlight {
+  background: #fff !important;
+  border: 1px solid #eceff3 !important;
+  border-radius: 22px !important;
+  box-shadow: none !important;
+}
+
+.command-stage .spotlight-badge {
+  background: #f6f8fb !important;
+  color: #8a9099 !important;
+  letter-spacing: 0.12em !important;
+}
+
+.command-stage .spotlight-name,
+.command-stage .vessel-title,
+.command-stage .item-name,
+.command-stage .stepper-name-text,
+.command-stage .card-name-row,
+.command-stage .inv-person span {
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.command-stage .spotlight-score-pill {
+  background: #fff4cc !important;
+  color: #8a6d00 !important;
+  border-radius: 14px !important;
+}
+
+.command-stage .spotlight-meter {
+  background: #f3f4f6 !important;
+}
+
+.command-stage .spotlight-meter-fill {
+  background: #f0c14b !important;
+}
+
+.command-stage .spotlight-action-btn,
+.command-stage .inspect-candidate-button {
+  width: 100% !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #f0c14b !important;
+  color: #1a1404 !important;
+  box-shadow: none !important;
+}
+
+.command-stage .candidate-entry-card,
+.command-stage .detection-slick-card {
+  width: 100% !important;
+  max-width: none !important;
+  border: 1px solid #eceff3 !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+}
+
+.command-stage .filter-chip,
+.command-stage .tab-btn,
+.command-stage .speed-button {
+  border-radius: 999px !important;
+}
+
+.command-stage .filter-chip.filter-chip-active,
+.command-stage .tab-btn-active {
+  background: #f0c14b !important;
+  color: #1a1404 !important;
+  border-color: #f0c14b !important;
+}
+
+.command-stage .close-button,
+.command-stage .context-close-button,
+.command-stage .replay-close,
+.command-stage .evidence-close {
+  border-radius: 999px !important;
+  background: #f3f4f6 !important;
+  color: #1a1d23 !important;
 }
