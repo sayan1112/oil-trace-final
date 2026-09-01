@@ -3285,7 +3285,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
   pointer-events: none;
 }
 
@@ -3399,7 +3399,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .run-card {
   position: absolute;
   left: 14px;
-  top: 148px;
+  top: 156px;
   bottom: auto;
   z-index: 1100;
   width: 248px;
@@ -3759,6 +3759,16 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .command-stage .replay-controls {
   justify-content: flex-start !important;
   gap: 10px !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.command-stage .replay-speed-section {
+  background: transparent !important;
+}
+
+.command-stage .replay-timeline-labels {
+  color: #6b7280 !important;
 }
 
 .command-stage .replay-time-label,
@@ -3882,11 +3892,26 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   color: #111318 !important;
 }
 
+.command-stage .detection-intro-card,
+.command-stage .detection-upload-zone,
+.command-stage .detection-empty-card,
+.command-stage .evidence-empty {
+  background: #ffffff !important;
+  border: 1px solid #eceff3 !important;
+  border-radius: 22px !important;
+  box-shadow: none !important;
+}
+
+.command-stage .detection-intro-text,
+.command-stage .detection-upload-hint,
+.command-stage .evidence-empty p {
+  color: #5c6370 !important;
+}
+
 .command-stage .evidence-card,
 .command-stage .evidence-block,
 .command-stage .evidence-empty {
   width: auto !important;
   max-width: none !important;
-  border-radius: 22px !important;
 }
 
