@@ -1,16 +1,23 @@
 import axios from "axios";
 
-export const PRIMARY_URL =
+export const PRIMARY_HOST =
   import.meta.env.VITE_BACKEND_PRIMARY_URL ||
   "https://sih-oil-spill-26143-backend.onrender.com";
 
-export const FALLBACK_URL =
+export const FALLBACK_HOST =
   import.meta.env.VITE_BACKEND_FALLBACK_URL ||
   "https://vscimatic999--oiltrace-backend-web.modal.run";
+
+const useDevProxy = import.meta.env.DEV && !import.meta.env.VITE_BACKEND_DIRECT;
+
+export const PRIMARY_URL = useDevProxy ? "" : PRIMARY_HOST;
+export const FALLBACK_URL = useDevProxy ? "/__backend-fallback" : FALLBACK_HOST;
 
 let activeBase = PRIMARY_URL;
 
 export function getActiveBackendUrl() {
+  if (!activeBase || activeBase === PRIMARY_URL) return PRIMARY_HOST;
+  if (activeBase === FALLBACK_URL) return FALLBACK_HOST;
   return activeBase;
 }
 
