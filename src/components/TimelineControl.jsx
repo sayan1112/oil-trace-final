@@ -42,15 +42,14 @@ export function TimelineControl({
           <div className={`status-pill ${isPlaying ? "active" : "paused"}`}>
             <span className="status-indicator"></span>
             <span className="status-label">
-              {isPlaying ? "REPLAY ACTIVE" : "LIVE / REPLAY"}
+              {isPlaying ? "Playing" : "Scene clock"}
             </span>
           </div>
-          <span className="timeline-sub-tag">Trajectory Replay</span>
+          <span className="timeline-sub-tag">Transport window</span>
         </div>
 
         <div className="current-timestamp-badge">
-          <span className="timestamp-clock-icon">⏱</span>
-          <span className="timestamp-text">{currentTimestamp} UTC</span>
+          <span className="timestamp-text">{currentTimestamp}</span>
           {currentEvent && (
             <span className="timeline-event-chip" title={currentEvent.label}>
               {currentEvent.label}
@@ -188,7 +187,7 @@ export function TimelineControl({
                 >
                   <path d="M8 5v14l11-7z" />
                 </svg>
-                <span>Play Replay</span>
+                <span>Play</span>
               </>
             )}
           </button>
@@ -212,7 +211,7 @@ export function TimelineControl({
         </div>
 
         <div className="timeline-counter">
-          Point {currentIndex + 1} of {timestamps.length}
+        Point {currentIndex + 1} / {timestamps.length}
         </div>
       </div>
     </div>

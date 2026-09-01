@@ -415,10 +415,11 @@
 .command-map-wrap .timeline-card {
   width: min(640px, calc(100% - 28px));
   min-width: 260px;
-  background: rgba(22, 24, 29, 0.94);
-  border-color: #2a2e36;
-  color: #e8eaed;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: #e5e7eb;
+  color: #1a1d23;
   bottom: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
 }
 
 .command-map-wrap .status-label,
@@ -426,11 +427,11 @@
 .command-map-wrap .time-endpoint-label,
 .command-map-wrap .timeline-counter,
 .command-map-wrap .control-btn {
-  color: #d7dbe2;
+  color: #1a1d23;
 }
 
 .command-map-wrap .control-btn,
 .command-map-wrap .speed-btn {
-  background: #1c1f26;
-  border-color: #2f343c;
+  background: #ffffff;
+  border-color: #e5e7eb;
 }

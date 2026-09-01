@@ -19,9 +19,9 @@ import "./DeckOilOverlay.css";
 ========================================================= */
 
 const CATEGORY_COLORS = {
-  initial: [16, 185, 129],   // green
-  active: [37, 99, 235],    // blue
-  stranded: [239, 68, 68],  // red
+  initial: [212, 168, 48],
+  active: [176, 92, 18],
+  stranded: [92, 36, 8],
 };
 
 class OilCanvasLayer {
@@ -260,7 +260,7 @@ class OilCanvasLayer {
         }
 
         if (hasPoint) {
-          ctx.strokeStyle = "rgba(59, 130, 246, 0.14)";
+          ctx.strokeStyle = "rgba(92, 54, 12, 0.16)";
           ctx.lineWidth = 1;
           ctx.stroke();
         }
@@ -278,6 +278,7 @@ class OilCanvasLayer {
     ------------------------------------------------------- */
     if (this._particles.length) {
       ctx.save();
+      ctx.globalCompositeOperation = "multiply";
 
       for (const particle of this._particles) {
         const lat = Number(particle?.latitude);
@@ -286,10 +287,10 @@ class OilCanvasLayer {
 
         const point = map.latLngToContainerPoint(L.latLng(lat, lng));
         if (
-          point.x < -12 ||
-          point.x > cssWidth + 12 ||
-          point.y < -12 ||
-          point.y > cssHeight + 12
+          point.x < -18 ||
+          point.x > cssWidth + 18 ||
+          point.y < -18 ||
+          point.y > cssHeight + 18
         ) {
           continue;
         }
@@ -297,17 +298,24 @@ class OilCanvasLayer {
         const [r, g, b] =
           CATEGORY_COLORS[particle.category] || CATEGORY_COLORS.active;
         const radius = Math.max(
-          1.5,
-          Math.min(5.8, Number(particle.radiusPixels) || 3.5)
+          4,
+          Math.min(14, (Number(particle.radiusPixels) || 3.5) * 2.4)
         );
-
-        // Slightly stronger particles near the centre make the plume read
-        // as a field of oil parcels instead of a solid polygon.
-        const alpha = particle.category === "stranded" ? 0.84 : 0.74;
-
+        const gradient = ctx.createRadialGradient(
+          point.x,
+          point.y,
+          0,
+          point.x,
+          point.y,
+          radius
+        );
+        const coreAlpha = particle.category === "stranded" ? 0.55 : 0.32;
+        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${coreAlpha})`);
+        gradient.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${coreAlpha * 0.45})`);
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         ctx.beginPath();
+        ctx.fillStyle = gradient;
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
         ctx.fill();
       }
 
