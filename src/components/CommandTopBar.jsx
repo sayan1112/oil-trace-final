@@ -1,3 +1,5 @@
+import { Bell, Search } from "lucide-react";
+
 export default function CommandTopBar({
   incidentId,
   search,
@@ -12,10 +14,7 @@ export default function CommandTopBar({
         <strong>{incidentId}</strong>
       </nav>
       <label className="stitch-search">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
+        <Search size={16} strokeWidth={1.8} />
         <input
           type="search"
           value={search}
@@ -29,10 +28,7 @@ export default function CommandTopBar({
           + New incident
         </button>
         <button type="button" className="stitch-icon-btn" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
-            <path d="M10 20a2 2 0 0 0 4 0" />
-          </svg>
+          <Bell size={18} strokeWidth={1.8} />
           <span className="stitch-badge" />
         </button>
       </div>

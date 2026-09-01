@@ -86,7 +86,7 @@
 }
 
 .inv-search input:focus {
-  border-color: #f0c14b;
+  border-color: #2f6fed;
   background: #fff;
 }
 
@@ -111,8 +111,8 @@
 }
 
 .inv-filters button.is-active {
-  background: #f0c14b;
-  border-color: #f0c14b;
+  background: #2f6fed;
+  border-color: #2f6fed;
   color: #1a1404;
 }
 
@@ -142,7 +142,7 @@
 .inv-vessel-card.is-selected,
 .inv-case-card:hover,
 .inv-vessel-card:hover {
-  border-color: #f0c14b;
+  border-color: #2f6fed;
 }
 
 .inv-case-top {
@@ -226,8 +226,8 @@
 }
 
 .inv-action.primary {
-  background: #f0c14b;
-  border-color: #f0c14b;
+  background: #2f6fed;
+  border-color: #2f6fed;
   color: #1a1404;
 }
 

@@ -41,7 +41,7 @@ export function SuspectPanel({
 
   const getScoreColor = (score) => {
     if (score >= 0.7) return "#3b82f6";
-    if (score >= 0.5) return "#d97706";
+    if (score >= 0.5) return "#ea580c";
 
     return "#64748b";
   };
@@ -604,7 +604,7 @@ export function SuspectPanel({
                                 width: `${confPercent}%`,
                                 backgroundColor:
                                   isTop
-                                    ? "#d97706"
+                                    ? "#ea580c"
                                     : confPercent >=
                                       50
                                     ? "#3b82f6"
@@ -928,7 +928,7 @@ export function SuspectPanel({
                 width: `${confidencePercent}%`,
                 backgroundColor:
                   candidateRank === 1
-                    ? "#d97706"
+                    ? "#ea580c"
                     : confidencePercent >= 50
                     ? "#3b82f6"
                     : "#64748b",

@@ -50,7 +50,7 @@ button {
 
   --spill: #ef4444;
   --source: #1769d3;
-  --candidate: #d97706;
+  --candidate: #ea580c;
   --trajectory-muted: #94a3b8;
 
   --toolbar-bg: rgba(255, 255, 255, 0.94);
@@ -68,12 +68,11 @@ button {
   background: var(--app-bg);
   color: var(--text);
   font-family:
-    "Plus Jakarta Sans",
     Inter,
-    -apple-system,
-    BlinkMacSystemFont,
     "Segoe UI",
     Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
 }
 
@@ -96,7 +95,7 @@ button {
   --primary-soft: #162f50;
 
   --success: #35c895;
-  --warning: #eab308;
+  --warning: #ea580c;
   --danger: #f05b61;
 
   --toolbar-bg: rgba(19, 31, 48, 0.96);
@@ -1077,13 +1076,13 @@ path.leaflet-interactive {
 }
 
 .legend-top-vessel {
-  border-color: #eab308;
+  border-color: #f97316;
   color: #334155;
 }
 
 .legend-top-vessel::before {
-  border-color: rgba(217, 119, 6, 0.35);
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.08);
+  border-color: rgba(234, 88, 12, 0.35);
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.08);
 }
 
 .legend-line {
@@ -1098,7 +1097,7 @@ path.leaflet-interactive {
 }
 
 .legend-candidate {
-  border-top: 4px solid #d97706;
+  border-top: 4px solid #ea580c;
 }
 
 .legend-muted-trajectory {
@@ -1114,7 +1113,7 @@ path.leaflet-interactive {
 }
 
 .probability-high-dot { background: #dc2626; }
-.probability-medium-dot { background: #eab308; }
+.probability-medium-dot { background: #f97316; }
 .probability-low-dot { background: #16a34a; }
 
 .legend-note {
@@ -1246,9 +1245,9 @@ path.leaflet-interactive {
 }
 
 .probability-medium .vessel-probability-label {
-  color: #9a6700;
-  border: 1px solid #f0c36d;
-  background: #fff9e8;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+  background: #fff7ed;
 }
 
 .probability-low .vessel-probability-label {
@@ -1310,7 +1309,7 @@ path.leaflet-interactive {
 }
 
 .probability-medium .vessel-marker-body {
-  border-color: #eab308;
+  border-color: #f97316;
 }
 
 .probability-low .vessel-marker-body {
@@ -1375,6 +1374,8 @@ path.leaflet-interactive {
 
 /* Top candidate */
 .oiltrace-vessel-marker.is-top-candidate .vessel-marker-body {
+  border-color: #ea580c;
+  background: #ffffff;
   animation:
     oiltrace-anchor-pulse
     1.9s
@@ -1383,7 +1384,7 @@ path.leaflet-interactive {
 }
 
 .oiltrace-vessel-marker.is-top-candidate .vessel-probability-ring {
-  border-color: rgba(217, 119, 6, 0.35);
+  border-color: rgba(234, 88, 12, 0.35);
 }
 
 @keyframes oiltrace-anchor-pulse {
@@ -1394,7 +1395,7 @@ path.leaflet-interactive {
 
   50% {
     box-shadow:
-      0 0 0 5px rgba(217, 119, 6, 0.11),
+      0 0 0 5px rgba(234, 88, 12, 0.11),
       0 5px 15px rgba(15, 23, 42, 0.28);
   }
 
@@ -2001,7 +2002,7 @@ path.leaflet-interactive {
 }
 
 .app-dark .legend-top-vessel {
-  border-color: #d97706;
+  border-color: #ea580c;
   color: #f0a33c;
 }
 
@@ -2599,7 +2600,7 @@ path.leaflet-interactive {
   border: 1px solid #f3d47b;
   border-radius: 11px;
 
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.06);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.06);
 }
 
 .suspect-panel .spotlight-badge {
@@ -2611,7 +2612,7 @@ path.leaflet-interactive {
   align-items: center;
   gap: 6px;
 
-  background: #d97706;
+  background: #ea580c;
 
   color: #ffffff;
   font-size: 8px;
@@ -2644,7 +2645,7 @@ path.leaflet-interactive {
   min-width: 45px;
   padding: 5px 7px;
 
-  background: #d97706;
+  background: #ea580c;
   border-radius: 7px;
 }
 
@@ -3159,7 +3160,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   width: 100%;
   height: 100%;
   background: #111318;
-  font-family: Inter, "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-family: Inter, "Segoe UI", sans-serif;
 }
 
 .command-shell {
@@ -3238,7 +3239,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .head-chip.is-active {
-  background: #f0c14b;
+  background: #2f6fed;
   color: #1a1404;
 }
 
@@ -3458,7 +3459,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .run-rail span.is-on {
-  background: #f0c14b;
+  background: #2f6fed;
   color: #1a1404;
 }
 
@@ -3572,7 +3573,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .command-stage .detection-panel {
   background: #ffffff !important;
   color: #1a1d23 !important;
-  font-family: "Plus Jakarta Sans", Inter, sans-serif !important;
+  font-family: Inter, "Segoe UI", sans-serif !important;
 }
 
 .command-stage .panel-header,
@@ -3659,7 +3660,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-stage .spotlight-meter-fill {
-  background: #f0c14b !important;
+  background: #2f6fed !important;
 }
 
 .command-stage .spotlight-action-btn,
@@ -3667,7 +3668,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   width: 100% !important;
   border: 0 !important;
   border-radius: 999px !important;
-  background: #f0c14b !important;
+  background: #2f6fed !important;
   color: #1a1404 !important;
   box-shadow: none !important;
 }
@@ -3689,9 +3690,9 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .command-stage .filter-chip.filter-chip-active,
 .command-stage .tab-btn-active {
-  background: #f0c14b !important;
+  background: #2f6fed !important;
   color: #1a1404 !important;
-  border-color: #f0c14b !important;
+  border-color: #2f6fed !important;
 }
 
 .command-stage .close-button,
@@ -3835,7 +3836,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-stage .speed-button.active {
-  background: #f0c14b !important;
+  background: #2f6fed !important;
   color: #1a1404 !important;
 }
 
@@ -3859,7 +3860,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-stage .detection-panel-kicker-dot {
-  background: #f0c14b !important;
+  background: #2f6fed !important;
   animation: none !important;
 }
 
@@ -3881,7 +3882,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .command-stage .detection-demo-button {
   border: 0 !important;
   border-radius: 999px !important;
-  background: #f0c14b !important;
+  background: #2f6fed !important;
   color: #1a1404 !important;
   box-shadow: none !important;
 }

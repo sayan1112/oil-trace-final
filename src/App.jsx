@@ -137,7 +137,7 @@ function createVesselIcon({
   if (replay) {
     // Sleek directional ship icon for replay animation
     const ringColor = candidateRank === 1
-      ? "#d97706"
+      ? "#ea580c"
       : selected
       ? "#2563eb"
       : "#64748b";
@@ -203,9 +203,10 @@ function createVesselIcon({
         <div class="vessel-probability-label">${confidencePercent}%</div>
         <div class="vessel-probability-ring"></div>
         <div class="vessel-marker-body">
-          <svg class="vessel-marker-symbol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M4 15h16l-2 4H6l-2-4Z" />
-            <path d="M8 15V9h8v6" />
+          <svg class="vessel-marker-symbol" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#ffffff" stroke="#0f172a" stroke-width="1.15" stroke-linejoin="round" d="M3.2 15.2h17.6L18.4 20H5.6z"/>
+            <path fill="#ffffff" stroke="#0f172a" stroke-width="1.15" stroke-linejoin="round" d="M7 15.2V8.4h7.4L16.8 15.2"/>
+            <path fill="#94a3b8" d="M8.1 8.4h2.2v2.4H8.1zM11.1 8.4h2.1v2.4h-2.1z"/>
           </svg>
         </div>
       </div>
@@ -1871,7 +1872,7 @@ function App() {
           url={
             mapStyle === "satellite"
               ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           }
           maxZoom={19}
         />
@@ -2006,7 +2007,7 @@ function App() {
               ],
             ]}
             pathOptions={{
-              color: "#d97706",
+              color: "#ea580c",
               weight: 2.5,
               opacity: 0.9,
               dashArray: "4 6",
@@ -2283,7 +2284,7 @@ function App() {
             polylineWeight = 5;
             polylineOpacity = 1;
           } else if (vessel.candidateRank === 1) {
-            polylineColor = "#d97706";
+            polylineColor = "#ea580c";
             polylineWeight = 3.5;
             polylineOpacity = hasSelection ? 0.75 : 0.95;
           } else if (hasSelection) {
@@ -2350,7 +2351,7 @@ function App() {
                       color: isSelected
                         ? "#2563eb"
                         : vessel.candidateRank === 1
-                        ? "#d97706"
+                        ? "#ea580c"
                         : "#94a3b8",
                       weight: isSelected ? 5 : vessel.candidateRank === 1 ? 3 : 2,
                       opacity: isSelected ? 1 : vessel.candidateRank === 1 ? 0.9 : 0.5,
