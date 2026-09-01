@@ -79,18 +79,10 @@ function ReplayPanel({
       </div>
 
       <div className="replay-timeline-section">
-        {releaseFrac === undefined ? (
-          <div className="replay-timeline-labels">
-            <span>{startLabel}</span>
-            <span>{midLabel}</span>
-            <span>{endLabel}</span>
-          </div>
-        ) : (
-          <div className="replay-timeline-labels">
-            <span>{startLabel}</span>
-            <span>{endLabel}</span>
-          </div>
-        )}
+        <div className="replay-timeline-labels">
+          <span>{startLabel}</span>
+          <span>{endLabel}</span>
+        </div>
 
         <div style={{ position: "relative" }}>
           <input
@@ -126,46 +118,6 @@ function ReplayPanel({
               />
             )}
         </div>
-
-        {releaseFrac === undefined ? (
-          <div className="replay-timeline-markers">
-            <span>START</span>
-            <span>{computedTime}</span>
-            <span>RELEASE</span>
-            <span>DETECTED</span>
-          </div>
-        ) : (
-          <div
-            className="replay-timeline-markers"
-            style={{ position: "relative", display: "block", height: "16px" }}
-          >
-            <span style={{ position: "absolute", left: 0 }}>START</span>
-            {releaseFrac !== null && releaseFrac > 0.1 && releaseFrac < 0.86 && (
-              <span
-                style={{
-                  position: "absolute",
-                  left: `${releaseFrac * 100}%`,
-                  transform: "translateX(-50%)",
-                  color: "#d97706",
-                }}
-              >
-                RELEASE
-              </span>
-            )}
-            <span
-              style={{
-                position: "absolute",
-                left: `${Math.max(8, Math.min(92, progressPercent))}%`,
-                transform: "translateX(-50%)",
-                fontWeight: 700,
-                color: "#2563eb",
-              }}
-            >
-              {computedTime}
-            </span>
-            <span style={{ position: "absolute", right: 0 }}>DETECTED</span>
-          </div>
-        )}
       </div>
 
       <div className="replay-controls">
@@ -188,20 +140,11 @@ function ReplayPanel({
         >
           {isPlaying ? "Ⅱ" : "▶"}
         </button>
-
-        <button
-          type="button"
-          className="replay-reset-text"
-          onClick={resetReplay}
-        >
-          Reset replay
-        </button>
       </div>
 
       <div className="replay-speed-section">
         <div className="replay-speed-heading">
           <span className="replay-speed-title">Playback Speed</span>
-          <span className="replay-speed-value">{replaySpeed}×</span>
         </div>
 
         <div className="replay-speed-buttons">

@@ -599,6 +599,8 @@ path.leaflet-interactive {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .incident-title {
@@ -616,42 +618,67 @@ path.leaflet-interactive {
 
   color: #8491a1;
 
-  font-size: 9px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.incident-coord-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f6f8fb;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.incident-export-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #1a1d23;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .incident-metrics {
   display: grid;
-
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
-
-  gap: 7px;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .incident-metric {
   min-width: 0;
-  min-height: 76px;
-
-  padding: 11px;
-
+  min-height: 84px;
+  padding: 12px 10px;
   background: #ffffff;
-  border: 1px solid #dbe3ec;
-  border-radius: 9px;
+  border: 1px solid #eceff3;
+  border-radius: 18px;
 }
 
 .incident-metric strong {
   display: block;
 
-  overflow: hidden;
+  overflow: visible;
 
   color: #26344a;
 
-  font-size: 14px;
-  line-height: 1.2;
+  font-size: 13px;
+  line-height: 1.25;
   font-weight: 800;
 
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .incident-metric span {
@@ -681,15 +708,16 @@ path.leaflet-interactive {
 .candidate-count {
   min-width: 26px;
   height: 26px;
+  margin-left: auto;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  border: 1px solid #d4dfe9;
-  border-radius: 7px;
+  border: 1px solid #eceff3;
+  border-radius: 999px;
 
-  background: #edf3f8;
+  background: #f6f8fb;
   color: #49657e;
 
   font-size: 10px;
@@ -722,17 +750,13 @@ path.leaflet-interactive {
 
 .incident-candidate-summary strong {
   display: block;
-
-  max-width: 190px;
-  overflow: hidden;
-
+  max-width: none;
+  overflow: visible;
   color: #2d3c51;
-
   font-size: 13px;
   font-weight: 750;
-
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .candidate-confidence {
@@ -3257,11 +3281,25 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   pointer-events: none;
 }
 
-.map-floating-head > div:first-child {
+.map-title-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.map-title-chip {
   padding: 10px 14px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 10px 24px rgba(17, 19, 24, 0.12);
+}
+
+.map-title-stack .oil-legend-chip {
+  position: static;
+  left: auto;
+  top: auto;
 }
 
 .map-floating-head h1 {
@@ -3314,12 +3352,14 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   max-width: none !important;
   height: 100% !important;
   box-sizing: border-box !important;
-  padding: 16px 18px 24px !important;
+  padding: 0 !important;
   border-radius: 0 !important;
   border-left: 0;
   box-shadow: none !important;
   z-index: 2;
   animation: none;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 
 .command-stage .context-section,
@@ -3359,8 +3399,9 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 .run-card {
   position: absolute;
   left: 14px;
-  bottom: 150px;
-  z-index: 1200;
+  top: 148px;
+  bottom: auto;
+  z-index: 1100;
   width: 248px;
   padding: 12px 14px;
   border: 0;
@@ -3392,7 +3433,7 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .run-card p {
-  margin: 8px 0 12px;
+  margin: 6px 0 10px;
   color: #6b7280;
   font-size: 12px;
   line-height: 1.4;
@@ -3661,3 +3702,191 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   background: #f3f4f6 !important;
   color: #1a1d23 !important;
 }
+
+.command-stage .panel-header,
+.command-stage .context-panel-header,
+.command-stage .replay-panel-header,
+.command-stage .evidence-header,
+.command-stage .detection-panel-header {
+  padding: 18px 18px 14px !important;
+  margin: 0 !important;
+}
+
+.command-stage .replay-panel-header p,
+.command-stage .evidence-header-description,
+.command-stage .detection-panel-subtitle {
+  max-width: none !important;
+}
+
+.command-stage .context-section,
+.command-stage .incident-status-row {
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+
+.command-stage .incident-metrics .incident-metric {
+  min-height: 92px;
+  padding: 14px 12px;
+  border-radius: 18px;
+}
+
+.command-stage .candidate-confidence strong {
+  color: #8a6d00 !important;
+}
+
+.command-stage .replay-time-card,
+.command-stage .replay-vessel-summary,
+.command-stage .replay-analysis-note {
+  width: auto !important;
+  max-width: none !important;
+  margin-left: 18px !important;
+  margin-right: 18px !important;
+  background: #ffffff !important;
+  border: 1px solid #eceff3 !important;
+  border-radius: 22px !important;
+  color: #1a1d23 !important;
+  box-shadow: none !important;
+}
+
+.command-stage .replay-timeline-section,
+.command-stage .replay-controls,
+.command-stage .replay-speed-section {
+  width: auto !important;
+  margin-left: 18px !important;
+  margin-right: 18px !important;
+}
+
+.command-stage .replay-controls {
+  justify-content: flex-start !important;
+  gap: 10px !important;
+}
+
+.command-stage .replay-time-label,
+.command-stage .replay-summary-header span,
+.command-stage .replay-speed-title {
+  color: #8a9099 !important;
+}
+
+.command-stage .replay-time-card strong,
+.command-stage .replay-vessel-name,
+.command-stage .replay-summary-header strong {
+  color: #111318 !important;
+}
+
+.command-stage .replay-vessel-name {
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+}
+
+.command-stage .replay-status {
+  background: #e8f8ee !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: #166534 !important;
+}
+
+.command-stage .replay-reset-button {
+  width: 40px !important;
+  height: 40px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #f3f4f6 !important;
+  color: #111318 !important;
+}
+
+.command-stage .replay-play-button {
+  min-width: 88px !important;
+  height: 40px !important;
+  border-radius: 999px !important;
+  background: #111318 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.command-stage .replay-slider {
+  background: linear-gradient(
+    to right,
+    #111318 0%,
+    #111318 var(--replay-progress),
+    #e8eaee var(--replay-progress),
+    #e8eaee 100%
+  ) !important;
+}
+
+.command-stage .replay-slider::-webkit-slider-thumb {
+  border-color: #111318 !important;
+}
+
+.command-stage .speed-button {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border: 0 !important;
+}
+
+.command-stage .speed-button.active {
+  background: #f0c14b !important;
+  color: #1a1404 !important;
+}
+
+.command-stage .replay-analysis-note {
+  margin-bottom: 24px !important;
+  background: #f6f8fb !important;
+}
+
+.command-stage .replay-analysis-note p,
+.command-stage .replay-note-icon {
+  color: #5c6370 !important;
+}
+
+.command-stage .replay-note-icon {
+  border-color: #d7dce3 !important;
+}
+
+.command-stage .detection-panel-kicker,
+.command-stage .detection-panel-kicker-dot {
+  color: #8a9099 !important;
+}
+
+.command-stage .detection-panel-kicker-dot {
+  background: #f0c14b !important;
+  animation: none !important;
+}
+
+.command-center .detection-panel {
+  padding: 18px 18px 24px !important;
+}
+
+.command-stage .detection-panel-header {
+  padding: 0 0 14px !important;
+}
+
+.command-stage .detection-section {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.command-stage .detection-action-btn.primary,
+.command-stage .detection-seed-button,
+.command-stage .detection-demo-button {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #f0c14b !important;
+  color: #1a1404 !important;
+  box-shadow: none !important;
+}
+
+.command-stage .detection-action-btn.secondary {
+  border-radius: 999px !important;
+  background: #f3f4f6 !important;
+  color: #111318 !important;
+}
+
+.command-stage .evidence-card,
+.command-stage .evidence-block,
+.command-stage .evidence-empty {
+  width: auto !important;
+  max-width: none !important;
+  border-radius: 22px !important;
+}
+

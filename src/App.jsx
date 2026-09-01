@@ -678,19 +678,6 @@ function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, i
             className="incident-export-button"
             onClick={handleExportReport}
             title="Export full incident investigation report"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              padding: "5px 9px",
-              background: "rgba(15, 23, 42, 0.05)",
-              border: "1px solid rgba(15, 23, 42, 0.12)",
-              borderRadius: "6px",
-              fontSize: "10px",
-              fontWeight: "700",
-              cursor: "pointer",
-              color: "inherit",
-            }}
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -719,7 +706,7 @@ function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, i
       <section className="context-section">
         <span className="context-section-label">INCIDENT</span>
         <h3 className="incident-title">{incident.spillType}</h3>
-        <div style={{ marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(37, 99, 235, 0.08)", padding: "4px 8px", borderRadius: "5px", fontSize: "11px", fontWeight: "700", fontFamily: "ui-monospace, monospace", color: "#1d4ed8" }}>
+        <div className="incident-coord-chip">
           <span>{formattedCoordinates}</span>
         </div>
         <p className="incident-time" style={{ marginTop: "6px" }}>
@@ -752,20 +739,19 @@ function IncidentPanel({ vessels, onSelectVessel, onClose, onTriggerBacktrack, i
         </div>
       </section>
 
-      <section className="context-section" style={{ background: "rgba(2, 132, 199, 0.08)", padding: "1rem", borderRadius: "8px", border: "1px solid rgba(2, 132, 199, 0.2)" }}>
-        <span className="context-section-label" style={{ color: "#0284c7" }}>SOURCE ESTIMATION</span>
-        <h4 style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.95rem" }}>Backward Trajectory Analysis</h4>
-        <p style={{ fontSize: "0.8rem", color: "#64748b", margin: "0 0 0.75rem 0" }}>
-          Reconstruct historical oil transport backwards from detection time to estimate origin region.
+      <section className="context-section">
+        <span className="context-section-label">SOURCE ESTIMATION</span>
+        <h4 className="incident-title">Backward trajectory</h4>
+        <p className="incident-time">
+          Reconstruct oil transport back from detection to estimate the origin region.
         </p>
         <button
           type="button"
           className="inspect-candidate-button"
           onClick={onTriggerBacktrack}
           disabled={isBacktracking}
-          style={{ background: "#0284c7", color: "#ffffff", justifyContent: "center" }}
         >
-          {isBacktracking ? "Backtracking..." : "Run Backtrack Analysis ↺"}
+          {isBacktracking ? "Running hindcast…" : "Run hindcast"}
         </button>
       </section>
 
@@ -1758,9 +1744,15 @@ function App() {
         <div className="command-workspace-main">
           <div className="command-map-wrap">
             <div className="map-floating-head">
-              <div>
-                <p className="inv-kicker">{incident.id}</p>
-                <h1>{incident.spillType}</h1>
+              <div className="map-title-stack">
+                <div className="map-title-chip">
+                  <p className="inv-kicker">{incident.id}</p>
+                  <h1>{incident.spillType}</h1>
+                </div>
+                <div className="oil-legend-chip">
+                  <span aria-hidden="true" />
+                  {showBackendOil ? "Oil sheen from hindcast" : "Detected oil slick"}
+                </div>
               </div>
               <div className="command-head-actions">
                 <button
@@ -2336,11 +2328,6 @@ function App() {
           );
         })}
       </MapContainer>
-
-            <div className="oil-legend-chip">
-              <span aria-hidden="true" />
-              {showBackendOil ? "Oil sheen from hindcast" : "Detected oil slick"}
-            </div>
 
             <TimelineControl
               startMs={clockStart}
