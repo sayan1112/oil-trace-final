@@ -38,7 +38,6 @@ export default function InvestigationList({
   const [queryLocal, setQueryLocal] = useState("");
   const query = queryProp ?? queryLocal;
   const setQuery = onQueryChange || setQueryLocal;
-  const [filter, setFilter] = useState("all");
 
   const ranked = useMemo(
     () => [...vessels].sort((a, b) => (a.candidateRank || 99) - (b.candidateRank || 99)),
@@ -48,15 +47,12 @@ export default function InvestigationList({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return ranked.filter((v) => {
-      const pct = confidencePct(v.attributionConfidence);
-      if (filter === "ranked" && pct < 40) return false;
-      if (filter === "high" && pct < 70) return false;
       if (!q) return true;
       return [v.name, v.id, v.mmsi, v.type, v.flag]
         .filter(Boolean)
         .some((part) => String(part).toLowerCase().includes(q));
     });
-  }, [ranked, query, filter]);
+  }, [ranked, query]);
 
   const lat = Number(incident?.centroid?.latitude ?? incident?.location?.latitude);
   const lon = Number(incident?.centroid?.longitude ?? incident?.location?.longitude);
@@ -96,23 +92,6 @@ export default function InvestigationList({
           placeholder="Search MMSI, name, type"
           aria-label="Search vessels"
         />
-      </div>
-
-      <div className="inv-filters" role="tablist">
-        {[
-          ["all", "All cases"],
-          ["ranked", "Ranked"],
-          ["high", "High score"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={filter === id ? "is-active" : ""}
-            onClick={() => setFilter(id)}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       <button type="button" className="inv-case-card" onClick={onOpenIncident}>
@@ -174,7 +153,7 @@ export default function InvestigationList({
       </div>
 
       <div className="inv-section-label">
-        Candidate vessels
+        Ranked vessels
         <span>{visible.length}</span>
       </div>
 
@@ -182,7 +161,7 @@ export default function InvestigationList({
         {visible.map((vessel) => {
           const pct = confidencePct(vessel.attributionConfidence);
           const selected = selectedVesselId === vessel.id;
-          const initial = (vessel.name || "V").trim().charAt(0);
+          const confidenceLabel = pct >= 70 ? "High" : pct >= 40 ? "Medium" : "Low";
           return (
             <button
               key={vessel.id}
@@ -190,28 +169,19 @@ export default function InvestigationList({
               className={`inv-vessel-card ${selected ? "is-selected" : ""}`}
               onClick={() => onSelectVessel?.(vessel)}
             >
-              <div className="inv-case-top">
-                <strong>#{vessel.mmsi || vessel.id}</strong>
-                <span className={`inv-badge ${statusClass(pct)}`}>
-                  {pct >= 70 ? "High" : pct >= 40 ? "Medium" : "Low"} · {pct}%
-                </span>
-              </div>
-              <div className="inv-route">
-                <span>{vessel.type || "Vessel"}</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 16h18l-2 4H5l-2-4Z" />
-                  <path d="M7 16V9h10v7" />
-                </svg>
-                <span>Rank {vessel.candidateRank || "—"}</span>
-              </div>
-              <div className="inv-person">
-                <span className="inv-avatar" aria-hidden="true">
-                  {initial}
-                </span>
-                <div>
-                  <strong>{vessel.name}</strong>
-                  <small>{vessel.flag || "AIS track"}</small>
+              <div className="inv-vessel-head">
+                <div className="inv-vessel-title">
+                  <strong>{vessel.name || "Unknown vessel"}</strong>
+                  <small>#{vessel.mmsi || vessel.id}</small>
                 </div>
+                <span className={`inv-badge ${statusClass(pct)}`}>
+                  {confidenceLabel} {pct}%
+                </span>
+              </div>
+              <div className="inv-vessel-meta">
+                <span>{vessel.type || "Vessel"}</span>
+                <span>{vessel.flag || "AIS track"}</span>
+                <span>Rank {vessel.candidateRank || "—"}</span>
               </div>
             </button>
           );

@@ -162,8 +162,6 @@ export function SuspectPanel({
         <div className="panel-header">
           <div>
             <div className="panel-kicker-row">
-              <span className="live-pulse-dot" />
-
               <span className="panel-kicker">
                 MARITIME SURVEILLANCE &amp;
                 ATTRIBUTION
@@ -249,10 +247,6 @@ export function SuspectPanel({
             riskFilter === "all" && (
               <div className="primary-suspect-spotlight">
                 <div className="spotlight-badge">
-                  <span className="spotlight-star">
-                    ★
-                  </span>
-
                   <span>
                     PRIMARY ATTRIBUTION TARGET
                   </span>
@@ -406,31 +400,6 @@ export function SuspectPanel({
                   ×
                 </button>
               )}
-
-              <button
-                type="button"
-                className="search-action-button"
-                aria-label="Search vessels"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle
-                    cx="11"
-                    cy="11"
-                    r="7"
-                  />
-
-                  <path d="m20 20-4-4" />
-                </svg>
-              </button>
             </div>
 
             {/* FILTERS */}
@@ -575,22 +544,18 @@ export function SuspectPanel({
                           </div>
 
                           <div className="card-sub-row">
-                            <span>
+                            <span className="card-meta-chip">
                               {vessel.type ||
                                 "Vessel"}
                             </span>
 
-                            <span>•</span>
-
-                            <span>
+                            <span className="card-meta-chip">
                               {vessel.speedKnots ??
                                 "N/A"}{" "}
                               kts
                             </span>
 
-                            <span>•</span>
-
-                            <span>
+                            <span className="card-meta-chip">
                               {vessel.heading ??
                                 0}
                               °
@@ -670,6 +635,31 @@ export function SuspectPanel({
   const confidencePercent = Math.round(
     (attributionConfidence || 0) * 100
   );
+  const evidenceSignals = [
+    [
+      "Spatial Proximity",
+      evidence?.spatial,
+    ],
+    [
+      "Temporal Window",
+      evidence?.temporal,
+    ],
+    [
+      "Trajectory Compatibility",
+      evidence?.trajectory,
+    ],
+    [
+      "Drift & Counterfactual",
+      evidence?.drift,
+    ],
+  ].filter(([, item]) => item);
+
+  const describeSignalStrength = (score) => {
+    const pct = Math.round((score || 0) * 100);
+    if (pct >= 80) return "Strong";
+    if (pct >= 60) return "Moderate";
+    return "Weak";
+  };
 
   return (
     <aside
@@ -961,31 +951,21 @@ export function SuspectPanel({
             </h3>
 
             <span className="section-count">
-              5 signals
+              {evidenceSignals.length +
+                (evidence?.aisReliability
+                  ? 1
+                  : 0)}{" "}
+              signals
             </span>
           </div>
 
           <div className="evidence-cards-list">
-            {[
-              [
-                "Spatial Proximity",
-                evidence?.spatial,
-              ],
-              [
-                "Temporal Window",
-                evidence?.temporal,
-              ],
-              [
-                "Trajectory Compatibility",
-                evidence?.trajectory,
-              ],
-              [
-                "Drift & Counterfactual",
-                evidence?.drift,
-              ],
-            ].map(
-              ([title, item]) =>
-                item && (
+            {evidenceSignals.map(
+              ([title, item]) => {
+                const pct = Math.round(
+                  (item.score || 0) * 100
+                );
+                return (
                   <div
                     className="evidence-card"
                     key={title}
@@ -1001,23 +981,23 @@ export function SuspectPanel({
                         </span>
                       </div>
 
-                      <span className="evidence-score-badge">
-                        {Math.round(
-                          (item.score || 0) *
-                            100
-                        )}
-                        %
-                      </span>
+                      <div className="evidence-score-stack">
+                        <span className="evidence-score-badge">
+                          {pct}%
+                        </span>
+                        <span className="evidence-strength-label">
+                          {describeSignalStrength(
+                            item.score
+                          )}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="evidence-bar-bg">
                       <div
                         className="evidence-bar-fill"
                         style={{
-                          width: `${Math.round(
-                            (item.score || 0) *
-                              100
-                          )}%`,
+                          width: `${pct}%`,
                           backgroundColor:
                             getScoreColor(
                               item.score || 0
@@ -1026,7 +1006,8 @@ export function SuspectPanel({
                       />
                     </div>
                   </div>
-                )
+                );
+              }
             )}
 
             {evidence?.aisReliability && (
