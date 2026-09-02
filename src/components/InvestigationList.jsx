@@ -98,22 +98,6 @@ export default function InvestigationList({
         />
       </div>
 
-      <div className="inv-filters" role="tablist">
-        {[
-          ["all", "All cases"],
-          ["ranked", "Ranked"],
-          ["high", "High score"],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={filter === id ? "is-active" : ""}
-            onClick={() => setFilter(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       <button type="button" className="inv-case-card" onClick={onOpenIncident}>
         <div className="inv-case-top">
@@ -152,6 +136,15 @@ export default function InvestigationList({
         </div>
       </button>
 
+      <div className="inv-actions">
+        <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>
+          {isBacktracking ? "Running pipeline…" : "Run hindcast"}
+        </button>
+        <button type="button" className="inv-action" onClick={onOpenDetect}>
+          SAR detect
+        </button>
+      </div>
+
       {ranked[0] && (
         <div className="inv-top-hit">
           <div>
@@ -163,15 +156,6 @@ export default function InvestigationList({
           </button>
         </div>
       )}
-
-      <div className="inv-actions">
-        <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>
-          {isBacktracking ? "Running pipeline…" : "Run hindcast"}
-        </button>
-        <button type="button" className="inv-action" onClick={onOpenDetect}>
-          SAR detect
-        </button>
-      </div>
 
       <div className="inv-section-label">
         Candidate vessels

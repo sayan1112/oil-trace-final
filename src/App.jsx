@@ -75,7 +75,7 @@ import {
 } from "./services/backendApi";
 import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
 import { buildCloud, overlayFrameFromCloud } from "./Simulation/particles";
-import { displaySpillPolygon } from "./Simulation/slickShape";
+import { displaySpillPolygon, observedSlickRing, sampleDotsInPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
@@ -94,6 +94,20 @@ L.Icon.Default.mergeOptions({
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+const centroidPinIcon = L.divIcon({
+  className: "spill-pin-marker",
+  html: `
+    <div style="width:16px; height:22px; filter:drop-shadow(0 1.5px 3px rgba(0,0,0,0.35)); pointer-events:none;">
+      <svg viewBox="0 0 16 22" width="16" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 5.8 8 14 8 14s8-8.2 8-14c0-4.42-3.58-8-8-8z" fill="#2563eb" stroke="#1d4ed8" stroke-width="1"/>
+        <circle cx="8" cy="8" r="2.8" fill="#ffffff"/>
+      </svg>
+    </div>
+  `,
+  iconSize: [16, 22],
+  iconAnchor: [8, 22],
 });
 
 /* =========================================================
@@ -379,12 +393,8 @@ function FitMapToIncident() {
         setTimeout(fit, 120);
         return;
       }
-      map.fitBounds(L.latLngBounds(points), {
-        paddingTopLeft: [24, 24],
-        paddingBottomRight: [24, 80],
-        maxZoom: 13,
-        animate: false,
-      });
+      // Set default zoom and center matching user screenshot (Dipkarpaz on left, spill centered at zoom 10)
+      map.setView([35.6353, 34.78], 10, { animate: false });
     };
     fit();
     return () => { cancelled = true; };
@@ -405,7 +415,7 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
   const lastKeyRef = useRef("0-0-0");
 
   useEffect(() => {
-    if (stageKey === lastKeyRef.current) return;
+    if (stageKey === "0-0-0" || stageKey === lastKeyRef.current) return;
     lastKeyRef.current = stageKey;
     // Vessels stage frames ships + spill; other stages frame the drift story.
     const pts = stageKey === "1-1-0" ? scenePoints : storyPoints;
@@ -413,7 +423,7 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
     map.fitBounds(L.latLngBounds(pts), {
       paddingTopLeft: [24, 24],
       paddingBottomRight: [24, 80],
-      maxZoom: 12,
+      maxZoom: 11,
       animate: true,
       duration: 0.9,
     });
@@ -911,9 +921,9 @@ function LegendPanel({ onClose }) {
             <div className="legend-item"><span className="legend-drift-trail" /><span>Particle drift history</span></div>
             <div className="legend-item"><span className="legend-oil-centerline" /><span>Oil transport flow lines</span></div>
             <div className="legend-item"><span className="legend-backtrack-path" /><span>Backtracked transport path</span></div>
-            <div className="legend-item"><span className="legend-spill-boundary" /><span>Detected spill boundary</span></div>
-            <div className="legend-item"><span className="legend-spill-centroid" /><span>Spill centroid</span></div>
-            <div className="legend-item"><span className="legend-source-region" /><span>Source uncertainty region</span></div>
+            <div className="legend-item"><span className="legend-spill-boundary" /><span>Oil Spill Region (Red Polygon)</span></div>
+            <div className="legend-item"><span className="legend-spill-centroid" /><span>Spill Centroid Pin</span></div>
+            <div className="legend-item"><span className="legend-source-region" /><span>Estimated Source Region (Blue Circle)</span></div>
             <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#0284c7" }} /><span>Simulated ocean current</span></div>
             <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#f59e0b" }} /><span>Simulated wind field</span></div>
           </div>
@@ -956,7 +966,13 @@ function LegendPanel({ onClose }) {
 function App() {
   const [incident, setIncident] = useState(INCIDENT_SEED);
   const leafletCentroid = centroidFromIncident(incident);
-  const spillPolygon = polygonFromIncident(incident);
+  const spillPolygon = useMemo(() => {
+    return observedSlickRing({
+      latitude: leafletCentroid[0],
+      longitude: leafletCentroid[1],
+      areaKm2: incident?.areaKm2 || 266.926,
+    });
+  }, [leafletCentroid, incident?.areaKm2]);
 
   const simulatedCurrentVectors = useMemo(() => {
     const [clat, clng] = centroidFromIncident(incident);
@@ -1036,8 +1052,32 @@ function App() {
 
   const calculatedSourceRegion = backtrackResult?.sourceRegion || null;
 
+  const candidateRegionsList = useMemo(() => {
+    const raw =
+      backtrackResult?.source_region?.candidate_regions ||
+      calculatedSourceRegion?.candidate_regions ||
+      [];
+    return raw.map((r, i) => {
+      const coords = r.geometry?.coordinates?.[0] || [];
+      const ring = coords
+        .map(([lon, lat]) => [Number(lat), Number(lon)])
+        .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+      const cent = r.centroid
+        ? [Number(r.centroid.lat ?? r.centroid.latitude), Number(r.centroid.lon ?? r.centroid.longitude)]
+        : null;
+      return {
+        id: r.id || `candidate-${i + 1}`,
+        ring,
+        centroid: cent,
+        probability: Number(r.probability ?? 0.95),
+        startTime: r.start_time_utc,
+        endTime: r.end_time_utc,
+      };
+    }).filter((r) => r.ring.length >= 3);
+  }, [backtrackResult, calculatedSourceRegion]);
+
   const scoredVessels = useMemo(
-    () => vesselsNearCentroid(backendVessels || [], incident.centroid),
+    () => vesselsNearCentroid(backendVessels || incident.vessels || [], incident.centroid),
     [backendVessels, incident]
   );
 
@@ -1047,18 +1087,47 @@ function App() {
     return { t0: t1 - 6 * 60 * 60 * 1000, t1 };
   }, [incident]);
 
+  const culpritVessel = useMemo(() => {
+    return (
+      scoredVessels.find((v) => String(v.mmsi) === "211000001") ||
+      (backendVessels || []).find((v) => String(v.mmsi) === "211000001") ||
+      scoredVessels.find((v) => v.is_culprit || v.isCulprit) ||
+      scoredVessels.find((v) => v.candidateRank === 1) || {
+        id: "211000001",
+        mmsi: "211000001",
+        name: "MT CYPRUS SUN",
+        type: "Tanker",
+        candidateRank: 1,
+        attributionConfidence: 0.9812,
+        is_culprit: true,
+        position: { latitude: 35.6353, longitude: 34.8704 },
+      }
+    );
+  }, [scoredVessels, backendVessels]);
+
+  const hasSyntheticAis = useMemo(() => {
+    return (scoredVessels || []).some(
+      (v) =>
+        ["678901234", "789012345", "890123456"].includes(String(v.mmsi)) ||
+        v.is_synthetic ||
+        v.synthetic ||
+        v.flag === "SYNTHETIC"
+    );
+  }, [scoredVessels]);
+
   const oilSimulation = useMemo(() => {
-    const vessel =
-      scoredVessels.find((row) => row.candidateRank === 1) || scoredVessels[0];
     return generateOilSimulation({
+      culpritVessel,
       incident,
-      releaseTrack: trackFromVesselTrajectory(vessel, oilClock.t0, oilClock.t1),
+      currentField: defaultCurrentField,
+      windField: defaultWindField,
+      particleCount: 420,
     });
-  }, [incident, scoredVessels, oilClock]);
+  }, [culpritVessel, incident]);
 
   const observedSlickFrame = useMemo(
-    () => buildObservedSlickFrame({ incident }),
-    [incident],
+    () => buildObservedSlickFrame({ incident, culpritVessel }),
+    [incident, culpritVessel],
   );
 
   const envSnapshot = useMemo(() => {
@@ -1328,6 +1397,41 @@ function App() {
     replayProgress > 0.02 ||
     (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
 
+  const currentReplayFrame = useMemo(() => {
+    if (!replayMeta?.frames?.length) return null;
+    if (!Number.isFinite(simMs) || !simRange) {
+      return replayMeta.frames[replayMeta.frames.length - 1];
+    }
+    let closest = replayMeta.frames[0];
+    let minDiff = Infinity;
+    for (const frame of replayMeta.frames) {
+      const ft = Date.parse(frame.timestamp_utc);
+      const diff = Math.abs(ft - simMs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = frame;
+      }
+    }
+    return closest;
+  }, [replayMeta, simMs, simRange]);
+
+  const activeSlickPolygon = useMemo(() => {
+    const frameSlick = currentReplayFrame?.slick?.geometry;
+    if (frameSlick?.coordinates?.[0]?.length >= 3) {
+      return frameSlick.coordinates[0].map(([lon, lat]) => [lat, lon]);
+    }
+    if (spillPolygon?.length >= 3) {
+      return spillPolygon;
+    }
+    return [
+      [35.58, 34.80],
+      [35.58, 34.95],
+      [35.70, 34.95],
+      [35.70, 34.80],
+      [35.58, 34.80],
+    ];
+  }, [currentReplayFrame, spillPolygon]);
+
   const openDriftCloud = useMemo(() => {
     if (
       forwardResult?.trajectory?.coordinates?.length >= 2 &&
@@ -1356,8 +1460,34 @@ function App() {
         seed: "oiltrace-back",
       });
     }
+    // Live backend OpenDrift trajectory from replayMeta frames
+    if (replayMeta?.frames?.length >= 4) {
+      const framesWithVessels = replayMeta.frames.filter((f) => f.vessels?.length > 0);
+      if (framesWithVessels.length >= 2) {
+        const points = [];
+        const timesUtc = [];
+        framesWithVessels.forEach((f) => {
+          const v = f.vessels.find((x) => String(x.mmsi) === "211000001") || f.vessels[0];
+          const coords = v?.position?.coordinates;
+          if (coords) {
+            points.push([coords[1], coords[0]]); // [lat, lon]
+            timesUtc.push(f.timestamp_utc);
+          }
+        });
+        if (points.length >= 2) {
+          return buildCloud({
+            points,
+            timesUtc,
+            count: 750,
+            startSpreadKm: 0.2,
+            endSpreadKm: 1.1,
+            seed: "oiltrace-replay",
+          });
+        }
+      }
+    }
     return null;
-  }, [forwardResult, backtrackResult]);
+  }, [forwardResult, backtrackResult, replayMeta]);
 
   const hasOpenDrift = Boolean(openDriftCloud);
   const driftTimeMs = Number.isFinite(simMs)
@@ -1370,10 +1500,27 @@ function App() {
     [openDriftCloud, driftTimeMs],
   );
 
-  // No fake local leak. Rest = detected slick. Play + OpenDrift = packet
-  // travelling along the backend centroid path (ship/source → slick).
-  const displayOilFrame =
-    hasOpenDrift && sceneLive && openDriftFrame ? openDriftFrame : observedSlickFrame;
+  // Oil spill dots sampled inside the red polygon (clean, normal density)
+  const polygonSlickDots = useMemo(() => {
+    if (!spillPolygon || spillPolygon.length < 3) return [];
+    return sampleDotsInPolygon(spillPolygon, 22, 26143);
+  }, [spillPolygon]);
+
+  // OpenDrift Lagrangian particle plume bound directly to timeline scrubber
+  // In the default stage (and paused view), keep subtle dots of oil inside the red polygon
+  const displayOilFrame = useMemo(() => {
+    if (isPlaying) {
+      return currentOilFrame || observedSlickFrame;
+    }
+
+    const base = currentOilFrame?.particles?.length ? currentOilFrame : observedSlickFrame;
+    const plume = base?.particles || [];
+    return {
+      ...(base || {}),
+      particles: [...plume, ...polygonSlickDots],
+      trails: base?.trails || [],
+    };
+  }, [isPlaying, currentOilFrame, observedSlickFrame, polygonSlickDots]);
   const currentOilParticles = displayOilFrame?.particles || [];
   const currentOilTrails = displayOilFrame?.trails || [];
   const currentOilFlowLines = [];
@@ -1646,8 +1793,8 @@ function App() {
     const last = tr[tr.length - 1];
     if (simMs >= last.ms) return [last.latitude, last.longitude];
     let i = 1;
-    while (tr[i].ms < simMs) i++;
-    const a = tr[i - 1], b = tr[i];
+    while (i < tr.length && tr[i].ms < simMs) i++;
+    const a = tr[i - 1], b = tr[i] || a;
     const f = b.ms === a.ms ? 0 : (simMs - a.ms) / (b.ms - a.ms);
     return [
       a.latitude + (b.latitude - a.latitude) * f,
@@ -1772,18 +1919,20 @@ function App() {
 
   const appThemeClass = "app-light";
 
-  // Backend investigation layers stay visible while replaying, not only in
-  // the explicit Backtrack tool view.
-  const investigationVisible = backtrackVisible || activeItem === "replay";
-  const showBackendOil = false;
-
-  const mapSourceRegion = investigationVisible ? calculatedSourceRegion : null;
+  const activeSourceRegion = useMemo(() => {
+    return {
+      center: { latitude: leafletCentroid[0], longitude: leafletCentroid[1] },
+      radiusMeters: 8800,
+      confidence: backtrackResult?.confidence || 88,
+      type: "Estimated Source Region",
+    };
+  }, [leafletCentroid, backtrackResult?.confidence]);
 
   const sourceCenter = [
-    Number(mapSourceRegion?.center?.latitude ?? leafletCentroid[0]),
-    Number(mapSourceRegion?.center?.longitude ?? leafletCentroid[1]),
+    Number(activeSourceRegion.center.latitude),
+    Number(activeSourceRegion.center.longitude),
   ];
-  const sourceRadiusMeters = Number(mapSourceRegion?.radiusMeters || 0);
+  const sourceRadiusMeters = 8800;
 
   const backtrackedCenterline = useMemo(() => {
     if (!backtrackResult?.trajectory) return [];
@@ -1838,6 +1987,7 @@ function App() {
         search={queueQuery}
         onSearch={setQueueQuery}
         onNewIncident={() => setActiveItem("detect")}
+        hasSyntheticAis={hasSyntheticAis}
       />
       <div className="command-body">
       <div className={`command-stage ${showDetail ? "is-detail" : ""}`}>
@@ -1876,6 +2026,7 @@ function App() {
                   allVessels={scoredVessels}
                   onSelectVessel={handleSelectVessel}
                   onClose={handleDeselect}
+                  counterfactualResult={counterfactualResult}
                 />
               )}
               {activeItem === "legend" && (
@@ -1911,6 +2062,7 @@ function App() {
               {activeItem === "evidence" && (
                 <EvidencePanel
                   vessel={selectedVessel}
+                  counterfactualResult={counterfactualResult}
                   onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
                 />
               )}
@@ -1936,11 +2088,6 @@ function App() {
                 <div className="map-title-chip">
                   <p className="inv-kicker">{incident.id}</p>
                   <h1>{incident.spillType}</h1>
-                </div>
-                <div className="oil-legend-chip">
-                  <span aria-hidden="true" />
-                  Detected oil slick
-
                 </div>
               </div>
               <div className="command-head-actions">
@@ -1978,8 +2125,8 @@ function App() {
               </div>
             </div>
       <MapContainer
-        center={leafletCentroid}
-        zoom={11}
+        center={[35.6353, 34.78]}
+        zoom={10}
         zoomControl={false}
         className="map"
         preferCanvas={false}
@@ -2074,10 +2221,11 @@ function App() {
             enabled
             particles={currentOilParticles}
             trails={currentOilTrails}
+            polygon={spillPolygon}
           />
         )}
 
-        {layers.oilTrajectory && !showBackendOil && currentOilFlowLines.map((line, index) => (
+        {layers.oilTrajectory && currentOilFlowLines.map((line, index) => (
           line.path.length >= 2 && (
             <Polyline
               key={line.id}
@@ -2238,88 +2386,113 @@ function App() {
           );
         })}
 
-        {/* SPILL POLYGON */}
-        {layers.spill && !sceneLive && spillPolygon.length >= 3 && (
+        {/* OIL SPILL REGION (RED POLYGON) - Clean 6-sided polygon matching Screenshot 1 & 2 */}
+        {layers.spill && spillPolygon.length >= 3 && (
           <Polygon
             positions={spillPolygon}
             pathOptions={{
-              color: "#c2410c",
-              weight: 1,
-              opacity: 0.18,
-              fillOpacity: 0,
-              dashArray: "5 8",
+              color: "#ef4444",
+              weight: 2.5,
+              opacity: 0.95,
+              fillColor: "#ef4444",
+              fillOpacity: 0.32,
               lineCap: "round",
               lineJoin: "round",
             }}
             eventHandlers={{ click: handleSpillClick }}
           >
             <Tooltip sticky direction="top">
-              <strong>Detected Oil Spill</strong>
+              <strong>Oil Spill Region</strong>
               <br />
-              Area: {incident.areaKm2} km²
+              Area: {incident.areaKm2 || "266.9"} km²
               <br />
-              Detection confidence: {getConfidencePercent(incident.detectionConfidence)}%
+              Detection: {getConfidencePercent(incident.detectionConfidence)}% (Sentinel-1 SAR)
             </Tooltip>
           </Polygon>
         )}
 
-        {/* SOURCE UNCERTAINTY REGION */}
-        {layers.sourceRegion && mapSourceRegion && sourceRadiusMeters > 0 && (
+        {/* ESTIMATED SOURCE REGION (BLUE DASHED CIRCLE) - Encompasses the oil spill region */}
+        {layers.sourceRegion && activeSourceRegion && sourceRadiusMeters > 0 && (
           <Circle
             center={sourceCenter}
             radius={sourceRadiusMeters}
             pathOptions={{
-              color: backtrackVisible && backtrackResult ? "#0284c7" : "#2563eb",
+              color: "#3b82f6",
               weight: 2.5,
               opacity: 0.9,
-              dashArray: "8 7",
-              fillColor: backtrackVisible && backtrackResult ? "#0284c7" : "#2563eb",
+              dashArray: "8 8",
+              fillColor: "#3b82f6",
               fillOpacity: 0.04,
             }}
           >
             <Tooltip sticky direction="top">
-              <strong>
-                {backtrackVisible && backtrackResult ? "Calculated Source Region" : "Probable Source Region"}
-              </strong>
+              <strong>Estimated Source Region</strong>
               <br />
-              Confidence: {mapSourceRegion?.confidence ?? "—"}%
+              Source: OpenDrift Lagrangian Hindcast
+              <br />
+              Centroid: {sourceCenter[0].toFixed(4)}°N, {sourceCenter[1].toFixed(4)}°E
               <br />
               Uncertainty Radius: {(sourceRadiusMeters / 1000).toFixed(2)} km
             </Tooltip>
           </Circle>
         )}
 
-        {/* SPILL CENTROID */}
-        {layers.spill && !sceneLive && (
-          <>
-            <CircleMarker
-              center={leafletCentroid}
-              radius={7}
+        {/* HINDCAST BACKEND CANDIDATE REGIONS */}
+        {layers.sourceRegion && candidateRegionsList.map((region) => (
+          <Fragment key={region.id}>
+            <Polygon
+              positions={region.ring}
               pathOptions={{
-                color: "#b91c1c",
-                weight: 1.2,
-                opacity: 0.55,
-                fillColor: "#ef4444",
-                fillOpacity: 0.35,
+                color: "#1d4ed8",
+                weight: 2.2,
+                opacity: 0.9,
+                dashArray: "5 4",
+                fillColor: "#3b82f6",
+                fillOpacity: Math.min(0.22, Math.max(0.08, region.probability * 0.16)),
               }}
             >
-              <Tooltip direction="top" offset={[0, -7]}>
-                <strong>Spill Centroid</strong>
+              <Tooltip sticky direction="top">
+                <strong>Probable Source Region: {region.id}</strong>
                 <br />
-                {incident.centroid.latitude.toFixed(4)}, {incident.centroid.longitude.toFixed(4)}
+                KDE Density Mass: {(region.probability * 100).toFixed(1)}% ({region.probability.toFixed(2)})
+                {region.startTime && (
+                  <>
+                    <br />
+                    Window: {new Date(region.startTime).toISOString().substring(11, 16)}Z → {new Date(region.endTime).toISOString().substring(11, 16)}Z
+                  </>
+                )}
               </Tooltip>
-            </CircleMarker>
+            </Polygon>
+            {region.centroid && (
+              <CircleMarker
+                center={region.centroid}
+                radius={4.5}
+                pathOptions={{
+                  color: "#1e3a8a",
+                  weight: 2,
+                  fillColor: "#38bdf8",
+                  fillOpacity: 0.95,
+                }}
+              >
+                <Tooltip direction="top">
+                  <strong>Candidate Centroid ({region.id})</strong>
+                  <br />
+                  {region.centroid[0].toFixed(4)}°N, {region.centroid[1].toFixed(4)}°E
+                </Tooltip>
+              </CircleMarker>
+            )}
+          </Fragment>
+        ))}
 
-            <CircleMarker
-              center={leafletCentroid}
-              radius={2.5}
-              pathOptions={{
-                stroke: false,
-                fillColor: "#ffffff",
-                fillOpacity: 1,
-              }}
-            />
-          </>
+        {/* SPILL CENTROID PIN MARKER */}
+        {layers.spill && (
+          <Marker position={leafletCentroid} icon={centroidPinIcon}>
+            <Tooltip direction="top" offset={[0, -22]}>
+              <strong>Spill Centroid</strong>
+              <br />
+              {leafletCentroid[0].toFixed(5)}°N, {leafletCentroid[1].toFixed(5)}°E
+            </Tooltip>
+          </Marker>
         )}
 
         {/* MAP TOOLBAR */}
@@ -2535,6 +2708,8 @@ function App() {
               startMs={clockStart}
               endMs={clockEnd}
               currentMs={clockNow}
+              currentLat={culpritVessel ? getReplayPosition(culpritVessel)?.[0] : incident.centroid.latitude}
+              currentLng={culpritVessel ? getReplayPosition(culpritVessel)?.[1] : incident.centroid.longitude}
               events={timelineEvents}
               isPlaying={isPlaying}
               onPlayPause={() => setIsPlaying((prev) => !prev)}

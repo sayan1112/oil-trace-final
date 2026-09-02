@@ -19,9 +19,11 @@ import "./DeckOilOverlay.css";
 ========================================================= */
 
 const CATEGORY_COLORS = {
-  initial: [196, 140, 64],
-  active: [154, 82, 22],
-  stranded: [67, 32, 10],
+  initial: [56, 189, 248], // Sky cyan oil sheen
+  sheen: [56, 189, 248],   // Sky cyan oil sheen
+  active: [30, 58, 95],    // Marine petroleum slate
+  stranded: [15, 23, 42],  // Deep oil black core
+  core: [15, 23, 42],      // Deep oil black core
 };
 
 class OilCanvasLayer {
@@ -248,45 +250,6 @@ class OilCanvasLayer {
     const zoomBoost = Math.pow(1.12, Math.max(0, 10.5 - zoom));
     const pad = 24 + 40 * zoomBoost;
 
-    if (this._trails.length && zoom >= 8) {
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      const stride = this._trails.length > 400 ? 3 : 1;
-
-      for (let i = 0; i < this._trails.length; i += stride) {
-        const trail = this._trails[i];
-        if (!Array.isArray(trail?.path) || trail.path.length < 2) continue;
-
-        const start = Math.max(0, trail.path.length - 18);
-        const recent = trail.path.slice(start);
-        if (recent.length < 2) continue;
-
-        const pts = [];
-        for (let j = 0; j < recent.length; j += 1) {
-          const pair = recent[j];
-          if (!Array.isArray(pair) || pair.length < 2) continue;
-          const lng = Number(pair[0]);
-          const lat = Number(pair[1]);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-          pts.push(map.latLngToContainerPoint(L.latLng(lat, lng)));
-        }
-        if (pts.length < 2) continue;
-
-        for (let j = 1; j < pts.length; j += 1) {
-          const fade = j / pts.length;
-          ctx.beginPath();
-          ctx.moveTo(pts[j - 1].x, pts[j - 1].y);
-          ctx.lineTo(pts[j].x, pts[j].y);
-          ctx.strokeStyle = `rgba(92, 54, 12, ${0.04 + fade * 0.16})`;
-          ctx.lineWidth = 0.7 + fade * 0.5;
-          ctx.stroke();
-        }
-      }
-
-      ctx.restore();
-    }
-
     if (this._particles.length) {
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
@@ -311,32 +274,24 @@ class OilCanvasLayer {
         plotted.push({ point, particle });
       }
 
-      const cell = 9;
-      const counts = new Map();
-      for (const { point } of plotted) {
-        const key = `${Math.floor(point.x / cell)}|${Math.floor(point.y / cell)}`;
-        counts.set(key, (counts.get(key) || 0) + 1);
-      }
+      // Normal crisp oil dots (matte dark petroleum core and clean sheen)
+      const order = { initial: 0, sheen: 0, active: 1, stranded: 2, core: 2 };
+      plotted.sort((a, b) => (order[a.particle.category] ?? 1) - (order[b.particle.category] ?? 1));
 
       for (const { point, particle } of plotted) {
-        const [r, g, b] =
-          CATEGORY_COLORS[particle.category] || CATEGORY_COLORS.active;
-        const key = `${Math.floor(point.x / cell)}|${Math.floor(point.y / cell)}`;
-        const dens = Math.min(1, (counts.get(key) || 1) / 12);
-        const baseR = Number(particle.radiusPixels) || 1.4;
-        const radius = Math.max(
-          0.7,
-          Math.min(3.4, baseR * zoomBoost * (0.7 + dens * 0.55)),
-        );
-        const coreAlpha =
-          (particle.category === "stranded"
-            ? 0.55
-            : particle.category === "active"
-              ? 0.28
-              : 0.12) *
-          (0.55 + dens * 0.7);
+        const cat = particle.category || "active";
+        const isCore = cat === "stranded" || cat === "core";
+        const isSheen = cat === "initial" || cat === "sheen";
+
+        const radius = isCore ? 2.3 : isSheen ? 1.5 : 1.85;
+        const color = isCore
+          ? "rgba(15, 23, 42, 0.92)"
+          : isSheen
+          ? "rgba(30, 41, 59, 0.55)"
+          : "rgba(30, 41, 59, 0.85)";
+
         ctx.beginPath();
-        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${coreAlpha})`;
+        ctx.fillStyle = color;
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         ctx.fill();
       }

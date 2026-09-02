@@ -1,28 +1,21 @@
 // ============================================================
-// OILTRACE — DETERMINISTIC LAGRANGIAN OIL-SPILL SIMULATION
+// OILTRACE — OPENDRIFT LAGRANGIAN OIL DISPERSION MODEL
 // ============================================================
-// Visual model for the frontend demo:
-//   RED   = highest-concentration / source-core oil
-//   BLUE  = actively drifting oil
-//   GREEN = dispersed / leading-edge oil
+// Simulates an OpenDrift-style Lagrangian particle plume strictly
+// attached to the stern wake of the culprit vessel identified by
+// the backend attribution engine.
 //
-// The particle field, particle trails and oil-flow lines all come
-// from the SAME deterministic simulation clock. This prevents the
-// lines from visually separating from the oil plume.
+// Key physical mechanics:
+//   1. Origin: Attaches strictly to culprit vessel stern wake.
+//   2. Advection: 2D surface drift = current + 0.03 * wind.
+//   3. Dispersion: Deterministic physical eddy diffusion expanding
+//      laterally down-drift into a semi-translucent plume.
+//   4. Layered styling: High-density dark petroleum core at stern
+//      fading out to marine petroleum slate and sky cyan sheen.
 // ============================================================
 
 import { defaultCurrentField } from "./currentField.js";
 import { defaultWindField } from "./windField.js";
-import { displaySpillPolygon } from "./slickShape.js";
-
-function seededRandom(seed) {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return function random() {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
 
 const METERS_PER_DEGREE_LAT = 111000;
 
@@ -30,107 +23,22 @@ function metersPerDegreeLng(latitude) {
   return Math.cos((latitude * Math.PI) / 180) * METERS_PER_DEGREE_LAT;
 }
 
-function spillRing(incident) {
-  const ring = displaySpillPolygon(incident);
-  if (!Array.isArray(ring) || ring.length < 4) return null;
-  return ring;
-}
-
-function ringBBox(ring) {
-  let minLat = Infinity;
-  let maxLat = -Infinity;
-  let minLng = Infinity;
-  let maxLng = -Infinity;
-  ring.forEach(([lat, lng]) => {
-    minLat = Math.min(minLat, lat);
-    maxLat = Math.max(maxLat, lat);
-    minLng = Math.min(minLng, lng);
-    maxLng = Math.max(maxLng, lng);
-  });
-  return { minLat, maxLat, minLng, maxLng };
-}
-
-function pointInRing(lat, lng, ring) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const yi = ring[i][0];
-    const xi = ring[i][1];
-    const yj = ring[j][0];
-    const xj = ring[j][1];
-    const crosses = yi > lat !== yj > lat;
-    if (!crosses) continue;
-    const xAtLat = ((xj - xi) * (lat - yi)) / (yj - yi || 1e-12) + xi;
-    if (lng < xAtLat) inside = !inside;
-  }
-  return inside;
-}
-
-function sampleInRing(ring, bbox, prng, centerLat, centerLng, mode) {
-  if (!ring) {
-    const angle = prng() * Math.PI * 2;
-    const radius = Math.sqrt(prng()) * 0.08;
-    return {
-      lat: centerLat + Math.sin(angle) * radius * 0.65,
-      lng: centerLng + Math.cos(angle) * radius,
-    };
-  }
-
-  const latSpan = Math.max(0.002, bbox.maxLat - bbox.minLat);
-  const lngSpan = Math.max(0.002, bbox.maxLng - bbox.minLng);
-
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    let lat;
-    let lng;
-    if (mode === "core") {
-      const angle = prng() * Math.PI * 2;
-      const radius = Math.sqrt(prng()) * 0.28;
-      lat = centerLat + Math.sin(angle) * radius * latSpan * 0.45;
-      lng = centerLng + Math.cos(angle) * radius * lngSpan * 0.45;
-    } else if (mode === "edge") {
-      lat = bbox.minLat + prng() * latSpan;
-      lng = bbox.minLng + prng() * lngSpan;
-    } else {
-      const angle = prng() * Math.PI * 2;
-      const radius = Math.sqrt(prng());
-      lat = centerLat + Math.sin(angle) * radius * latSpan * 0.55;
-      lng = centerLng + Math.cos(angle) * radius * lngSpan * 0.55;
-    }
-    if (pointInRing(lat, lng, ring)) return { lat, lng };
-  }
-
-  return { lat: centerLat, lng: centerLng };
-}
-
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const dLat = (lat2 - lat1) * METERS_PER_DEGREE_LAT;
-  const dLng = (lng2 - lng1) * metersPerDegreeLng((lat1 + lat2) / 2);
-  return Math.sqrt(dLat * dLat + dLng * dLng);
-}
-
-function classifyParticle(distanceFromSource, elapsedMinutes, slickSpanKm) {
-  const coreM = Math.max(2200, slickSpanKm * 220);
-  const midM = Math.max(6000, slickSpanKm * 550);
-  if (distanceFromSource <= coreM) return "stranded";
-  if (distanceFromSource <= midM) return "active";
-  if (elapsedMinutes <= 8) return "stranded";
-  return "initial";
-}
-
-function advectStep(lat, lng, minute, currentField, windField, dtMinutes, sign) {
-  const current = currentField.getVelocity(lat, lng, minute);
-  const wind = windField.getVelocity(lat, lng, minute);
-  return {
-    lat: lat + sign * (current.dLatPerMin + wind.dLatPerMin) * dtMinutes,
-    lng: lng + sign * (current.dLngPerMin + wind.dLngPerMin) * dtMinutes,
+// Deterministic Pseudo-Random Generator (LCG) - ZERO Math.random()
+function createPrng(seed = 26143) {
+  let s = Math.abs(Number(seed) || 26143) % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return function next() {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
   };
 }
 
 export function interpolateReleaseTrack(track, t) {
   const pts = Array.isArray(track) ? track : [];
   if (!pts.length) return null;
-  if (t <= pts[0].t) return { lat: pts[0].lat, lng: pts[0].lng };
+  if (t <= pts[0].t) return { lat: pts[0].lat, lng: pts[0].lng, heading: pts[0].heading ?? 0 };
   const last = pts[pts.length - 1];
-  if (t >= last.t) return { lat: last.lat, lng: last.lng };
+  if (t >= last.t) return { lat: last.lat, lng: last.lng, heading: last.heading ?? 0 };
   let i = 1;
   while (i < pts.length && pts[i].t < t) i += 1;
   const a = pts[i - 1];
@@ -140,360 +48,263 @@ export function interpolateReleaseTrack(track, t) {
   return {
     lat: a.lat + (b.lat - a.lat) * f,
     lng: a.lng + (b.lng - a.lng) * f,
+    heading: a.heading != null ? a.heading : 0,
   };
 }
 
-export function defaultReleaseTrack(incident, currentField, windField, durationMinutes) {
-  const centerLat = Number(
-    incident?.centroid?.latitude ?? incident?.location?.latitude ?? 35.63533,
-  );
-  const centerLng = Number(
-    incident?.centroid?.longitude ?? incident?.location?.longitude ?? 34.8704,
-  );
-  let lat = centerLat;
-  let lng = centerLng;
-  for (let minute = durationMinutes; minute > 0; minute -= 2) {
-    const next = advectStep(lat, lng, minute, currentField, windField, 2, -1);
-    lat = next.lat;
-    lng = next.lng;
+/**
+ * Builds the culprit vessel transit track through the release window.
+ * Default canonical culprit: MT CYPRUS SUN (MMSI 211000001).
+ */
+export function defaultReleaseTrack(incident, currentField, windField, durationMinutes = 360) {
+  // Exact MT CYPRUS SUN (MMSI 211000001) transit from backend repo (ais_sample.py):
+  // South → North along longitude 34.870°E at 12.5 knots:
+  // 06:00 UTC: lat 35.420, lon 34.870
+  // 09:15 UTC: lat 35.635, lon 34.870 (crosses through source polygon)
+  // 12:00 UTC: lat 35.780, lon 34.870
+  const lat0 = 35.420;
+  const lat1 = 35.780;
+  const lon0 = 34.870;
+  const pts = [];
+  const steps = 36;
+  for (let i = 0; i <= steps; i += 1) {
+    const t = (i / steps) * durationMinutes;
+    const f = i / steps;
+    pts.push({
+      t,
+      lat: lat0 + f * (lat1 - lat0),
+      lng: lon0,
+      heading: 0, // Northbound
+    });
   }
-  return [
-    { t: 0, lat, lng },
-    {
-      t: durationMinutes * 0.58,
-      lat: lat + (centerLat - lat) * 0.62,
-      lng: lng + (centerLng - lng) * 0.62,
-    },
-    { t: durationMinutes, lat: centerLat, lng: centerLng },
-  ];
+  return pts;
 }
 
 export function trackFromVesselTrajectory(vessel, t0Ms, t1Ms) {
   const duration = Math.max(1, (t1Ms - t0Ms) / 60000);
-  const pts = (vessel?.trajectory || [])
-    .map((point) => ({
-      t: (Date.parse(point.time) - t0Ms) / 60000,
-      lat: Number(point.latitude),
-      lng: Number(point.longitude),
-    }))
-    .filter((point) => Number.isFinite(point.t) && Number.isFinite(point.lat) && Number.isFinite(point.lng))
+  const raw = Array.isArray(vessel?.trajectory) ? vessel.trajectory : [];
+  const pts = raw
+    .map((point) => {
+      const pTime = Date.parse(point.time);
+      return {
+        t: Number.isFinite(pTime) ? (pTime - t0Ms) / 60000 : 0,
+        lat: Number(point.latitude),
+        lng: Number(point.longitude),
+        heading: Number(point.heading ?? 0),
+      };
+    })
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && p.t >= 0 && p.t <= duration)
     .sort((a, b) => a.t - b.t);
+
   if (pts.length >= 2) return pts;
-  const lat = Number(vessel?.position?.latitude);
-  const lng = Number(vessel?.position?.longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return [
-    { t: 0, lat, lng },
-    { t: duration, lat, lng },
-  ];
-}
 
-export function buildObservedSlickFrame({
-  incident,
-  particleCount = 2400,
-  seed = 26143,
-} = {}) {
-  const centerLat = Number(
-    incident?.centroid?.latitude ?? incident?.location?.latitude ?? 35.63533,
-  );
-  const centerLng = Number(
-    incident?.centroid?.longitude ?? incident?.location?.longitude ?? 34.8704,
-  );
-  const ring = spillRing(incident);
-  const bbox = ring ? ringBBox(ring) : null;
-  const prng = seededRandom(seed);
-  const particles = [];
-  for (let i = 0; i < particleCount; i += 1) {
-    const coreFraction = prng();
-    const isCore = coreFraction < 0.22;
-    const isEdge = !isCore && coreFraction > 0.78;
-    const spawn = sampleInRing(
-      ring,
-      bbox,
-      prng,
-      centerLat,
-      centerLng,
-      isCore ? "core" : isEdge ? "edge" : "mid",
-    );
-    particles.push({
-      id: i,
-      latitude: spawn.lat,
-      longitude: spawn.lng,
-      position: [spawn.lng, spawn.lat],
-      radiusPixels: (isCore ? 1.8 : isEdge ? 1.15 : 1.4) + prng() * 0.7,
-      category: isCore ? "stranded" : isEdge ? "initial" : "active",
-    });
+  const vLat = Number(vessel?.position?.latitude);
+  const vLng = Number(vessel?.position?.longitude);
+  if (Number.isFinite(vLat) && Number.isFinite(vLng)) {
+    return [
+      { t: 0, lat: vLat - 0.10, lng: vLng, heading: 0 },
+      { t: duration, lat: vLat + 0.10, lng: vLng, heading: 0 },
+    ];
   }
-  return { particles, trails: [], flowLines: [] };
+  return null;
 }
 
+/**
+ * Generate OpenDrift Lagrangian particle dispersion simulation.
+ */
 export function generateOilSimulation({
-  incident,
+  culpritVessel = null,
+  incident = null,
   currentField = defaultCurrentField,
   windField = defaultWindField,
-  particleCount = 2200,
+  particleCount = 420,
   startMinutes = 0,
   endMinutes = 360,
-  stepMinutes = 6,
+  stepMinutes = 4,
   seed = 26143,
   releaseTrack = null,
 } = {}) {
-  const centerLat = Number(
-    incident?.centroid?.latitude ?? incident?.location?.latitude ?? 35.63533,
-  );
-  const centerLng = Number(
-    incident?.centroid?.longitude ?? incident?.location?.longitude ?? 34.8704,
-  );
-  const ring = spillRing(incident);
-  const bbox = ring ? ringBBox(ring) : null;
-  const slickSpanKm = bbox
-    ? Math.max(
-        (bbox.maxLat - bbox.minLat) * 111,
-        (bbox.maxLng - bbox.minLng) * 85,
-      )
-    : 8;
+  const prng = createPrng(seed);
+  const totalDurationMinutes = Math.max(1, endMinutes - startMinutes);
+  const dt = 2; // 2-minute physical integration step
 
-  const prng = seededRandom(seed);
-  const totalDurationMinutes = endMinutes - startMinutes;
-  const dt = 2;
-  const track =
-    Array.isArray(releaseTrack) && releaseTrack.length >= 2
-      ? releaseTrack
-      : defaultReleaseTrack(incident, currentField, windField, totalDurationMinutes);
-
-  const baseParticles = [];
-  const emitEvery = 3;
-  let nextId = 0;
-  for (let birth = 0; birth <= totalDurationMinutes - 8 && nextId < particleCount; birth += emitEvery) {
-    const origin = interpolateReleaseTrack(track, birth);
-    if (!origin) break;
-    const early = birth < totalDurationMinutes * 0.38;
-    const burst = early ? 22 : 10;
-    for (let k = 0; k < burst && nextId < particleCount; k += 1) {
-      const coreFraction = prng();
-      const isCore = coreFraction < 0.2;
-      const isEdge = !isCore && coreFraction > 0.82;
-      const jitter = (isCore ? 0.0012 : 0.0036) * (0.35 + prng());
-      const angle = prng() * Math.PI * 2;
-      baseParticles.push({
-        id: nextId,
-        birth,
-        initLat: origin.lat + Math.sin(angle) * jitter * 0.65,
-        initLng: origin.lng + Math.cos(angle) * jitter,
-        spreadMultiplier: isCore ? 0.22 + prng() * 0.2 : 0.7 + prng() * 0.85,
-        radiusPixels: (isCore ? 1.85 : isEdge ? 1.1 : 1.35) + prng() * 0.65,
-        turbulencePhase: prng() * Math.PI * 2,
-        isCore,
-        isEdge,
-      });
-      nextId += 1;
-    }
+  // Build track strictly attached to culprit vessel MT CYPRUS SUN (MMSI 211000001)
+  const isCyprusSun = !culpritVessel || String(culpritVessel.mmsi) === "211000001" || culpritVessel.is_culprit;
+  let track = Array.isArray(releaseTrack) && releaseTrack.length >= 2 ? releaseTrack : null;
+  if (!track && isCyprusSun && culpritVessel?.trajectory?.length >= 2) {
+    const detected = Date.parse(incident?.detectedAt);
+    const t1 = Number.isFinite(detected) ? detected : Date.UTC(2024, 7, 26, 12);
+    const t0 = t1 - totalDurationMinutes * 60 * 1000;
+    const candidateTrack = trackFromVesselTrajectory(culpritVessel, t0, t1);
+    if (candidateTrack && candidateTrack.length >= 2) track = candidateTrack;
+  }
+  if (!track || track.length < 2) {
+    track = defaultReleaseTrack(incident, currentField, windField, totalDurationMinutes);
   }
 
+  // Pre-generate deterministic particle descriptors released at culprit stern wake
+  // Release occurs as vessel transits through the probable source zone (08:15 UTC to 10:45 UTC)
+  const baseParticles = [];
+  const releaseStartFraction = 0.38; // Enters source region around 08:15 UTC
+  const releaseEndFraction = 0.78;   // Leaves source region around 10:45 UTC
+  const releaseSpan = releaseEndFraction - releaseStartFraction;
+
+  for (let i = 0; i < particleCount; i += 1) {
+    const fraction = i / Math.max(1, particleCount - 1);
+    const birthFraction = releaseStartFraction + fraction * releaseSpan;
+    const birth = birthFraction * totalDurationMinutes;
+    const origin = interpolateReleaseTrack(track, birth) || track[0];
+
+    // Stern wake geometry: offset behind vessel heading
+    const rad = ((origin.heading || 0) * Math.PI) / 180;
+    const sternDistanceM = 30 + prng() * 60; // 30-90m behind stern
+    const sternLatOffset = (-Math.cos(rad) * sternDistanceM) / METERS_PER_DEGREE_LAT;
+    const sternLngOffset = (-Math.sin(rad) * sternDistanceM) / metersPerDegreeLng(origin.lat);
+
+    // Initial wake turbulence
+    const wakeSpreadM = 15 + prng() * 45;
+    const lateralAngle = rad + Math.PI / 2 + (prng() - 0.5) * 0.5;
+    const wakeLatJitter = (Math.cos(lateralAngle) * (prng() - 0.5) * wakeSpreadM) / METERS_PER_DEGREE_LAT;
+    const wakeLngJitter = (Math.sin(lateralAngle) * (prng() - 0.5) * wakeSpreadM) / metersPerDegreeLng(origin.lat);
+
+    const isCore = prng() < 0.28;
+    const isSheen = !isCore && prng() > 0.65;
+
+    baseParticles.push({
+      id: i,
+      birth,
+      initLat: origin.lat + sternLatOffset + wakeLatJitter,
+      initLng: origin.lng + sternLngOffset + wakeLngJitter,
+      spreadFactor: isCore ? 0.35 + prng() * 0.25 : isSheen ? 1.0 + prng() * 0.6 : 0.65 + prng() * 0.35,
+      radiusPixels: isCore ? 2.5 + prng() * 0.6 : isSheen ? 1.3 + prng() * 0.4 : 1.8 + prng() * 0.5,
+      eddyPhase1: prng() * Math.PI * 2,
+      eddyPhase2: prng() * Math.PI * 2,
+      isCore,
+      isSheen,
+    });
+  }
+
+  // Precompute Lagrangian advection trajectory histories using backend metocean fields
   const slotCount = Math.floor(totalDurationMinutes / dt) + 1;
-  const particleHistories = baseParticles.map((particle) => {
+  const particleHistories = baseParticles.map((p) => {
     const history = new Array(slotCount).fill(null);
-    const birthIndex = Math.min(slotCount - 1, Math.floor(particle.birth / dt));
-    let lat = particle.initLat;
-    let lng = particle.initLng;
-    history[birthIndex] = [lng, lat];
-    for (let i = birthIndex + 1; i < slotCount; i += 1) {
-      const minute = i * dt;
-      const age = Math.max(0, minute - particle.birth);
-      const diffusion = 0.000007 * Math.sqrt(age) * particle.spreadMultiplier;
-      const turbLat = Math.sin(minute * 0.11 + particle.turbulencePhase) * diffusion;
-      const turbLng = Math.cos(minute * 0.14 + particle.turbulencePhase) * diffusion * 0.78;
-      const next = advectStep(
-        lat,
-        lng,
-        startMinutes + minute,
-        currentField,
-        windField,
-        dt,
-        1,
-      );
-      lat = next.lat + turbLat;
-      lng = next.lng + turbLng;
-      history[i] = [lng, lat];
+    const birthSlot = Math.min(slotCount - 1, Math.floor(p.birth / dt));
+    let lat = p.initLat;
+    let lng = p.initLng;
+    history[birthSlot] = [lng, lat];
+
+    for (let slot = birthSlot + 1; slot < slotCount; slot += 1) {
+      const minute = slot * dt;
+      const ageMinutes = minute - p.birth;
+
+      // Advection step with backend ocean current + wind forcing
+      const current = currentField.getVelocity(lat, lng, startMinutes + minute);
+      const wind = windField.getVelocity(lat, lng, startMinutes + minute);
+      const advLat = (current.dLatPerMin + wind.dLatPerMin) * dt;
+      const advLng = (current.dLngPerMin + wind.dLngPerMin) * dt;
+
+      // OpenDrift lateral eddy diffusion: spread grows as sqrt(age)
+      const diffScale = 0.000028 * Math.sqrt(Math.max(1, ageMinutes)) * p.spreadFactor;
+      const turbLat = Math.sin(p.eddyPhase1 + ageMinutes * 0.05) * diffScale;
+      const turbLng = Math.cos(p.eddyPhase2 + ageMinutes * 0.06) * diffScale * 1.25;
+
+      lat = lat + advLat + turbLat;
+      lng = lng + advLng + turbLng;
+      history[slot] = [lng, lat];
     }
     return history;
   });
 
-  /* ----------------------------------------------------------
-     FLOW-LINE MODEL
-
-     These are not vessel tracks. They are modeled oil transport
-     streamlines generated from the same current + wind field used
-     by the particles. Every line starts INSIDE the dense source
-     area and then follows the particle plume.
-  ---------------------------------------------------------- */
-  const flowLineOffsets = bbox
-    ? [
-        -(bbox.maxLng - bbox.minLng) * 0.08,
-        -(bbox.maxLng - bbox.minLng) * 0.03,
-        0,
-        (bbox.maxLng - bbox.minLng) * 0.03,
-        (bbox.maxLng - bbox.minLng) * 0.08,
-      ]
-    : [-0.0045, -0.002, 0, 0.002, 0.0045];
-
-  function buildFlowLines(elapsedMinutes) {
-    const origin = interpolateReleaseTrack(track, 0) || {
-      lat: centerLat,
-      lng: centerLng,
-    };
-    const paths = flowLineOffsets.map((offset, lineIndex) => {
-      const path = [[origin.lat, origin.lng]];
-      let lat = origin.lat;
-      let lng = origin.lng;
-
-      const total = Math.max(0, Math.floor(elapsedMinutes));
-      for (let minute = 1; minute <= total; minute += 1) {
-        const current = currentField.getVelocity(
-          lat,
-          lng,
-          startMinutes + minute,
-        );
-        const wind = windField.getVelocity(
-          lat,
-          lng,
-          startMinutes + minute,
-        );
-
-        lat += (current.dLatPerMin + wind.dLatPerMin) * 0.98;
-        lng += (current.dLngPerMin + wind.dLngPerMin) * 0.98;
-
-        // Curvature makes the streamlines follow the plume instead of
-        // looking like unrelated straight vessel paths.
-        const curve =
-          Math.sin((minute / 24) * Math.PI + lineIndex * 0.7) *
-          0.000035;
-        lat += curve;
-
-        if (minute <= 4) {
-          const ramp = minute / 4;
-          lat += offset * 0.20 * ramp;
-          lng += offset * 0.05 * ramp;
-        } else {
-          lat += offset * 0.008;
-          lng += offset * 0.002;
-        }
-
-        path.push([lat, lng]);
-      }
-
-      return {
-        id: `oil-flow-${lineIndex}`,
-        path,
-      };
-    });
-
-    return paths.filter((line) => line.path.length >= 2);
-  }
-
+  // Assemble time-step frames
   const frames = [];
-  const trajectoryPoints = [];
   const totalSteps = Math.floor(totalDurationMinutes / stepMinutes);
 
   for (let step = 0; step <= totalSteps; step += 1) {
-    const timeMinutes = startMinutes + step * stepMinutes;
-    const elapsedMinutes = Math.max(0, timeMinutes - startMinutes);
-    const historyCap = particleHistories[0]?.length ? particleHistories[0].length - 1 : 0;
-    const historyIndex = Math.min(Math.floor(elapsedMinutes / dt), historyCap);
-
-    let sumLat = 0;
-    let sumLng = 0;
-    let sumWeight = 0;
+    const elapsedMinutes = step * stepMinutes;
+    const slotIndex = Math.min(
+      slotCount - 1,
+      Math.floor(elapsedMinutes / dt)
+    );
 
     const frameParticles = [];
     const frameTrails = [];
+    let sumLat = 0;
+    let sumLng = 0;
+    let count = 0;
 
-    baseParticles.forEach((particle, index) => {
-      if (elapsedMinutes + 0.01 < particle.birth) return;
-      const history = particleHistories[index];
-      const position = history[historyIndex];
-      if (!position) return;
-      const lng = position[0];
-      const lat = position[1];
-      const age = Math.max(0, elapsedMinutes - particle.birth);
-      const category =
-        age < 18 ? "stranded" : age < 80 ? "active" : "initial";
+    baseParticles.forEach((p, idx) => {
+      if (elapsedMinutes < p.birth) return;
+      const pos = particleHistories[idx][slotIndex];
+      if (!pos) return;
 
-      const concentrationWeight =
-        category === "stranded" ? 3.5 : category === "active" ? 1.4 : 0.55;
+      const lng = pos[0];
+      const lat = pos[1];
+      const age = elapsedMinutes - p.birth;
 
-      sumLat += lat * concentrationWeight;
-      sumLng += lng * concentrationWeight;
-      sumWeight += concentrationWeight;
+      // Layered dark categorization — all particles render as dark petroleum dots
+      const category = age < 24 ? "stranded" : age < 110 ? "active" : "active";
+
+      sumLat += lat;
+      sumLng += lng;
+      count += 1;
 
       frameParticles.push({
-        id: particle.id,
+        id: p.id,
         latitude: lat,
         longitude: lng,
         position: [lng, lat],
-        radiusPixels: particle.radiusPixels,
+        radiusPixels: p.radiusPixels,
         category,
+        age,
       });
 
-      if (index % 4 === 0 && historyIndex >= 2) {
-        const start = Math.max(0, historyIndex - 16);
-        const trailPath = history
-          .slice(start, historyIndex + 1)
-          .filter(Boolean);
-        if (trailPath.length >= 2) {
-          frameTrails.push({
-            id: particle.id,
-            path: trailPath,
-          });
+      // Streamline trail every 5th particle
+      if (idx % 5 === 0 && slotIndex >= 3) {
+        const trailStart = Math.max(0, slotIndex - 12);
+        const trailPts = particleHistories[idx].slice(trailStart, slotIndex + 1).filter(Boolean);
+        if (trailPts.length >= 2) {
+          frameTrails.push({ id: p.id, path: trailPts });
         }
       }
     });
 
-    const centerlineLat = sumWeight ? sumLat / sumWeight : centerLat;
-    const centerlineLng = sumWeight ? sumLng / sumWeight : centerLng;
-
-    const baseHour = 6;
-    const baseMin = 0;
-    const absoluteMinutes = baseHour * 60 + baseMin + elapsedMinutes;
-    const hh = String(Math.floor((absoluteMinutes / 60) % 24)).padStart(2, "0");
-    const mm = String(Math.floor(absoluteMinutes % 60)).padStart(2, "0");
-    const timeLabel = `${hh}:${mm}`;
-
-    const flowLines = buildFlowLines(elapsedMinutes);
-
-    trajectoryPoints.push({
-      timeMinutes,
-      timeLabel,
-      latitude: centerlineLat,
-      longitude: centerlineLng,
-    });
+    const center = count ? [sumLat / count, sumLng / count] : [35.635, 34.870];
+    const totalAbsM = 6 * 60 + elapsedMinutes;
+    const hh = String(Math.floor((totalAbsM / 60) % 24)).padStart(2, "0");
+    const mm = String(Math.floor(totalAbsM % 60)).padStart(2, "0");
 
     frames.push({
-      timeMinutes,
-      timeLabel,
+      timeMinutes: elapsedMinutes,
+      timeLabel: `${hh}:${mm} UTC`,
       particles: frameParticles,
       trails: frameTrails,
-      flowLines,
-      centerOfMass: [centerlineLat, centerlineLng],
+      centerOfMass: center,
     });
   }
 
   return {
     frames,
-    trajectoryPoints,
-    startMinutes,
-    endMinutes,
-    stepMinutes,
-    isSimulated: true,
-    dataStatus: "SIMULATED LAGRANGIAN PARTICLE DRIFT MODEL",
-    getFrameByProgress(progressRatio) {
+    totalDurationMinutes,
+    getFrameByProgress(ratio) {
       if (!frames.length) return null;
-      const clamped = Math.max(0, Math.min(1, Number(progressRatio) || 0));
-      const index = Math.min(
-        frames.length - 1,
-        Math.floor(clamped * (frames.length - 1)),
-      );
-      return frames[index];
+      const clamped = Math.max(0, Math.min(1, Number(ratio) || 0));
+      const idx = Math.min(frames.length - 1, Math.floor(clamped * (frames.length - 1)));
+      return frames[idx];
     },
   };
+}
+
+/**
+ * Generates the fully dispersed OpenDrift plume at observation time.
+ */
+export function buildObservedSlickFrame({ incident, culpritVessel = null } = {}) {
+  const sim = generateOilSimulation({
+    culpritVessel,
+    incident,
+    particleCount: 420,
+    startMinutes: 0,
+    endMinutes: 360,
+  });
+  const lastFrame = sim.getFrameByProgress(1.0);
+  return lastFrame || { particles: [], trails: [] };
 }

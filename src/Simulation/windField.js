@@ -16,11 +16,11 @@ function getMetersPerDegreeLng(latitude) {
 
 export class WindField {
   constructor(options = {}) {
-    // Default wind: North-North-West wind blowing toward South-South-East (u = 2.5 m/s, v = -4.0 m/s)
-    this.baseU = options.baseU ?? 2.5;
-    this.baseV = options.baseV ?? -4.0;
-    this.windageFactor = options.windageFactor ?? 0.03; // 3% rule of thumb
-    this.description = options.description ?? "SIMULATED WIND FIELD (NNW 5.2 m/s)";
+    // Base wind vector from backend med_wind.nc: u10=2.82 m/s, v10=2.94 m/s (4.40 m/s, 69.0° ENE)
+    this.baseU = options.baseU ?? 2.82;
+    this.baseV = options.baseV ?? 2.94;
+    this.windageFactor = options.windageFactor ?? 0.03; // 3% standard oil windage rule
+    this.description = options.description ?? "BACKEND ERA5 WIND FIELD (med_wind.nc)";
   }
 
   /**

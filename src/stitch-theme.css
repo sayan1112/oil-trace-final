@@ -206,9 +206,17 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #f8fafc;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.stitch-search:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  background: #fff;
 }
 
 .stitch-search svg {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
   stroke: #64748b;
@@ -217,10 +225,26 @@
 
 .stitch-search input {
   flex: 1;
+  min-width: 0;
   border: 0;
   background: transparent;
   outline: none;
   font-size: 13px;
+  font-family: inherit;
+  color: #111827;
+}
+
+.stitch-search input::placeholder {
+  color: #9ca3af;
+}
+
+/* suppress native browser search decorations */
+.stitch-search input[type="search"]::-webkit-search-decoration,
+.stitch-search input[type="search"]::-webkit-search-cancel-button,
+.stitch-search input[type="search"]::-webkit-search-results-button,
+.stitch-search input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  display: none;
 }
 
 .stitch-top-actions {

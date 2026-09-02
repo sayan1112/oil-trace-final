@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const MODAL_BACKEND = "https://vscimatic999--oiltrace-backend-web.modal.run";
-const LOCAL_BACKEND = "http://localhost:8000";
+const LOCAL_BACKEND = "http://127.0.0.1:8000";
 const RENDER_BACKEND = "https://sih-oil-spill-26143-backend.onrender.com";
 
 function stripApiSuffix(url) {
@@ -25,7 +25,7 @@ export const FALLBACK_HOST = stripApiSuffix(
 export const isLocalBackend = /localhost|127\.0\.0\.1/i.test(PRIMARY_HOST);
 
 const disableFailover =
-  import.meta.env.DEV || import.meta.env.VITE_DISABLE_BACKEND_FAILOVER === "true";
+  import.meta.env.VITE_DISABLE_BACKEND_FAILOVER === "true";
 
 const useDevProxy =
   import.meta.env.DEV && import.meta.env.VITE_BACKEND_DIRECT !== "true";
@@ -43,7 +43,7 @@ export function getActiveBackendUrl() {
 
 export const apiClient = axios.create({
   baseURL: PRIMARY_URL,
-  timeout: 15000,
+  timeout: 10000,
   headers: { "Content-Type": "application/json" },
 });
 

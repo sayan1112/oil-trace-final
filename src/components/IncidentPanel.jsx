@@ -343,37 +343,44 @@ function IncidentPanel({ incident, vessels = [] }) {
 
         <div className="incident-metrics">
           <div className="incident-metric">
-            <span>AREA</span>
-
-            <strong>
-              {incident.areaKm2 ?? "—"}
-              <small> km²</small>
-            </strong>
+            <span className="metric-header-lbl">AREA</span>
+            <div className="metric-value-wrap">
+              <strong>{incident.areaKm2 ?? "—"}</strong>
+              <span className="metric-unit">km²</span>
+            </div>
           </div>
 
           <div className="incident-metric">
-            <span>DETECTION</span>
-
-            <strong>
-              {Math.round(
-                (incident.detectionConfidence || 0) *
-                  100
-              )}
-              <small>%</small>
-            </strong>
+            <span className="metric-header-lbl">DETECTION</span>
+            <div className="metric-value-wrap">
+              <strong>
+                {Math.round(
+                  (incident.detectionConfidence || 0) * 100
+                )}%
+              </strong>
+              <span className="metric-unit">conf.</span>
+            </div>
           </div>
 
           <div className="incident-metric">
-            <span>SATELLITE</span>
+            <span className="metric-header-lbl">SENSOR</span>
+            <div className="metric-value-wrap">
+              <strong>
+                {incident.satellite?.platform || "Sentinel-1"}
+              </strong>
+              <span className="metric-unit">
+                {incident.satellite?.sensor || "SAR"}
+              </span>
+            </div>
+          </div>
 
-            <strong>
-              {incident.satellite?.platform ||
-                "—"}
-            </strong>
-
-            <small className="metric-subtext">
-              {incident.satellite?.sensor || ""}
-            </small>
+          <div className="incident-metric">
+            <span className="metric-header-lbl">SCENE ID</span>
+            <div className="metric-value-wrap">
+              <strong style={{ fontSize: "11px", letterSpacing: "0.02em" }}>
+                {incident.satellite?.imageId || incident.satellite?.scene_id || incident.scene_id || "Oil/00067"}
+              </strong>
+            </div>
           </div>
         </div>
       </section>

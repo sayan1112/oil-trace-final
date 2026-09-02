@@ -16,12 +16,12 @@ function getMetersPerDegreeLng(latitude) {
 
 export class OceanCurrentField {
   constructor(options = {}) {
-    // Base current vector: Westward-Northwestward drift (~1.8 m/s, ~3.5 knots)
-    this.baseU = options.baseU ?? -1.45;
-    this.baseV = options.baseV ?? 0.85;
-    this.shearScale = options.shearScale ?? 0.25;
+    // Base current vector from backend med_currents.nc: uo=0.096 m/s, vo=-0.132 m/s (0.22 m/s, 154.5° SSE)
+    this.baseU = options.baseU ?? 0.096;
+    this.baseV = options.baseV ?? -0.132;
+    this.shearScale = options.shearScale ?? 0.15;
     this.wavePeriodMinutes = options.wavePeriodMinutes ?? 120;
-    this.description = options.description ?? "SIMULATED OCEAN CURRENT (NORTHWEST COASTAL DRIFT)";
+    this.description = options.description ?? "BACKEND CMEMS OCEAN CURRENT (med_currents.nc)";
   }
 
   getVelocity(latitude, longitude, timeMinutes = 0) {

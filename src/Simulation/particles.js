@@ -137,28 +137,30 @@ export function overlayFrameFromCloud(cloud, tMs) {
   const now = Number.isFinite(tMs)
     ? Math.min(cloud.t1, Math.max(cloud.t0, tMs))
     : cloud.t0;
-  const c = centroidAt(cloud.samples, now);
-  const kmLon = KM_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180);
+
+  const positions = cloudPositions(cloud, now);
   const particles = [];
+
   for (let i = 0; i < cloud.count; i += 1) {
-    const ang = cloud.parts[i * 4];
+    const pLat = positions[i * 2];
+    const pLon = positions[i * 2 + 1];
+    if (!Number.isFinite(pLat) || !Number.isFinite(pLon)) continue;
+
     const rad = cloud.parts[i * 4 + 1];
-    const rKm = rad * 0.55;
     particles.push({
       id: i,
-      latitude: c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT,
-      longitude: c.lon + (Math.cos(ang) * rKm) / kmLon,
-      position: [
-        c.lon + (Math.cos(ang) * rKm) / kmLon,
-        c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT,
-      ],
-      radiusPixels: rad < 0.35 ? 1.7 : 1.2,
+      latitude: pLat,
+      longitude: pLon,
+      position: [pLon, pLat],
+      radiusPixels: rad < 0.35 ? 1.8 : 1.3,
       category: rad < 0.35 ? "stranded" : rad < 0.7 ? "active" : "initial",
     });
   }
+
   const trailPath = cloud.samples
     .filter((sample) => sample.t <= now + 1000)
     .map((sample) => [sample.lon, sample.lat]);
+
   return {
     particles,
     trails: trailPath.length >= 2 ? [{ id: "opendrift-path", path: trailPath }] : [],

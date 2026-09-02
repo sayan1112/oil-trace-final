@@ -22,6 +22,8 @@ export function TimelineControl({
   startMs,
   endMs,
   currentMs,
+  currentLat,
+  currentLng,
   events = [],
   isPlaying = false,
   onPlayPause,
@@ -42,6 +44,11 @@ export function TimelineControl({
     onSeekMs?.(next);
   };
 
+  const coordStr =
+    Number.isFinite(currentLat) && Number.isFinite(currentLng)
+      ? `${Math.abs(currentLat).toFixed(3)}°${currentLat >= 0 ? "N" : "S"} ${Math.abs(currentLng).toFixed(3)}°${currentLng >= 0 ? "E" : "W"}`
+      : null;
+
   return (
     <div className="timeline-card" role="region" aria-label="Transport timeline">
       <div className="timeline-header">
@@ -52,6 +59,9 @@ export function TimelineControl({
           </div>
           {currentEvent && (
             <span className="timeline-event-chip">{currentEvent.label}</span>
+          )}
+          {coordStr && (
+            <span className="timeline-coord-badge">{coordStr}</span>
           )}
         </div>
 

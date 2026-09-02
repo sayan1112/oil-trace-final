@@ -5,6 +5,7 @@ export default function CommandTopBar({
   search,
   onSearch,
   onNewIncident,
+  hasSyntheticAis = false,
 }) {
   return (
     <header className="stitch-topbar">
@@ -12,6 +13,34 @@ export default function CommandTopBar({
         <span>Incidents</span>
         <span aria-hidden="true">›</span>
         <strong>{incidentId}</strong>
+        {hasSyntheticAis && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              backgroundColor: "rgba(234, 88, 12, 0.15)",
+              color: "#fb923c",
+              border: "1px solid rgba(234, 88, 12, 0.35)",
+              marginLeft: "12px",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: "#f97316",
+              }}
+            />
+            DEMO / SYNTHETIC AIS DATA
+          </span>
+        )}
       </nav>
       <label className="stitch-search">
         <Search size={16} strokeWidth={1.8} />
