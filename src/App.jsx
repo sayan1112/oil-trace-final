@@ -1776,9 +1776,28 @@ function App() {
     ];
   };
 
-  const getReplayPosition = (vessel) => {
-    const timed = timeReplayPosition(vessel);
-    if (timed) return timed;
+  const doesVesselOverlapSimRange = (vessel) => {
+    if (!simRange) return false;
+    const tr = (vessel.trajectory || [])
+      .map((pt) => Date.parse(pt.time))
+      .filter(Number.isFinite);
+    if (tr.length < 2) return false;
+    const minT = Math.min(...tr);
+    const maxT = Math.max(...tr);
+    return maxT >= simRange.t0 && minT <= simRange.t1;
+  };
+
+  const getTimelineProgressRatio = () => {
+    if (simRange && Number.isFinite(simMs)) {
+      return Math.max(
+        0,
+        Math.min(1, (simMs - simRange.t0) / Math.max(1, simRange.t1 - simRange.t0))
+      );
+    }
+    return replayProgressRatio;
+  };
+
+  const getProgressPosition = (vessel, progressRatio) => {
     const trajectory = vessel.trajectory || [];
     if (!trajectory.length) {
       return [vessel.position.latitude, vessel.position.longitude];
@@ -1787,10 +1806,7 @@ function App() {
       return [trajectory[0].latitude, trajectory[0].longitude];
     }
 
-    const clampedProgress = Math.max(
-      0,
-      Math.min(replayProgress, trajectory.length - 1)
-    );
+    const clampedProgress = Math.max(0, Math.min(1, progressRatio)) * (trajectory.length - 1);
     const lowerIndex = Math.floor(clampedProgress);
     const upperIndex = Math.min(lowerIndex + 1, trajectory.length - 1);
     const fraction = clampedProgress - lowerIndex;
@@ -1804,12 +1820,20 @@ function App() {
     ];
   };
 
+  const getReplayPosition = (vessel) => {
+    if (simRange && Number.isFinite(simMs) && doesVesselOverlapSimRange(vessel)) {
+      const timed = timeReplayPosition(vessel);
+      if (timed) return timed;
+    }
+    return getProgressPosition(vessel, getTimelineProgressRatio());
+  };
+
   const getReplayTrajectory = (vessel) => {
     const trajectory = vessel.trajectory || [];
     if (!trajectory.length) return [];
 
-    // Time-based: every past track point plus the interpolated position.
-    if (simRange && Number.isFinite(simMs)) {
+    // Time-based: every past track point plus the interpolated position if within simRange
+    if (simRange && Number.isFinite(simMs) && doesVesselOverlapSimRange(vessel)) {
       const pts = trajectory
         .filter((pt) => {
           const ms = Date.parse(pt.time);
@@ -1821,16 +1845,17 @@ function App() {
       return pts;
     }
 
-    const visibleProgress = Math.min(replayProgress, trajectory.length - 1);
-    const completedPoints = Math.floor(visibleProgress);
+    // Progress-based: slice up to current timeline progress so vessels outside simRange also animate
+    const progress = getTimelineProgressRatio();
+    const visibleIndex = Math.max(0, Math.min(1, progress)) * (trajectory.length - 1);
+    const completedCount = Math.floor(visibleIndex);
 
     const points = trajectory
-      .slice(0, completedPoints + 1)
+      .slice(0, completedCount + 1)
       .map((point) => [point.latitude, point.longitude]);
 
-    if (completedPoints < trajectory.length - 1) {
-      points.push(getReplayPosition(vessel));
-    }
+    const cur = getReplayPosition(vessel);
+    if (cur) points.push(cur);
 
     return points;
   };
