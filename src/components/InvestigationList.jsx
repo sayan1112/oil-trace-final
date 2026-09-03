@@ -99,42 +99,6 @@ export default function InvestigationList({
       </div>
 
 
-      <button type="button" className="inv-case-card" onClick={onOpenIncident}>
-        <div className="inv-case-top">
-          <strong>#{incident?.id || "incident"}</strong>
-          <span className="inv-badge high-sev">{incident?.severity || "HIGH"}</span>
-        </div>
-        <p className="inv-status-line">{incident?.status || "Under Investigation"}</p>
-        <div className="inv-route">
-          <span>{incident?.satellite?.platform || "Sentinel-1"}</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 12h16M14 6l6 6-6 6" />
-          </svg>
-          <span>{formatCoord(lat, lon)}</span>
-        </div>
-        <div className="inv-assess">
-          <div>
-            <span>Area</span>
-            <strong>
-              {incident?.areaKm2 ?? "—"}
-              <i>km²</i>
-            </strong>
-          </div>
-          <div>
-            <span>Conf.</span>
-            <strong>
-              {confidencePct(incident?.detectionConfidence)}
-              <i>%</i>
-            </strong>
-          </div>
-          <div>
-            <span>Sensor</span>
-            <strong>
-              {incident?.satellite?.sensor || "SAR"}
-            </strong>
-          </div>
-        </div>
-      </button>
 
       <div className="inv-actions">
         <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>

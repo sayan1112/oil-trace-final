@@ -2,7 +2,6 @@ import "./Sidebar.css";
 import {
   Droplets,
   ScanLine,
-  Undo2,
   Ship,
   FileText,
   CirclePlay,
@@ -12,7 +11,6 @@ import {
 const NAV = [
   { id: "incident", label: "Incident", Icon: ScanLine },
   { id: "detect", label: "Detection", Icon: Droplets },
-  { id: "backtrack", label: "Hindcast", Icon: Undo2 },
   { id: "vessels", label: "Vessels", Icon: Ship },
   { id: "evidence", label: "Evidence", Icon: FileText },
   { id: "replay", label: "Replay", Icon: CirclePlay },
@@ -45,10 +43,7 @@ function Sidebar({
               key={item.id}
               type="button"
               className={`sidebar-item ${activeItem === item.id ? "active" : ""}`}
-              onClick={() => {
-                if (item.id === "backtrack") onTriggerBacktrack?.();
-                else onSelect?.(item.id);
-              }}
+              onClick={() => onSelect?.(item.id)}
             >
               <span className="sidebar-icon">
                 <Icon size={20} strokeWidth={1.75} />

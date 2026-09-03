@@ -223,25 +223,38 @@
 .inv-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 4px 16px 12px;
+  gap: 10px;
+  padding: 0 18px 14px;
 }
 
 .inv-action {
-  height: 40px;
+  height: 38px;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 10px;
   background: #fff;
   color: #1a1d23;
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.inv-action:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .inv-action.primary {
   background: #173a5e;
   border-color: #173a5e;
   color: #fff;
+}
+
+.inv-action.primary:hover:not(:disabled) {
+  background: #112d4a;
 }
 
 .inv-action:disabled {
@@ -252,7 +265,8 @@
 .inv-section-label {
   display: flex;
   justify-content: space-between;
-  padding: 4px 18px 8px;
+  align-items: center;
+  padding: 4px 18px 10px;
   color: #8a9099;
   font-size: 11px;
   font-weight: 700;
@@ -264,7 +278,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0 16px 16px;
+  padding: 0 18px 18px;
 }
 
 .inv-person {

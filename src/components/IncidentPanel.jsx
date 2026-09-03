@@ -385,55 +385,6 @@ function IncidentPanel({ incident, vessels = [] }) {
         </div>
       </section>
 
-      {/* INVESTIGATION */}
-      <section className="incident-section">
-        <div className="incident-section-heading">
-          <div className="incident-section-title">
-            Investigation
-          </div>
-
-          <span className="incident-investigation-count">
-            {vessels.length}
-          </span>
-        </div>
-
-        <div className="incident-investigation-card">
-          <div className="incident-candidate-count-box">
-            <span>CANDIDATES</span>
-
-            <strong>{vessels.length}</strong>
-
-            <small>
-              potential source vessels
-            </small>
-          </div>
-
-          <div className="incident-top-candidate">
-            <span>TOP CANDIDATE</span>
-
-            <strong>
-              {topCandidate?.name ||
-                "No candidate"}
-            </strong>
-
-            {topCandidate && (
-              <div className="incident-confidence">
-                <span>
-                  Attribution confidence
-                </span>
-
-                <strong>
-                  {Math.round(
-                    (topCandidate.attributionConfidence ||
-                      0) * 100
-                  )}
-                  %
-                </strong>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
 
       {/* TIMELINE */}
       <section className="incident-section">

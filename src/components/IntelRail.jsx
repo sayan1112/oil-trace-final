@@ -19,58 +19,12 @@ export default function IntelRail({
   onSelectVessel,
   selectedVesselId,
 }) {
-  const lat = Number(incident?.centroid?.latitude ?? incident?.location?.latitude);
-  const lon = Number(incident?.centroid?.longitude ?? incident?.location?.longitude);
-  const conf = pct(incident?.detectionConfidence);
   const ranked = [...vessels].sort(
     (a, b) => (a.candidateRank || 99) - (b.candidateRank || 99)
   );
 
   return (
-    <aside className="intel-rail" aria-label="Detection and environment">
-      <div className="intel-card">
-        <div className="intel-card-head">
-          <h3>Detection summary</h3>
-          <span>{incident?.detectedAt ? new Date(incident.detectedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "—"}</span>
-        </div>
-        <dl className="intel-kv">
-          <div>
-            <dt>First detection</dt>
-            <dd>
-              {incident?.detectedAt
-                ? new Date(incident.detectedAt).toLocaleString("en-GB", {
-                    day: "2-digit",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                    timeZone: "UTC",
-                  }) + " UTC"
-                : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt>Sensor</dt>
-            <dd>{incident?.satellite?.platform || "Sentinel-1"} {incident?.satellite?.sensor || "SAR"}</dd>
-          </div>
-          <div>
-            <dt>Confidence</dt>
-            <dd>{conf}%</dd>
-          </div>
-          <div>
-            <dt>Slick area</dt>
-            <dd>{Number(incident?.areaKm2 || 0).toFixed(3)} km²</dd>
-          </div>
-          <div>
-            <dt>Centroid</dt>
-            <dd>
-              {Number.isFinite(lat) ? lat.toFixed(4) : "—"}°N,{" "}
-              {Number.isFinite(lon) ? lon.toFixed(4) : "—"}°E
-            </dd>
-          </div>
-        </dl>
-      </div>
-
+    <aside className="intel-rail" aria-label="Environmental conditions and sources">
       <div className="intel-card">
         <h3>Environmental conditions</h3>
         <ul className="intel-env">
