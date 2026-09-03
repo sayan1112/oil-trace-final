@@ -42,7 +42,7 @@ export function SuspectPanel({
 
   const getScoreColor = (score) => {
     if (score >= 0.7) return "#3b82f6";
-    if (score >= 0.5) return "#ea580c";
+    if (score >= 0.5) return "#2563eb";
 
     return "#64748b";
   };
@@ -867,12 +867,7 @@ export function SuspectPanel({
               className="confidence-meter-bar"
               style={{
                 width: `${confidencePercent}%`,
-                backgroundColor:
-                  candidateRank === 1
-                    ? "#ea580c"
-                    : confidencePercent >= 50
-                    ? "#3b82f6"
-                    : "#64748b",
+                backgroundColor: "#2563eb",
               }}
             />
           </div>
@@ -1051,7 +1046,7 @@ export function SuspectPanel({
         <section className="panel-section" style={{ borderTop: "1px solid rgba(148, 163, 184, 0.15)", paddingTop: "14px" }}>
           <div className="section-heading-row">
             <h3 className="section-title">Backend Forensic Summary</h3>
-            <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#ea580c", fontWeight: 700, backgroundColor: "#fff7ed", padding: "2px 6px", borderRadius: "4px", border: "1px solid #ffedd5" }}>API Justification</span>
+            <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#1d4ed8", fontWeight: 700, backgroundColor: "#eff6ff", padding: "2px 6px", borderRadius: "4px", border: "1px solid rgba(37, 99, 235, 0.25)" }}>API Justification</span>
           </div>
 
           <div
@@ -1060,7 +1055,7 @@ export function SuspectPanel({
               padding: "10px 12px",
               backgroundColor: "#f8fafc",
               border: "1px solid #cbd5e1",
-              borderLeft: "3px solid #ea580c",
+              borderLeft: "3px solid #2563eb",
               borderRadius: "6px",
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               fontSize: "11px",
@@ -1084,9 +1079,9 @@ export function SuspectPanel({
                 padding: "2px 6px",
                 borderRadius: "4px",
                 fontWeight: 700,
-                backgroundColor: (candidateRank === 1) ? "#dcfce7" : "#fee2e2",
-                color: (candidateRank === 1) ? "#15803d" : "#b91c1c",
-                border: (candidateRank === 1) ? "1px solid #bbf7d0" : "1px solid #fecaca",
+                backgroundColor: "#eff6ff",
+                color: "#1d4ed8",
+                border: "1px solid rgba(37, 99, 235, 0.25)",
               }}
             >
               {counterfactualResult?.evidence_strength || (candidateRank === 1 ? "Strong" : "Weak")} Evidence
@@ -1096,14 +1091,14 @@ export function SuspectPanel({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "10px" }}>
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Spatial Agreement</span>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: "#0284c7", marginTop: "3px", fontFamily: "monospace" }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "#1d4ed8", marginTop: "3px", fontFamily: "monospace" }}>
                 {Math.round((counterfactualResult?.spatial_agreement ?? (candidateRank === 1 ? 0.91 : 0.12)) * 100)}% Jaccard
               </div>
             </div>
 
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Trajectory Intersection</span>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: (counterfactualResult?.trajectory_reaches_slick ?? (candidateRank === 1)) ? "#16a34a" : "#dc2626", marginTop: "3px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "#1d4ed8", marginTop: "3px" }}>
                 {(counterfactualResult?.trajectory_reaches_slick ?? (candidateRank === 1)) ? "TRUE (Reaches Slick)" : "FALSE (Diverged)"}
               </div>
             </div>

@@ -1660,7 +1660,7 @@
 .section-label {
   display: block;
 
-  color: #ea580c;
+  color: #1d4ed8;
 
   font-size: 8px;
 
@@ -1785,22 +1785,13 @@
   border-radius: 7px;
 }
 
-.confidence-value-pill.conf-high {
-  background: #fef3c7;
-
-  color: #b45309;
-}
-
-.confidence-value-pill.conf-med {
-  background: #e0f2fe;
-
-  color: #0369a1;
-}
-
+.confidence-value-pill,
+.confidence-value-pill.conf-high,
+.confidence-value-pill.conf-med,
 .confidence-value-pill.conf-low {
-  background: #f1f5f9;
-
-  color: #64748b;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.25) !important;
 }
 
 .confidence-meter-container {

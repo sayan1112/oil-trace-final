@@ -218,10 +218,6 @@ export function DetectionPanel({
       {/* ── HEADER ─────────────────────────────────────── */}
       <div className="context-panel-header detection-panel-header">
         <div>
-          <div className="detection-panel-kicker">
-            <span className="detection-panel-kicker-dot" />
-            SAR DETECTION SERVICE
-          </div>
           <h2 className="detection-panel-title">Oil Detection</h2>
           <p className="detection-panel-subtitle">
             Sentinel-1 VV+VH → U-Net → GeoJSON slick polygons

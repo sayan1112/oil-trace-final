@@ -23,23 +23,7 @@
 }
 
 .detection-panel-kicker {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent-primary, #0ea5e9);
-  margin-bottom: 0.25rem;
-}
-
-.detection-panel-kicker-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-primary, #0ea5e9);
-  animation: detectionPulse 2s ease-in-out infinite;
+  display: none !important;
 }
 
 @keyframes detectionPulse {

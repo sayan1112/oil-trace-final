@@ -50,7 +50,7 @@ button {
 
   --spill: #ef4444;
   --source: #1769d3;
-  --candidate: #ea580c;
+  --candidate: #2563eb;
   --trajectory-muted: #94a3b8;
 
   --toolbar-bg: rgba(255, 255, 255, 0.94);
@@ -1096,7 +1096,7 @@ path.leaflet-interactive {
 }
 
 .legend-candidate {
-  border-top: 4px solid #ea580c;
+  border-top: 4px solid #2563eb;
 }
 
 .legend-muted-trajectory {

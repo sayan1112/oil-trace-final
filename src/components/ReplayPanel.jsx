@@ -111,7 +111,7 @@ function ReplayPanel({
                   transform: "translateX(-50%)",
                   width: "2px",
                   height: "16px",
-                  background: "#ea580c",
+                  background: "#2563eb",
                   borderRadius: "1px",
                   pointerEvents: "none",
                 }}
