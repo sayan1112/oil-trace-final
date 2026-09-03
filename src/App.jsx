@@ -75,7 +75,7 @@ import {
 } from "./services/backendApi";
 import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
 import { buildCloud, overlayFrameFromCloud } from "./Simulation/particles";
-import { displaySpillPolygon, observedSlickRing } from "./Simulation/slickShape";
+import { displaySpillPolygon, observedSlickRing, sampleDotsInPolygon } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
@@ -1112,21 +1112,15 @@ function App() {
     );
   }, [scoredVessels]);
 
-
   const oilSimulation = useMemo(() => {
-    const targetVessel =
-      scoredVessels.find((row) => String(row.mmsi) === "211000001") ||
-      scoredVessels.find((row) => row.candidateRank === 1) ||
-      culpritVessel;
     return generateOilSimulation({
-      culpritVessel: targetVessel,
+      culpritVessel,
       incident,
       currentField: defaultCurrentField,
       windField: defaultWindField,
       particleCount: 420,
-      releaseTrack: trackFromVesselTrajectory(targetVessel, oilClock.t0, oilClock.t1),
     });
-  }, [culpritVessel, incident, scoredVessels, oilClock]);
+  }, [culpritVessel, incident]);
 
   const observedSlickFrame = useMemo(
     () => buildObservedSlickFrame({ incident, culpritVessel }),
@@ -1503,22 +1497,30 @@ function App() {
     [openDriftCloud, driftTimeMs],
   );
 
-  const displayOilFrame = useMemo(() => {
-    // When backend OpenDrift simulation is active and playing, stream from backend OpenDrift (MT CYPRUS SUN)
-    if (hasOpenDrift && sceneLive && openDriftFrame?.particles?.length) {
-      return openDriftFrame;
-    }
-    // When playing in simulation mode, stream from culprit MT CYPRUS SUN
-    if (sceneLive && currentOilFrame?.particles?.length) {
-      return currentOilFrame;
-    }
-    // At rest / before playing: show the observed slick frame
-    return observedSlickFrame;
-  }, [hasOpenDrift, sceneLive, openDriftFrame, currentOilFrame, observedSlickFrame]);
+  // Oil spill dots sampled inside the red polygon (clean, normal density)
+  const polygonSlickDots = useMemo(() => {
+    if (!spillPolygon || spillPolygon.length < 3) return [];
+    return sampleDotsInPolygon(spillPolygon, 22, 26143);
+  }, [spillPolygon]);
 
+  // OpenDrift Lagrangian particle plume bound directly to timeline scrubber
+  // In the default stage (and paused view), keep subtle dots of oil inside the red polygon
+  const displayOilFrame = useMemo(() => {
+    if (isPlaying) {
+      return currentOilFrame || observedSlickFrame;
+    }
+
+    const base = currentOilFrame?.particles?.length ? currentOilFrame : observedSlickFrame;
+    const plume = base?.particles || [];
+    return {
+      ...(base || {}),
+      particles: [...plume, ...polygonSlickDots],
+      trails: base?.trails || [],
+    };
+  }, [isPlaying, currentOilFrame, observedSlickFrame, polygonSlickDots]);
   const currentOilParticles = displayOilFrame?.particles || [];
   const currentOilTrails = displayOilFrame?.trails || [];
-  const currentOilFlowLines = displayOilFrame?.flowLines || [];
+  const currentOilFlowLines = [];
 
   /* =======================================================
      REPLAY ENGINE
