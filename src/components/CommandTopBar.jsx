@@ -38,7 +38,7 @@ export default function CommandTopBar({
                 backgroundColor: "#f97316",
               }}
             />
-            DEMO / SYNTHETIC AIS DATA
+             SYNTHETIC AIS DATA
           </span>
         )}
       </nav>
