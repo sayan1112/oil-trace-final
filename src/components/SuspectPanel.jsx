@@ -163,8 +163,6 @@ export function SuspectPanel({
         <div className="panel-header">
           <div>
             <div className="panel-kicker-row">
-              <span className="live-pulse-dot" />
-
               <span className="panel-kicker">
                 MARITIME SURVEILLANCE &amp;
                 ATTRIBUTION
@@ -516,18 +514,6 @@ export function SuspectPanel({
                           )
                         }
                       >
-                        <div className="card-rank-indicator">
-                          <span
-                            className={`rank-badge rank-${
-                              vessel.candidateRank ||
-                              "other"
-                            }`}
-                          >
-                            {vessel.candidateRank ||
-                              "-"}
-                          </span>
-                        </div>
-
                         <div className="card-main-info">
                           <div className="card-name-row">
                             <span className="vessel-title">
@@ -578,13 +564,7 @@ export function SuspectPanel({
                               className="candidate-mini-fill"
                               style={{
                                 width: `${confPercent}%`,
-                                backgroundColor:
-                                  isTop
-                                    ? "#ea580c"
-                                    : confPercent >=
-                                      50
-                                    ? "#3b82f6"
-                                    : "#64748b",
+                                backgroundColor: "#2563eb",
                               }}
                             />
                           </div>
@@ -599,28 +579,6 @@ export function SuspectPanel({
                 )
               )}
             </div>
-          </div>
-
-          {/* METHODOLOGY */}
-          <div className="attribution-methodology-card">
-            <div className="methodology-header">
-              <span className="methodology-icon">
-                ⚡
-              </span>
-
-              <span className="methodology-title">
-                Attribution Methodology
-              </span>
-            </div>
-
-            <p className="methodology-desc">
-              Scores are calculated by combining
-              backward Lagrangian transport
-              convergence, vessel AIS trajectory
-              crossing, temporal release window
-              overlap, and counterfactual forward
-              plume drift matching.
-            </p>
           </div>
         </div>
       </aside>

@@ -46,9 +46,9 @@
 }
 
 .inv-link-chip.ok {
-  border-color: #b7e4c7;
-  background: #ecfdf3;
-  color: #157a3c;
+  background: #eff6ff;
+  border-color: rgba(37, 99, 235, 0.25);
+  color: #1d4ed8;
 }
 
 .inv-link-chip.bad {
@@ -176,22 +176,18 @@
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.2) !important;
 }
 
 .inv-badge.investigating,
-.inv-badge.in-transit {
-  background: #fff4cc;
-  color: #8a6d00;
-}
-
-.inv-badge.queued {
-  background: #e8f1ff;
-  color: #1d4ed8;
-}
-
+.inv-badge.in-transit,
+.inv-badge.queued,
 .inv-badge.delivered {
-  background: #ecfdf3;
-  color: #157a3c;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.2) !important;
 }
 
 .inv-route {

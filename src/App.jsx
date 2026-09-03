@@ -777,10 +777,7 @@ function IncidentPanel({ incident, vessels, onSelectVessel, onClose, onTriggerBa
         </div>
       </div>
 
-      <div className="incident-status-row">
-        <span className="incident-status">{incident.status}</span>
-        <span className="incident-severity">{incident.severity}</span>
-      </div>
+
 
       <section className="context-section">
         <span className="context-section-label">INCIDENT</span>
@@ -2364,24 +2361,6 @@ function App() {
                   </Tooltip>
                 </Polygon>
               ))}
-              {/* Centroid marker */}
-              <CircleMarker
-                center={[slickCentroid.lat, slickCentroid.lon]}
-                radius={5}
-                pathOptions={{
-                  color: slickColor,
-                  weight: 2,
-                  opacity: 1,
-                  fillColor: slickColor,
-                  fillOpacity: 0.85,
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -6]}>
-                  <strong>Slick centroid: {id}</strong>
-                  <br />
-                  {slickCentroid.lat.toFixed(5)}°N, {slickCentroid.lon.toFixed(5)}°E
-                </Tooltip>
-              </CircleMarker>
             </Fragment>
           );
         })}
@@ -2751,21 +2730,22 @@ function App() {
                 <button type="button" onClick={() => setBackendError(null)}>Dismiss</button>
               </div>
             )}
+
+            <IntelRail
+              incident={incident}
+              vessels={scoredVessels}
+              env={envSnapshot}
+              selectedVesselId={selectedVesselId}
+              onSelectVessel={(id) => {
+                const hit = scoredVessels.find(
+                  (vessel) => String(vessel.id) === String(id) || String(vessel.mmsi) === String(id)
+                );
+                if (hit) handleSelectVessel(hit);
+              }}
+            />
           </div>
         </div>
       </div>
-      <IntelRail
-        incident={incident}
-        vessels={scoredVessels}
-        env={envSnapshot}
-        selectedVesselId={selectedVesselId}
-        onSelectVessel={(id) => {
-          const hit = scoredVessels.find(
-            (vessel) => String(vessel.id) === String(id) || String(vessel.mmsi) === String(id)
-          );
-          if (hit) handleSelectVessel(hit);
-        }}
-      />
       </div>
       </div>
     </div>

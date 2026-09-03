@@ -1,20 +1,24 @@
 .timeline-card {
   position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  width: calc(100% - 32px);
+  max-width: 820px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 16px 12px;
-  border: 0;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 40px rgba(17, 19, 24, 0.16);
-  backdrop-filter: blur(18px);
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #17181c;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  box-sizing: border-box;
 }
 
 .timeline-header {
@@ -45,19 +49,21 @@
 }
 
 .status-pill.active {
-  background: #ecfdf3;
-  color: #15803d;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
 .status-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: #2563eb;
 }
 
 .status-pill.active .status-indicator {
-  background: #16a34a;
+  background: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
 }
 
 .timestamp-text {
@@ -71,8 +77,9 @@
   overflow: hidden;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #fff4cc;
-  color: #8a6d00;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
   font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;

@@ -92,21 +92,7 @@
 }
 
 .live-pulse-dot {
-  width: 7px;
-  height: 7px;
-
-  border-radius: 50%;
-
-  background: #ef4444;
-
-  box-shadow:
-    0 0 0 2px rgba(239, 68, 68, 0.25);
-
-  animation:
-    beaconPulse
-    1.6s
-    ease-in-out
-    infinite;
+  display: none !important;
 }
 
 @keyframes beaconPulse {
@@ -457,16 +443,11 @@
   color: #475569;
 }
 
-.spotlight-tag.alert-tag {
-  background: #fee2e2;
-
-  color: #b91c1c;
-}
-
+.spotlight-tag.alert-tag,
 .spotlight-tag.warn-tag {
-  background: #fef3c7;
-
-  color: #92400e;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .spotlight-action-btn {
@@ -967,11 +948,11 @@
 }
 
 .rank-badge.rank-1 {
-  background: #fff3cf;
+  background: #dbeafe;
 
-  border: 1px solid #f6d878;
+  border: 1px solid #bfdbfe;
 
-  color: #b45309;
+  color: #1d4ed8;
 }
 
 .rank-badge.rank-2 {
@@ -1052,22 +1033,13 @@
   text-align: center;
 }
 
-.vessel-conf-badge.conf-high {
-  background: #dcfce7;
-
-  color: #15803d;
-}
-
-.vessel-conf-badge.conf-med {
-  background: #fef3c7;
-
-  color: #b45309;
-}
-
+.vessel-conf-badge,
+.vessel-conf-badge.conf-high,
+.vessel-conf-badge.conf-med,
 .vessel-conf-badge.conf-low {
-  background: #f1f5f9;
-
-  color: #64748b;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 /* =====================================================

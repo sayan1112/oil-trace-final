@@ -277,15 +277,6 @@ function IncidentPanel({ incident, vessels = [] }) {
           </button>
         </div>
 
-        <div className="incident-status-row">
-          <span className="incident-status">
-            {incident.status}
-          </span>
-
-          <span className="incident-severity">
-            {incident.severity}
-          </span>
-        </div>
       </div>
 
       {/* INCIDENT DESCRIPTION & COORDINATES */}

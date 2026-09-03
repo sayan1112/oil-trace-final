@@ -53,10 +53,6 @@ export function TimelineControl({
     <div className="timeline-card" role="region" aria-label="Transport timeline">
       <div className="timeline-header">
         <div className="timeline-status-group">
-          <div className={`status-pill ${isPlaying ? "active" : "paused"}`}>
-            <span className="status-indicator" />
-            <span className="status-label">{isPlaying ? "Playing" : "Scene clock"}</span>
-          </div>
           {currentEvent && (
             <span className="timeline-event-chip">{currentEvent.label}</span>
           )}

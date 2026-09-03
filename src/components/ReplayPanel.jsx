@@ -169,12 +169,12 @@ function ReplayPanel({
         </div>
 
         <div className="replay-vessel-row" style={{ fontSize: "0.78rem" }}>
-          <span className="replay-vessel-dot" style={{ backgroundColor: "#3b82f6" }} />
+          <span className="replay-vessel-num">1</span>
           <span className="replay-vessel-name">{currentFieldDesc}</span>
         </div>
 
         <div className="replay-vessel-row" style={{ fontSize: "0.78rem" }}>
-          <span className="replay-vessel-dot" style={{ backgroundColor: "#06b6d4" }} />
+          <span className="replay-vessel-num">2</span>
           <span className="replay-vessel-name">{windFieldDesc}</span>
         </div>
       </div>
@@ -186,9 +186,9 @@ function ReplayPanel({
         </div>
 
         {vessels.length > 0 ? (
-          vessels.slice(0, 6).map((vessel) => (
+          vessels.slice(0, 6).map((vessel, index) => (
             <div className="replay-vessel-row" key={vessel.id}>
-              <span className="replay-vessel-dot" />
+              <span className="replay-vessel-num">{vessel.candidateRank || index + 1}</span>
               <span className="replay-vessel-name">{vessel.name}</span>
               <span className="replay-vessel-rank">#{vessel.candidateRank}</span>
             </div>

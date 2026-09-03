@@ -3727,9 +3727,15 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 }
 
 .command-stage .spotlight-score-pill {
-  background: #fff4cc !important;
-  color: #8a6d00 !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.25) !important;
   border-radius: 14px !important;
+}
+
+.command-stage .spotlight-score-pill .score-num,
+.command-stage .spotlight-score-pill .score-lbl {
+  color: #1d4ed8 !important;
 }
 
 .command-stage .spotlight-meter {
