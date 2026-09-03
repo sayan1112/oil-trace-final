@@ -75,7 +75,7 @@ import {
 } from "./services/backendApi";
 import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
 import { buildCloud, overlayFrameFromCloud } from "./Simulation/particles";
-import { displaySpillPolygon, observedSlickRing, sampleDotsInPolygon } from "./Simulation/slickShape";
+import { displaySpillPolygon, observedSlickRing } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
 import { backtrackOil } from "./Simulation/backtracking";
@@ -1201,22 +1201,13 @@ function App() {
   ======================================================= */
 
   const simRange = useMemo(() => {
-    const ts = [];
-    (backtrackResult?.backend?.trajectory_timestamps_utc || []).forEach((t) =>
-      ts.push(Date.parse(t))
-    );
-    (forwardResult?.trajectory_timestamps_utc || []).forEach((t) =>
-      ts.push(Date.parse(t))
-    );
-    if (replayMeta?.start_time_utc) ts.push(Date.parse(replayMeta.start_time_utc));
-    if (replayMeta?.end_time_utc) ts.push(Date.parse(replayMeta.end_time_utc));
-    (replayMeta?.frames || []).forEach((frame) => ts.push(Date.parse(frame.timestamp_utc)));
-    const valid = ts.filter(Number.isFinite);
-    if (valid.length < 2) return null;
-    return { t0: Math.min(...valid), t1: Math.max(...valid) };
-  }, [backtrackResult, forwardResult, replayMeta]);
+    const detected = Date.parse(incident?.detectedAt) || Date.UTC(2024, 7, 26, 12);
+    const t0 = detected - 6 * 60 * 60 * 1000;
+    const t1 = detected;
+    return { t0, t1 };
+  }, [incident]);
 
-  const [simMs, setSimMs] = useState(null);
+  const [simMs, setSimMs] = useState(Date.UTC(2024, 7, 26, 6));
 
   const fmtSimClock = (ms) => {
     if (!Number.isFinite(ms)) return null;
@@ -1497,27 +1488,13 @@ function App() {
     [openDriftCloud, driftTimeMs],
   );
 
-  // Oil spill dots sampled inside the red polygon (clean, normal density)
-  const polygonSlickDots = useMemo(() => {
-    if (!spillPolygon || spillPolygon.length < 3) return [];
-    return sampleDotsInPolygon(spillPolygon, 22, 26143);
-  }, [spillPolygon]);
-
   // OpenDrift Lagrangian particle plume bound directly to timeline scrubber
-  // In the default stage (and paused view), keep subtle dots of oil inside the red polygon
   const displayOilFrame = useMemo(() => {
-    if (isPlaying) {
+    if (isPlaying || sceneLive) {
       return currentOilFrame || observedSlickFrame;
     }
-
-    const base = currentOilFrame?.particles?.length ? currentOilFrame : observedSlickFrame;
-    const plume = base?.particles || [];
-    return {
-      ...(base || {}),
-      particles: [...plume, ...polygonSlickDots],
-      trails: base?.trails || [],
-    };
-  }, [isPlaying, currentOilFrame, observedSlickFrame, polygonSlickDots]);
+    return observedSlickFrame;
+  }, [isPlaying, sceneLive, currentOilFrame, observedSlickFrame]);
   const currentOilParticles = displayOilFrame?.particles || [];
   const currentOilTrails = displayOilFrame?.trails || [];
   const currentOilFlowLines = [];
