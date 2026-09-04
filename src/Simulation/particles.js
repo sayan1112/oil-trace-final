@@ -61,7 +61,7 @@ export function envelopeRadiusKm(geometry, fallbackKm = 1.5) {
 //   timesUtc      ISO strings aligned 1:1 with points
 //   startSpreadKm cloud radius at the earliest timestamp
 //   endSpreadKm   cloud radius at the latest timestamp
-export function buildCloud({ points, timesUtc, count, startSpreadKm, endSpreadKm, seed }) {
+export function buildCloud({ points, timesUtc, count, startSpreadKm, endSpreadKm, seed, preformed = false }) {
   if (!points?.length || !timesUtc?.length) return null;
   const n = Math.min(points.length, timesUtc.length);
   const samples = [];
@@ -81,8 +81,16 @@ export function buildCloud({ points, timesUtc, count, startSpreadKm, endSpreadKm
     samples,
     parts,
     count,
-    startSpreadKm: Math.min(0.35, Number(startSpreadKm) || 0.2),
-    endSpreadKm: Math.min(2.4, Number(endSpreadKm) || 1.4),
+    // Trust the caller's envelopes: they come from the backend geometries
+    // (observed slick, source region, predicted footprint). The old hard
+    // clamps (0.35 / 2.4 km) shrank a cloud meant to cover a ~10 km slick
+    // into a single dot — the "one blue point" failure mode.
+    startSpreadKm: Math.min(15, Math.max(0.05, Number(startSpreadKm) || 0.2)),
+    endSpreadKm: Math.min(15, Math.max(0.05, Number(endSpreadKm) || 1.4)),
+    // preformed: the oil mass already exists in full at t0 (a detected
+    // slick being traced), so every particle is alive from the first frame
+    // and the cloud travels as one coherent body along the trajectory.
+    preformed: Boolean(preformed),
     t0: samples[0].t,
     t1: samples[samples.length - 1].t,
   };
@@ -102,7 +110,7 @@ function centroidAt(samples, t) {
 
 // Particle [lat, lon] pairs at time t → flat Float64Array [lat0, lon0, ...].
 export function cloudPositions(cloud, tMs, out) {
-  const { samples, parts, count, startSpreadKm, endSpreadKm, t0, t1 } = cloud;
+  const { samples, parts, count, startSpreadKm, endSpreadKm, t0, t1, preformed } = cloud;
   const span = Math.max(1, t1 - t0);
   const res = out && out.length === count * 2 ? out : new Float64Array(count * 2);
   const now = Number.isFinite(tMs) ? tMs : t0;
@@ -111,15 +119,19 @@ export function cloudPositions(cloud, tMs, out) {
     const rad = parts[i * 4 + 1];
     const birthFrac = parts[i * 4 + 2];
     const ph = parts[i * 4 + 3];
-    const birthT = t0 + birthFrac * span;
+    const birthT = preformed ? t0 : t0 + birthFrac * span;
     if (now < birthT) {
       res[i * 2] = Number.NaN;
       res[i * 2 + 1] = Number.NaN;
       continue;
     }
-    // Spread particles along the OpenDrift centroid path from release
-    // to the current clock, so the plume moves with the model.
-    const alongT = t0 + birthFrac * Math.max(0, now - t0);
+    // preformed: the whole mass rides the trajectory together, with only a
+    // short deterministic lag per particle so the body keeps a comet tail.
+    // Otherwise: particles enter over time and trail back to the release,
+    // reproducing a continuous discharge stretching into a plume.
+    const alongT = preformed
+      ? Math.max(t0, now - birthFrac * 0.18 * span)
+      : t0 + birthFrac * Math.max(0, now - t0);
     const c = centroidAt(samples, alongT);
     const age = Math.max(0, Math.min(1, (now - birthT) / span));
     const spread = startSpreadKm + (endSpreadKm - startSpreadKm) * Math.sqrt(age);

@@ -240,19 +240,25 @@ export function normalizeVessels(vessels, attr) {
         ? {
             spatial: {
               score: sc(c?.spatial_score, b.spatial?.score != null ? b.spatial.score / 100 : 0),
+              weight: b.spatial?.weight,
               label: b.spatial?.explanation || "Spatial proximity computed by backend attribution.",
             },
             temporal: {
               score: sc(c?.temporal_score, b.temporal?.score != null ? b.temporal.score / 100 : 0),
+              weight: b.temporal?.weight,
               label: b.temporal?.explanation || "Temporal window computed by backend attribution.",
             },
             trajectory: {
               score: sc(c?.trajectory_score, b.trajectory?.score != null ? b.trajectory.score / 100 : 0),
+              weight: b.trajectory?.weight,
               label: b.trajectory?.explanation || "Trajectory compatibility computed by backend attribution.",
             },
+            // The counterfactual is a separate validation stage, not part of
+            // the backend's attribution weighting — weight stays undefined.
             drift: { score: 0, label: "Counterfactual not run for this vessel." },
             aisReliability: {
               score: rel ?? 0,
+              weight: b.source_probability?.weight,
               status: (rel ?? 0) >= 0.7 ? "Good" : (rel ?? 0) >= 0.4 ? "Warning" : "Critical",
               label: `AIS data reliability: ${((rel ?? 0) * 100).toFixed(1)}%. Hourly-bin coverage with gap penalty.`,
             },
@@ -305,7 +311,9 @@ export function buildFrontendScoring(v) {
   ];
   const items = arr.map(([key, title, x]) => {
     const value = Math.round(Math.max(0, Math.min(1, +(x?.score || 0))) * 100);
-    const weight = DISPLAY_WEIGHTS[key] ?? 0.2;
+    // Prefer the engine's own weight (evidence_breakdown[*].weight); the
+    // display constants are only a fallback for the counterfactual signal.
+    const weight = x?.weight ?? DISPLAY_WEIGHTS[key] ?? 0.2;
     return {
       key,
       title,

@@ -20,15 +20,46 @@ import {
   runLiveDetection,
 } from "../services/detectionApi";
 import incidentData from "../data/incident.json";
-import { displaySpillPolygon } from "../Simulation/slickShape";
+import { getReplay } from "../services/backendApi";
 import "./DetectionPanel.css";
 
-function localMediterraneanDemo() {
+/**
+ * Canonical demo detection.
+ *
+ * Geometry comes from the BACKEND: the observed slick polygon carried by the
+ * replay frames of the canonical incident (the same geometry the pipeline
+ * was validated against). The scene metadata (scene id, ML confidence, area,
+ * observation time, centroid) comes from the canonical incident record —
+ * those are the published facts of scene Oil/00067, not computed values.
+ * The synthetic display hexagon is gone: what renders is the real footprint.
+ */
+async function canonicalMediterraneanDemo() {
   const inc = incidentData.incident;
-  const ring = displaySpillPolygon(inc).map(([lat, lon]) => [lon, lat]);
-  if (ring.length && ring[0][0] !== ring[ring.length - 1][0]) {
-    ring.push(ring[0]);
+
+  let geometry = null;
+  try {
+    const replay = await getReplay(inc.id);
+    const framesWithSlick = (replay?.frames || []).filter(
+      (f) => f?.slick?.geometry?.coordinates?.length
+    );
+    if (framesWithSlick.length) {
+      // Latest frame = state at the observation time.
+      geometry = framesWithSlick[framesWithSlick.length - 1].slick.geometry;
+    }
+  } catch {
+    /* fall through to the canonical record's polygon */
   }
+
+  if (!geometry) {
+    // Offline fallback: the canonical record's own footprint ([lat, lon]
+    // pairs in the incident file → GeoJSON [lon, lat]).
+    const ring = (inc.spillPolygon || []).map(([lat, lon]) => [lon, lat]);
+    if (ring.length && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+      ring.push([...ring[0]]);
+    }
+    geometry = { type: "Polygon", coordinates: [ring] };
+  }
+
   return {
     type: "FeatureCollection",
     features: [
@@ -44,7 +75,7 @@ function localMediterraneanDemo() {
           sensor: inc.satellite?.sensor || "SAR",
           scene_id: inc.satellite?.imageId || "Oil/00067",
         },
-        geometry: { type: "Polygon", coordinates: [ring] },
+        geometry,
       },
     ],
   };
@@ -134,7 +165,7 @@ export function DetectionPanel({
     setError(null);
     try {
       if (import.meta.env.VITE_USE_MODAL_ML !== "true") {
-        const geojson = localMediterraneanDemo();
+        const geojson = await canonicalMediterraneanDemo();
         setResult(geojson);
         setStatus("success");
         onDetectionResult(geojson);

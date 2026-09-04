@@ -16,7 +16,6 @@ function rankTone(value) {
 }
 
 export default function IntelRail({
-  incident,
   vessels = [],
   env,
   onSelectVessel,
@@ -70,7 +69,9 @@ export default function IntelRail({
               </li>
             </ul>
             <p className="intel-note">
-              Wind and current at the slick centroid from the local drift fields used on the map.
+              Illustrative values from the frontend display fields. The
+              simulation itself is forced by CMEMS currents and ERA5 wind on
+              the backend, which does not expose point samples via the API.
             </p>
           </>
         )}

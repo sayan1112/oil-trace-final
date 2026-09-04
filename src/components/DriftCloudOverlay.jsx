@@ -68,10 +68,17 @@ export default function DriftCloudOverlay({
     return buildCloud({
       points,
       timesUtc: times,
-      count: 800,
-      startSpreadKm: envelopeRadiusKm(slickGeometry, 1.8),
+      // Dense enough to read as a coherent oil mass covering the observed
+      // slick, which then travels backward as one body toward the source.
+      // The ×1.7 compensates for the gaussian radial profile (typical
+      // particle sits at ~0.4-0.75 of the nominal spread), so the cloud's
+      // visible body actually fills the slick envelope instead of a core.
+      count: 1500,
+      startSpreadKm: envelopeRadiusKm(slickGeometry, 1.8) * 1.7,
       endSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
       seed: "oiltrace-back",
+      // The detected slick already exists in full when the trace starts.
+      preformed: true,
     });
   }, [hindcast, forward, slickGeometry]);
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import "./SuspectPanel.css";
 
 export function SuspectPanel({
@@ -229,15 +229,19 @@ export function SuspectPanel({
 
             <div className="investigation-metric-card">
               <span className="metric-label">
-                RELEASE WINDOW
+                EST. RELEASE
               </span>
 
               <span className="metric-val">
-                T-45m
+                {topCandidate?.releaseTime
+                  ? new Date(topCandidate.releaseTime)
+                      .toISOString()
+                      .substring(11, 16)
+                  : "—"}
               </span>
 
               <span className="metric-sub">
-                10:00–10:45 UTC
+                {topCandidate?.releaseTime ? "UTC · from attribution" : "pending forward run"}
               </span>
             </div>
           </div>
@@ -253,7 +257,7 @@ export function SuspectPanel({
                   </span>
 
                   <span>
-                    PRIMARY ATTRIBUTION TARGET
+                    TOP CANDIDATE VESSEL
                   </span>
                 </div>
 
@@ -266,10 +270,10 @@ export function SuspectPanel({
 
                       <span className="spotlight-type">
                         {topCandidate.type ||
-                          "Commercial Vessel"}{" "}
+                          "Vessel"}{" "}
                         •{" "}
                         {topCandidate.flag ||
-                          "Panama"}
+                          "—"}
                       </span>
                     </div>
 
@@ -598,7 +602,6 @@ export function SuspectPanel({
     speedKnots,
     heading,
     attributionConfidence,
-    overallScore,
     minDistanceKm,
     releaseLocation,
     releaseTime,
@@ -769,7 +772,7 @@ export function SuspectPanel({
             <div>
               <span className="section-label">
                 {candidateRank === 1
-                  ? "★ PRIMARY SUSPECT"
+                  ? "★ TOP CANDIDATE"
                   : `CANDIDATE RANK #${
                       candidateRank || "-"
                     }`}

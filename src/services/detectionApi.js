@@ -111,7 +111,7 @@ export async function runLiveDetection(file, threshold) {
   });
 
   if (!response.ok) {
-    let detail = "";
+    let detail;
     try {
       const json = await response.json();
       detail = json?.detail ?? json?.message ?? "";

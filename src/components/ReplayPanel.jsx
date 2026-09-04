@@ -15,7 +15,6 @@ function ReplayPanel({
   currentFieldDesc = "SIMULATED CURRENT (WESTWARD 0.3 m/s)",
   windFieldDesc = "SIMULATED WIND (NNW 5.2 m/s)",
   startLabel = "Start",
-  midLabel = "Detected",
   endLabel = "End",
   forcingTag = "SIMULATED",
   releaseFrac,
