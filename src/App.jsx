@@ -73,12 +73,6 @@ import {
   vesselsNearCentroid,
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
-import { generateOilSimulation, buildObservedSlickFrame } from "./Simulation/oilSimulation";
-import { buildCloud } from "./Simulation/particles";
-import { observedSlickRing } from "./Simulation/slickShape";
-import { defaultCurrentField } from "./Simulation/currentField";
-import { defaultWindField } from "./Simulation/windField";
-import { compassLabel, msToKnots } from "./utils/compass";
 
 /* =========================================================
    LEAFLET MARKER FIX
@@ -957,75 +951,13 @@ function App() {
   const [incident, setIncident] = useState(INCIDENT_SEED);
   const leafletCentroid = centroidFromIncident(incident);
   const spillPolygon = useMemo(() => {
-    // The observed slick layer renders the REAL detection footprint
+    // The observed slick layer renders ONLY the real detection footprint
     // (incident.spillPolygon is [lat, lon] pairs derived from the detection
-    // geometry by incidentFromDetection). The synthetic display ring is only
-    // a last resort when no real geometry exists at all.
-    const real = (incident?.spillPolygon || []).filter(
-      (p) => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1])
+    // geometry). No geometry → nothing is drawn; a synthetic stand-in
+    // polygon would be an invented observation.
+    return (incident?.spillPolygon || []).filter(
+      (pt) => Array.isArray(pt) && Number.isFinite(+pt[0]) && Number.isFinite(+pt[1])
     );
-    if (real.length >= 3) return real;
-    return observedSlickRing({
-      latitude: leafletCentroid[0],
-      longitude: leafletCentroid[1],
-      areaKm2: incident?.areaKm2 || 266.926,
-    });
-  }, [incident, leafletCentroid]);
-
-  const simulatedCurrentVectors = useMemo(() => {
-    const [clat, clng] = centroidFromIncident(incident);
-    if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
-    const vectors = [];
-    for (let lat = clat - 0.22; lat <= clat + 0.22; lat += 0.048) {
-      for (let lng = clng - 0.36; lng <= clng + 0.36; lng += 0.062) {
-        const vel = defaultCurrentField.getVelocity(lat, lng, 0);
-        const rad = ((90 - vel.direction) * Math.PI) / 180;
-        const len = 0.0075;
-        const endLat = lat + Math.sin(rad) * len * 0.9;
-        const endLng = lng + Math.cos(rad) * len;
-        const headLen = 0.0022;
-        const headAngle1 = rad + Math.PI * 0.82;
-        const headAngle2 = rad - Math.PI * 0.82;
-        const h1 = [endLat + Math.sin(headAngle1) * headLen * 0.9, endLng + Math.cos(headAngle1) * headLen];
-        const h2 = [endLat + Math.sin(headAngle2) * headLen * 0.9, endLng + Math.cos(headAngle2) * headLen];
-        vectors.push({
-          id: `curr-${lat.toFixed(3)}-${lng.toFixed(3)}`,
-          positions: [[lat, lng], [endLat, endLng]],
-          arrowHead: [h1, [endLat, endLng], h2],
-          speed: vel.speed,
-          direction: vel.direction,
-        });
-      }
-    }
-    return vectors;
-  }, [incident]);
-
-  const simulatedWindVectors = useMemo(() => {
-    const [clat, clng] = centroidFromIncident(incident);
-    if (!Number.isFinite(clat) || !Number.isFinite(clng)) return [];
-    const vectors = [];
-    for (let lat = clat - 0.2; lat <= clat + 0.2; lat += 0.048) {
-      for (let lng = clng - 0.32; lng <= clng + 0.32; lng += 0.062) {
-        const wind = defaultWindField.getVelocity(lat, lng, 0);
-        const rad = ((90 - wind.direction) * Math.PI) / 180;
-        const len = 0.007;
-        const endLat = lat + Math.sin(rad) * len * 0.9;
-        const endLng = lng + Math.cos(rad) * len;
-        const headLen = 0.0022;
-        const headAngle1 = rad + Math.PI * 0.82;
-        const headAngle2 = rad - Math.PI * 0.82;
-        const h1 = [endLat + Math.sin(headAngle1) * headLen * 0.9, endLng + Math.cos(headAngle1) * headLen];
-        const h2 = [endLat + Math.sin(headAngle2) * headLen * 0.9, endLng + Math.cos(headAngle2) * headLen];
-        vectors.push({
-          id: `wind-${lat.toFixed(3)}-${lng.toFixed(3)}`,
-          positions: [[lat, lng], [endLat, endLng]],
-          arrowHead: [h1, [endLat, endLng], h2],
-          speed: wind.speed,
-          direction: wind.direction,
-        });
-      }
-    }
-    return vectors;
   }, [incident]);
 
   /* =======================================================
@@ -1113,65 +1045,6 @@ function App() {
   // Seed vessel for the local oil simulation: prefer backend-flagged culprit,
   // then the attribution winner, then the tanker from the demo scene. The
   // static fallback only positions the simulation — it carries no score.
-  const culpritVessel = useMemo(() => {
-    return (
-      scoredVessels.find((v) => v.is_culprit || v.isCulprit) ||
-      scoredVessels.find((v) => v.candidateRank === 1) ||
-      scoredVessels.find((v) => String(v.mmsi) === "211000001") ||
-      (backendVessels || []).find((v) => String(v.mmsi) === "211000001") || {
-        id: "211000001",
-        mmsi: "211000001",
-        name: "MT CYPRUS SUN",
-        type: "Tanker",
-        candidateRank: null,
-        attributionConfidence: null,
-        is_culprit: false,
-        position: { latitude: 35.6353, longitude: 34.8704 },
-      }
-    );
-  }, [scoredVessels, backendVessels]);
-
-  const hasSyntheticAis = useMemo(() => {
-    return (scoredVessels || []).some(
-      (v) =>
-        ["678901234", "789012345", "890123456"].includes(String(v.mmsi)) ||
-        v.is_synthetic ||
-        v.synthetic ||
-        v.flag === "SYNTHETIC"
-    );
-  }, [scoredVessels]);
-
-  const oilSimulation = useMemo(() => {
-    return generateOilSimulation({
-      culpritVessel,
-      incident,
-      currentField: defaultCurrentField,
-      windField: defaultWindField,
-      particleCount: 420,
-    });
-  }, [culpritVessel, incident]);
-
-  const observedSlickFrame = useMemo(
-    () => buildObservedSlickFrame({ incident, culpritVessel }),
-    [incident, culpritVessel],
-  );
-
-  const envSnapshot = useMemo(() => {
-    const [lat, lng] = leafletCentroid;
-    const wind = defaultWindField.getVelocity(lat, lng, 0);
-    const current = defaultCurrentField.getVelocity(lat, lng, 0);
-    const windKn = msToKnots(wind.speed);
-    const currentKn = msToKnots(current.speed);
-    return {
-      windKn,
-      windDir: wind.direction,
-      currentKn,
-      currentDir: current.direction,
-      waveM: Math.max(0.5, Math.min(2.4, 0.02 * windKn * windKn)),
-      tempC: 26,
-    };
-  }, [leafletCentroid]);
-
   const topVessel = scoredVessels[0] || null;
 
   /* =======================================================
@@ -1428,147 +1301,69 @@ function App() {
     return Math.max(1, fromReplay, fromTracks);
   }, [scoredVessels, replayMeta]);
 
-  const replayProgressRatio = useMemo(() => {
-    const maxP = Math.max(1, totalReplayPoints - 1);
-    return Math.max(0, Math.min(1, replayProgress / maxP));
-  }, [replayProgress, totalReplayPoints]);
-
-  const oilProgressRatio = useMemo(() => {
-    if (simRange && Number.isFinite(simMs)) {
-      return Math.max(
-        0,
-        Math.min(1, (simMs - simRange.t0) / Math.max(1, simRange.t1 - simRange.t0)),
-      );
-    }
-    return replayProgressRatio;
-  }, [simRange, simMs, replayProgressRatio]);
-
-  const currentOilFrame = useMemo(
-    () => oilSimulation.getFrameByProgress(oilProgressRatio),
-    [oilSimulation, oilProgressRatio]
-  );
-
-  const sceneLive =
-    isPlaying ||
-    replayProgress > 0.02 ||
-    (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
-
-
-  const openDriftCloud = useMemo(() => {
-    if (
-      forwardResult?.trajectory?.coordinates?.length >= 2 &&
-      forwardResult?.trajectory_timestamps_utc?.length
-    ) {
-      return buildCloud({
-        points: forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon]),
-        timesUtc: forwardResult.trajectory_timestamps_utc,
-        count: 720,
-        startSpreadKm: 0.18,
-        endSpreadKm: 0.6,
-        seed: "oiltrace-fwd",
-      });
-    }
-    const hindcast = backtrackResult?.backend;
-    if (
-      hindcast?.backward_trajectory?.coordinates?.length >= 2 &&
-      hindcast?.trajectory_timestamps_utc?.length
-    ) {
-      return buildCloud({
-        points: hindcast.backward_trajectory.coordinates.map(([lon, lat]) => [lat, lon]),
-        timesUtc: hindcast.trajectory_timestamps_utc,
-        count: 720,
-        startSpreadKm: 0.2,
-        endSpreadKm: 0.65,
-        seed: "oiltrace-back",
-      });
-    }
-    // Live backend OpenDrift trajectory from replayMeta frames — only once
-    // the pipeline has run; the map stays clean before "Run hindcast".
-    if (backtrackResult && replayMeta?.frames?.length >= 4) {
-      const framesWithVessels = replayMeta.frames.filter((f) => f.vessels?.length > 0);
-      if (framesWithVessels.length >= 2) {
-        const points = [];
-        const timesUtc = [];
-        framesWithVessels.forEach((f) => {
-          const v = f.vessels.find((x) => String(x.mmsi) === "211000001") || f.vessels[0];
-          const coords = v?.position?.coordinates;
-          if (coords) {
-            points.push([coords[1], coords[0]]); // [lat, lon]
-            timesUtc.push(f.timestamp_utc);
-          }
-        });
-        if (points.length >= 2) {
-          return buildCloud({
-            points,
-            timesUtc,
-            count: 750,
-            startSpreadKm: 0.2,
-            endSpreadKm: 1.1,
-            seed: "oiltrace-replay",
-          });
-        }
-      }
-    }
-    return null;
-  }, [forwardResult, backtrackResult, replayMeta]);
-
-  const hasOpenDrift = Boolean(openDriftCloud);
-
-  // OpenDrift Lagrangian particle plume bound directly to timeline scrubber.
-  // Once the hindcast pipeline has run, the detected slick stays at rest and
-  // DriftCloudOverlay owns the moving backward/forward clouds.
-  const displayOilFrame = useMemo(() => {
-    if (backtrackResult) return observedSlickFrame;
-    if (isPlaying || sceneLive) {
-      return currentOilFrame || observedSlickFrame;
-    }
-    return observedSlickFrame;
-  }, [backtrackResult, isPlaying, sceneLive, currentOilFrame, observedSlickFrame]);
-  const currentOilParticles = displayOilFrame?.particles || [];
-  const currentOilTrails = displayOilFrame?.trails || [];
-  const currentOilFlowLines = [];
 
   /* =======================================================
      REPLAY ENGINE
   ======================================================= */
 
+  // ONE master clock, direction-aware. A playback plan says where the clock
+  // travels FROM and TO in real UTC milliseconds; hindcast plans run
+  // BACKWARD (12:00 → 06:00), forward plans run forward (release → obs).
+  // Timestamps are never reinterpreted — the clock itself changes direction.
+  //
+  // BASE_PLAYBACK_MS is the full-plan duration at 1×, so the speed chips map
+  // to: 0.5× ≈ 120 s · 1× ≈ 60 s · 2× ≈ 30 s · 4× ≈ 15 s.
+  const BASE_PLAYBACK_MS = 60000;
+  const playPlanRef = useRef(null);
+
+  const startPlayback = useCallback((fromMs, toMs) => {
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs === toMs) return;
+    playPlanRef.current = { from: fromMs, to: toMs };
+    setSimMs(fromMs);
+    setIsPlaying(true);
+  }, []);
+
   useEffect(() => {
     if (!isPlaying) return undefined;
 
-    // Time-based engine: advance the master UTC clock smoothly over the
-    // backend simulation window (~16 s per full run at 1x).
-    if (simRange) {
-      let raf, last = performance.now();
-      let cur = Number.isFinite(simMs) ? simMs : simRange.t0;
-      if (cur >= simRange.t1 - 500) cur = simRange.t0;
-      const rate = ((simRange.t1 - simRange.t0) / 16000) * replaySpeed;
-      const tick = (now) => {
-        cur = Math.min(simRange.t1, cur + (now - last) * rate);
-        last = now;
-        setSimMs(cur);
-        if (cur >= simRange.t1) { setIsPlaying(false); return; }
-        raf = requestAnimationFrame(tick);
-      };
+    const fallback = simRange
+      ? { from: Number.isFinite(simMs) ? simMs : simRange.t0, to: simRange.t1 }
+      : null;
+    const plan =
+      playPlanRef.current &&
+      Number.isFinite(playPlanRef.current.from) &&
+      Number.isFinite(playPlanRef.current.to)
+        ? playPlanRef.current
+        : fallback;
+    if (!plan || plan.from === plan.to) return undefined;
+
+    const dir = plan.to >= plan.from ? 1 : -1;
+    let cur = Number.isFinite(simMs) ? simMs : plan.from;
+    // Restart from the top of the plan when the clock already sits at (or
+    // beyond) its end, or outside the plan window entirely.
+    const before = dir === 1 ? cur < plan.from : cur > plan.from;
+    const done0 = dir === 1 ? cur >= plan.to - 500 : cur <= plan.to + 500;
+    if (before || done0) cur = plan.from;
+
+    const span = Math.abs(plan.to - plan.from);
+    const rate = (span / BASE_PLAYBACK_MS) * replaySpeed * dir; // sim-ms per real-ms
+    let raf, last = performance.now();
+    const tick = (now) => {
+      cur += (now - last) * rate;
+      last = now;
+      const finished = dir === 1 ? cur >= plan.to : cur <= plan.to;
+      if (finished) {
+        setSimMs(plan.to);
+        setIsPlaying(false);
+        return;
+      }
+      setSimMs(cur);
       raf = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(raf);
-    }
-
-    // Legacy index-based engine (pre-analysis demo replay).
-    const intervalTime = 120 / replaySpeed;
-    const interval = setInterval(() => {
-      setReplayProgress((previous) => {
-        const next = previous + 0.035 * replaySpeed;
-        if (next >= totalReplayPoints - 1) {
-          setIsPlaying(false);
-          return totalReplayPoints - 1;
-        }
-        return next;
-      });
-    }, intervalTime);
-
-    return () => clearInterval(interval);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, replaySpeed, totalReplayPoints, simRange]);
+  }, [isPlaying, replaySpeed, simRange]);
 
   /* =======================================================
      BACKTRACK RUNNER
@@ -1641,12 +1436,16 @@ function App() {
     setBackendOnline(true);
     setBackendHost(getActiveBackendUrl());
 
+    // HINDCAST playback runs BACKWARD: from the observation time down to
+    // the earliest backend hindcast timestamp — the clock itself decreases.
     const simTs = (hc.trajectory_timestamps_utc || [])
       .map((t) => Date.parse(t))
       .filter(Number.isFinite);
-    if (simTs.length) setSimMs(Math.min(...simTs));
-
-    setIsPlaying(true);
+    const obsT = Date.parse(slick.timestamp_utc);
+    const traceEnd = simTs.length ? Math.min(...simTs) : NaN;
+    if (Number.isFinite(obsT) && Number.isFinite(traceEnd) && traceEnd < obsT) {
+      startPlayback(obsT, traceEnd);
+    }
 
     try {
       const replay = await getReplay(CANONICAL_INCIDENT_ID);
@@ -1654,7 +1453,7 @@ function App() {
     } catch {
       /* replay is optional */
     }
-  }, [activeSeedId, detectionResult, apiSeedOverride, incident]);
+  }, [activeSeedId, detectionResult, apiSeedOverride, incident, startPlayback]);
 
   // STAGE 2 — AIS scan + attribution over the probable source region
   const handleRunAttributionStage = useCallback(async () => {
@@ -1756,11 +1555,17 @@ function App() {
       ).map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
     );
 
-    // Jump the clock to just before the release and play the leak forward.
+    // FORWARD playback: from the backend release time to the observation
+    // time. The forward cloud does not exist before the release moment.
     const relT = Date.parse(fwd.release_time_utc || top.release_time_utc || "");
-    if (Number.isFinite(relT)) setSimMs(relT - 10 * 60 * 1000);
-    setIsPlaying(true);
-  }, [activeSlick, attributionResult]);
+    const fwdTs = (fwd.trajectory_timestamps_utc || [])
+      .map((t) => Date.parse(t))
+      .filter(Number.isFinite);
+    const endT = fwdTs.length ? Math.max(...fwdTs) : Date.parse(slick.timestamp_utc);
+    if (Number.isFinite(relT) && Number.isFinite(endT) && endT > relT) {
+      startPlayback(relT, endT);
+    }
+  }, [activeSlick, attributionResult, startPlayback]);
 
   // Which stage is next, derived from what the backend has produced so far.
   const pipelineStage = forwardResult
@@ -1801,8 +1606,11 @@ function App() {
       else if (pipelineStage === 2) await handleRunForwardStage();
       else {
         const relT = Date.parse(forwardResult?.release_time_utc || "");
-        if (Number.isFinite(relT)) setSimMs(relT - 10 * 60 * 1000);
-        setIsPlaying(true);
+        const fwdTs = (forwardResult?.trajectory_timestamps_utc || [])
+          .map((t) => Date.parse(t))
+          .filter(Number.isFinite);
+        const endT = fwdTs.length ? Math.max(...fwdTs) : NaN;
+        if (Number.isFinite(relT) && Number.isFinite(endT)) startPlayback(relT, endT);
       }
     } catch (err) {
       // describeHindcastFailure only recognises a few remote-forcing cases
@@ -1821,6 +1629,7 @@ function App() {
     handleRunHindcastStage,
     handleRunAttributionStage,
     handleRunForwardStage,
+    startPlayback,
   ]);
 
   /* =======================================================
@@ -1830,7 +1639,7 @@ function App() {
   // Time-based interpolation along a vessel's AIS track (backend tracks
   // carry ISO timestamps); returns null when timestamps are unavailable.
   const timeReplayPosition = (vessel) => {
-    if (!simRange || !Number.isFinite(simMs)) return null;
+    if (!Number.isFinite(simMs)) return null;
     const tr = (vessel.trajectory || [])
       .map((pt) => ({ ...pt, ms: Date.parse(pt.time) }))
       .filter((pt) => Number.isFinite(pt.ms));
@@ -1848,97 +1657,39 @@ function App() {
     ];
   };
 
-  const doesVesselOverlapSimRange = (vessel) => {
-    if (!simRange) return false;
-    const tr = (vessel.trajectory || [])
-      .map((pt) => Date.parse(pt.time))
-      .filter(Number.isFinite);
-    if (tr.length < 2) return false;
-    const minT = Math.min(...tr);
-    const maxT = Math.max(...tr);
-    return maxT >= simRange.t0 && minT <= simRange.t1;
-  };
-
-  const getTimelineProgressRatio = () => {
-    if (simRange && Number.isFinite(simMs)) {
-      return Math.max(
-        0,
-        Math.min(1, (simMs - simRange.t0) / Math.max(1, simRange.t1 - simRange.t0))
-      );
-    }
-    return replayProgressRatio;
-  };
-
-  const getProgressPosition = (vessel, progressRatio) => {
-    const trajectory = vessel?.trajectory || [];
-    if (!trajectory.length) {
-      // position is null for a vessel the backend returned without a usable
-      // AIS track; callers treat null as "nothing to draw".
-      const lat = Number(vessel?.position?.latitude);
-      const lon = Number(vessel?.position?.longitude);
-      return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
-    }
-    if (trajectory.length === 1) {
-      return [trajectory[0].latitude, trajectory[0].longitude];
-    }
-
-    const clampedProgress = Math.max(0, Math.min(1, progressRatio)) * (trajectory.length - 1);
-    const lowerIndex = Math.floor(clampedProgress);
-    const upperIndex = Math.min(lowerIndex + 1, trajectory.length - 1);
-    const fraction = clampedProgress - lowerIndex;
-
-    const start = trajectory[lowerIndex];
-    const end = trajectory[upperIndex];
-
-    return [
-      start.latitude + (end.latitude - start.latitude) * fraction,
-      start.longitude + (end.longitude - start.longitude) * fraction,
-    ];
-  };
-
+  // Vessel positions come ONLY from timestamped AIS data: at time T the
+  // marker sits on the interpolation between the two surrounding AIS points.
+  // Outside the vessel's own track the marker HOLDS at the nearest real
+  // endpoint — movement is never invented from generic timeline progress.
   const getReplayPosition = (vessel) => {
-    if (simRange && Number.isFinite(simMs) && doesVesselOverlapSimRange(vessel)) {
-      const timed = timeReplayPosition(vessel);
-      if (timed) return timed;
-    }
-    return getProgressPosition(vessel, getTimelineProgressRatio());
+    const timed = timeReplayPosition(vessel);
+    if (timed) return timed;
+    // No usable timestamped track: fall back to the vessel's last reported
+    // AIS position as a static marker (no animation), or draw nothing.
+    const lat = Number(vessel?.position?.latitude);
+    const lon = Number(vessel?.position?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
   };
 
   const getReplayTrajectory = (vessel) => {
     const trajectory = vessel.trajectory || [];
     if (!trajectory.length) return [];
-
-    // Time-based: every past track point plus the interpolated position if within simRange
-    if (simRange && Number.isFinite(simMs) && doesVesselOverlapSimRange(vessel)) {
-      const pts = trajectory
-        .filter((pt) => {
-          const ms = Date.parse(pt.time);
-          return Number.isFinite(ms) && ms <= simMs;
-        })
-        .map((pt) => [pt.latitude, pt.longitude]);
-      const cur = timeReplayPosition(vessel);
-      if (cur) pts.push(cur);
-      return pts;
-    }
-
-    // Progress-based: slice up to current timeline progress so vessels outside simRange also animate
-    const progress = getTimelineProgressRatio();
-    const visibleIndex = Math.max(0, Math.min(1, progress)) * (trajectory.length - 1);
-    const completedCount = Math.floor(visibleIndex);
-
-    const points = trajectory
-      .slice(0, completedCount + 1)
-      .map((point) => [point.latitude, point.longitude]);
-
-    const cur = getReplayPosition(vessel);
-    if (cur) points.push(cur);
-
-    return points;
+    // Every AIS point up to the current clock, plus the interpolated
+    // current position. Purely timestamp-driven.
+    const pts = trajectory
+      .filter((pt) => {
+        const ms = Date.parse(pt.time);
+        return Number.isFinite(ms) && ms <= (Number.isFinite(simMs) ? simMs : Infinity);
+      })
+      .map((pt) => [pt.latitude, pt.longitude]);
+    const cur = timeReplayPosition(vessel);
+    if (cur) pts.push(cur);
+    return pts;
   };
 
-  // Replay visuals are active while playing or whenever the Replay panel is
-  // open in time mode (so scrubbing the slider moves vessels live).
-  const replayActive = sceneLive;
+  // Vessels follow the master UTC clock whenever it has a value — there is
+  // no separate "replay mode" clock and no progress-based fallback.
+  const replayActive = Number.isFinite(simMs);
 
   // Estimated-release position within the simulation window (0..1).
   const releaseMs = forwardResult ? Date.parse(forwardResult.release_time_utc) : NaN;
@@ -2012,11 +1763,6 @@ function App() {
     : null;
   const sourceRadiusMeters = activeSourceRegion?.radiusMeters || 0;
 
-  const backtrackedCenterline = useMemo(() => {
-    if (!backtrackResult?.trajectory) return [];
-    return backtrackResult.trajectory.map((pt) => [pt.latitude, pt.longitude]);
-  }, [backtrackResult]);
-
   /* =======================================================
      RENDER (SINGLE MapContainer STRICTLY ENFORCED)
   ======================================================= */
@@ -2065,7 +1811,6 @@ function App() {
         search={queueQuery}
         onSearch={setQueueQuery}
         onNewIncident={() => setActiveItem("detect")}
-        hasSyntheticAis={hasSyntheticAis}
       />
       <div className="command-body">
       <div className={`command-stage ${showDetail ? "is-detail" : ""}`}>
@@ -2128,7 +1873,7 @@ function App() {
                   replaySpeed={replaySpeed}
                   setReplaySpeed={setReplaySpeed}
                   totalPoints={totalReplayPoints}
-                  timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : currentOilFrame?.timeLabel}
+                  timeLabel={simRange ? fmtSimClock(simMs ?? simRange.t1) : undefined}
                   startLabel={simRange
                     ? `${fmtSimClock(simRange.t0)} UTC`
                     : undefined}
@@ -2191,20 +1936,6 @@ function App() {
                 >
                   Satellite
                 </button>
-                <button
-                  type="button"
-                  className={`head-chip ${layers.oceanCurrent ? "is-active" : ""}`}
-                  onClick={() => toggleLayer("oceanCurrent")}
-                >
-                  Current
-                </button>
-                <button
-                  type="button"
-                  className={`head-chip ${layers.windField ? "is-active" : ""}`}
-                  onClick={() => toggleLayer("windField")}
-                >
-                  Wind
-                </button>
                 <button type="button" className="head-chip" onClick={() => setActiveItem("legend")}>
                   Layers
                 </button>
@@ -2245,183 +1976,23 @@ function App() {
         />
 
         {/* SIMULATED OCEAN CURRENT LAYER */}
-        {layers.oceanCurrent && simulatedCurrentVectors.map((vec) => (
-          <Fragment key={vec.id}>
-            <Polyline
-              positions={vec.positions}
-              pathOptions={{
-              color: "#1e3a5f",
-              weight: 1.15,
-              opacity: 0.42,
-              lineCap: "round",
-            }}
-            >
-              <Tooltip sticky direction="top">
-                <strong>Simulated Ocean Current</strong>
-                <br />
-                Speed: {vec.speed.toFixed(2)} m/s ({(vec.speed * 1.94384).toFixed(1)} kts)
-                <br />
-                Heading: {Math.round(vec.direction)}° (Northwest coastal drift)
-              </Tooltip>
-            </Polyline>
-            <Polyline
-              positions={vec.arrowHead}
-              pathOptions={{
-              color: "#1e3a5f",
-              weight: 1,
-              opacity: 0.38,
-              lineCap: "round",
-            }}
-            />
-          </Fragment>
-        ))}
-
-        {/* SIMULATED WIND FIELD LAYER */}
-        {layers.windField && simulatedWindVectors.map((vec) => (
-          <Fragment key={vec.id}>
-            <Polyline
-              positions={vec.positions}
-              pathOptions={{
-              color: "#334e6e",
-              weight: 1.05,
-              opacity: 0.38,
-              lineCap: "round",
-            }}
-            >
-              <Tooltip sticky direction="top">
-                <strong>Simulated Wind Field</strong>
-                <br />
-                Speed: {vec.speed.toFixed(1)} m/s ({(vec.speed * 1.94384).toFixed(1)} kts)
-                <br />
-                Heading: {Math.round(vec.direction)}° (NNW wind, 3.0% oil windage)
-              </Tooltip>
-            </Polyline>
-            <Polyline
-              positions={vec.arrowHead}
-              pathOptions={{
-              color: "#334e6e",
-              weight: 1,
-              opacity: 0.34,
-              lineCap: "round",
-            }}
-            />
-          </Fragment>
-        ))}
-
-        {/* OIL SHEEN (SAR footprint + Lagrangian particles — Leaflet canvas) */}
-        {hasDetection && layers.spill && (
-          <DeckOilOverlay
-            enabled
-            particles={currentOilParticles}
-            trails={currentOilTrails}
-            polygon={spillPolygon}
-            light={mapStyle === "satellite"}
-            muted={Boolean(backtrackResult)}
-          />
+        {/* OBSERVED SAR SLICK — static dark texture strictly inside the
+            actual detection geometry. Never moves, fades, or recolors. */}
+        {hasDetection && layers.spill && activeSlick?.geometry && (
+          <DeckOilOverlay geometry={activeSlick.geometry} />
         )}
 
-        {/* BACKEND DRIFT CLOUDS — teal backward reconstruction, green forward oil travel */}
+        {/* BACKEND RECONSTRUCTIONS — teal hindcast (stage 1, clock runs
+            backward) / green forward drift (stage 3). Stage-scoped so only
+            one reconstruction is ever on screen. The overlay's trail IS the
+            single representative backend trajectory. */}
         <DriftCloudOverlay
           hindcast={backtrackResult?.backend}
           forward={forwardResult}
           slickGeometry={activeSlick?.geometry}
-          visible={Boolean(backtrackResult)}
+          stage={pipelineStage}
           timeMs={clockNow}
         />
-
-        {layers.oilTrajectory && currentOilFlowLines.map((line, index) => (
-          line.path.length >= 2 && (
-            <Polyline
-              key={line.id}
-              positions={line.path}
-              pathOptions={{
-                color: "#1e293b",
-                weight: index === 2 ? 3.5 : 2.2,
-                opacity: index === 2 ? 0.86 : 0.52,
-                dashArray: index === 2 ? "7 6" : "5 7",
-                lineCap: "round",
-                lineJoin: "round",
-              }}
-            >
-              {index === 2 && (
-                <Tooltip sticky direction="top">
-                  <strong>Oil Transport Flow</strong>
-                  <br />
-                  Modeled current + wind streamline through the densest oil field
-                </Tooltip>
-              )}
-            </Polyline>
-          )
-        ))}
-
-        {/* BACKTRACKED TRANSPORT PATH */}
-        {layers.backtrack && backtrackedCenterline.length >= 2 && (
-          <Polyline
-            positions={backtrackedCenterline}
-            pathOptions={{
-              color: "#06b6d4",
-              weight: 3.5,
-              opacity: 0.9,
-              dashArray: "4 6",
-              lineCap: "round",
-            }}
-          >
-            <Tooltip sticky direction="top">
-              <strong>Backtracked Transport Path</strong>
-              <br />
-              Inferred historical drift path (Confidence: {backtrackResult?.confidence}%)
-            </Tooltip>
-          </Polyline>
-        )}
-
-        {/* BACKTRACKED SUSPECT INTERSECTION LINK */}
-        {layers.backtrack && backtrackResult && scoredVessels.find((v) => v.candidateRank === 1) && (
-          <Polyline
-            positions={[
-              sourceCenter,
-              [
-                Number(scoredVessels.find((v) => v.candidateRank === 1).position.latitude),
-                Number(scoredVessels.find((v) => v.candidateRank === 1).position.longitude),
-              ],
-            ]}
-            pathOptions={{
-              color: "#ea580c",
-              weight: 2.5,
-              opacity: 0.9,
-              dashArray: "4 6",
-              lineCap: "round",
-            }}
-          >
-            <Tooltip sticky direction="top">
-              <strong>Candidate Vessel Intersection</strong>
-              <br />
-              Top candidate: {scoredVessels.find((v) => v.candidateRank === 1).name} (
-              {Math.round(scoredVessels.find((v) => v.candidateRank === 1).attributionConfidence * 100)}% Confidence)
-            </Tooltip>
-          </Polyline>
-        )}
-
-        {/* OpenDrift paths are drawn as polylines below — no fake particle cloud. */}
-
-        {/* BACKEND FORWARD SIMULATION: trajectory from suspected ship */}
-        {hasOpenDrift && layers.backtrack && forwardResult?.trajectory?.coordinates?.length >= 2 && (
-          <Polyline
-            positions={forwardResult.trajectory.coordinates.map(([lon, lat]) => [lat, lon])}
-            pathOptions={{
-              color: "#173a5e",
-              weight: 2.4,
-              opacity: 0.85,
-              dashArray: "5 6",
-              lineCap: "round",
-            }}
-          >
-            <Tooltip sticky direction="top">
-              <strong>Forward Simulation (backend)</strong>
-              <br />
-              Release {forwardResult.release_time_utc} · MMSI {forwardResult.vessel_mmsi}
-            </Tooltip>
-          </Polyline>
-        )}
 
         {/* API DETECTED SLICK POLYGONS (from Detection Service) */}
         {layers.detectedSlicks && detectionResult && detectionResult.features.map((feature) => {
@@ -2498,7 +2069,7 @@ function App() {
         )}
 
         {/* ESTIMATED SOURCE REGION (BLUE DASHED CIRCLE) - Encompasses the oil spill region */}
-        {hasDetection && layers.sourceRegion && activeSourceRegion && sourceRadiusMeters > 0 && (
+        {pipelineStage >= 1 && pipelineStage <= 2 && layers.sourceRegion && activeSourceRegion && sourceRadiusMeters > 0 && (
           <Circle
             center={sourceCenter}
             radius={sourceRadiusMeters}
@@ -2530,7 +2101,7 @@ function App() {
         )}
 
         {/* PREDICTED FOOTPRINT (GREEN) — forward simulation particle envelope */}
-        {layers.spill && predictedFootprintRing.length >= 3 && (
+        {pipelineStage === 3 && predictedFootprintRing.length >= 3 && (
           <Polygon
             positions={predictedFootprintRing}
             pathOptions={{
@@ -2554,7 +2125,7 @@ function App() {
         )}
 
         {/* ESTIMATED RELEASE POINT (RED) */}
-        {releasePoint && (
+        {pipelineStage === 3 && releasePoint && (
           <CircleMarker
             center={releasePoint.position}
             radius={6}
@@ -2586,7 +2157,7 @@ function App() {
         )}
 
         {/* HINDCAST BACKEND CANDIDATE REGIONS */}
-        {layers.sourceRegion && candidateRegionsList.map((region) => (
+        {pipelineStage >= 1 && pipelineStage <= 2 && layers.sourceRegion && candidateRegionsList.map((region) => (
           <Fragment key={region.id}>
             <Polygon
               positions={region.ring}
@@ -2823,35 +2394,71 @@ function App() {
         })}
       </MapContainer>
 
+            {/* PERMANENT MAP KEY — the observed slick facts, the source
+                estimate with its KDE density mass, and a plain-language key
+                for every layer currently on the map. Always visible; no
+                hover required. All values come from backend state. */}
+            <div className="map-key" aria-label="Map key">
+              {hasDetection && (
+                <div className="map-key-block">
+                  <p className="map-key-title">
+                    <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
+                    Observed SAR slick
+                  </p>
+                  <p className="map-key-line">
+                    {incident.satellite?.imageId || "Oil/00067"} · {new Date(incident.detectedAt).toISOString().replace("T", " · ").substring(0, 18)} UTC
+                  </p>
+                  <p className="map-key-line">
+                    {Number(incident.centroid?.latitude).toFixed(5)}°N · {Number(incident.centroid?.longitude).toFixed(5)}°E
+                    {" · "}{Number(incident.areaKm2).toFixed(1)} km² · ML {Math.round((incident.detectionConfidence || 0) * 100)}%
+                  </p>
+                </div>
+              )}
+              {pipelineStage >= 1 && pipelineStage <= 2 && candidateRegionsList[0] && (
+                <div className="map-key-block">
+                  <p className="map-key-title">
+                    <span className="map-key-swatch" style={{ background: "rgba(59,130,246,0.12)", border: "1.5px dashed #3b82f6" }} />
+                    Probable source region
+                  </p>
+                  <p className="map-key-line">
+                    KDE density mass {(candidateRegionsList[0].probability * 100).toFixed(0)}%
+                    {backtrackResult?.confidence != null ? ` · source confidence ${backtrackResult.confidence}%` : ""}
+                  </p>
+                  {candidateRegionsList[0].startTime && (
+                    <p className="map-key-line">
+                      Window {new Date(candidateRegionsList[0].startTime).toISOString().substring(11, 16)} → {new Date(candidateRegionsList[0].endTime).toISOString().substring(11, 16)} UTC
+                    </p>
+                  )}
+                </div>
+              )}
+              {pipelineStage === 1 && (
+                <p className="map-key-line muted">
+                  <span className="map-key-dot" style={{ background: "#0db2c8" }} /> Hindcast reconstruction — modelled drift back to the probable source
+                </p>
+              )}
+              {pipelineStage >= 2 && (
+                <p className="map-key-line muted">
+                  <span className="map-key-dot" style={{ background: "#2563eb" }} /> Candidate vessel — AIS trajectory ranked by attribution
+                </p>
+              )}
+              {pipelineStage === 3 && (
+                <>
+                  <p className="map-key-line muted">
+                    <span className="map-key-dot" style={{ background: "#ffffff", border: "2px solid #dc2626" }} /> Estimated release — backend-derived location &amp; time
+                  </p>
+                  <p className="map-key-line muted">
+                    <span className="map-key-swatch" style={{ background: "rgba(16,185,129,0.2)", border: "1.5px solid #059669" }} /> Predicted footprint — forward counterfactual model output
+                  </p>
+                </>
+              )}
+            </div>
+
             <div className="command-ops-row">
               <OperationCard
                 vessel={selectedVessel || topVessel}
                 photoSrc="/vessels/mt-cyprus-sun.png"
                 pipelineStage={pipelineStage}
               />
-            </div>
-
-            <div className="env-strip" aria-label="Environmental conditions">
-              <div className="env-chip">
-                <span>Wind</span>
-                <strong>
-                  {envSnapshot.windKn.toFixed(0)} kn {compassLabel(envSnapshot.windDir)}
-                </strong>
-              </div>
-              <div className="env-chip">
-                <span>Current</span>
-                <strong>
-                  {envSnapshot.currentKn.toFixed(1)} kn {compassLabel(envSnapshot.currentDir)}
-                </strong>
-              </div>
-              <div className="env-chip">
-                <span>Waves</span>
-                <strong>{envSnapshot.waveM.toFixed(1)} m</strong>
-              </div>
-              <div className="env-chip">
-                <span>Temp</span>
-                <strong>{envSnapshot.tempC}°C</strong>
-              </div>
             </div>
 
             <TimelineControl
@@ -2906,7 +2513,6 @@ function App() {
             <IntelRail
               incident={incident}
               vessels={scoredVessels}
-              env={envSnapshot}
               selectedVesselId={selectedVesselId}
               onSelectVessel={(id) => {
                 const hit = scoredVessels.find(
