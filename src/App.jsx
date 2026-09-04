@@ -1052,6 +1052,7 @@ function App() {
 
   const candidateRegionsList = useMemo(() => {
     const raw =
+      backtrackResult?.backend?.source_region?.candidate_regions ||
       backtrackResult?.source_region?.candidate_regions ||
       calculatedSourceRegion?.candidate_regions ||
       [];
@@ -1073,6 +1074,33 @@ function App() {
       };
     }).filter((r) => r.ring.length >= 3);
   }, [backtrackResult, calculatedSourceRegion]);
+
+  // Forward simulation's predicted particle envelope (stage 3).
+  const predictedFootprintRing = useMemo(() => {
+    const geom = forwardResult?.predicted_footprint;
+    const coords = geom?.coordinates?.[0] || [];
+    return coords
+      .map(([lon, lat]) => [Number(lat), Number(lon)])
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+  }, [forwardResult]);
+
+  // Estimated release point: from the forward run once it exists, otherwise
+  // from the attribution's leading candidate.
+  const releasePoint = useMemo(() => {
+    const src = forwardResult?.release_location
+      ? { loc: forwardResult.release_location, t: forwardResult.release_time_utc }
+      : attributionResult?.top_candidates?.[0]?.release_location
+        ? {
+            loc: attributionResult.top_candidates[0].release_location,
+            t: attributionResult.top_candidates[0].release_time_utc,
+          }
+        : null;
+    if (!src) return null;
+    const lat = Number(src.loc.lat ?? src.loc.latitude);
+    const lon = Number(src.loc.lon ?? src.loc.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { position: [lat, lon], time: src.t };
+  }, [forwardResult, attributionResult]);
 
   const scoredVessels = useMemo(
     // Vessels appear only once the hindcast pipeline has queried AIS —
@@ -1681,10 +1709,12 @@ function App() {
     );
     setAttributionResult(attribution);
 
+    // Present only the two most probable ships — the roster drives the
+    // candidate list, the map markers, and their AIS tracks alike.
     const normalized = vesselsNearCentroid(
       normalizeVessels(vessels, attribution),
       { lat: slick.centroid.lat, lon: slick.centroid.lon }
-    );
+    ).slice(0, 2);
     if (normalized.length) {
       setBackendVessels(
         normalized.map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
@@ -1947,20 +1977,24 @@ function App() {
 
   const appThemeClass = "app-light";
 
+  // The uncertainty circle is the backend hindcast's own estimate — its
+  // centre, radius and confidence all come from /hindcast. Before the
+  // hindcast runs there is no source region to draw.
   const activeSourceRegion = useMemo(() => {
+    const sr = backtrackResult?.sourceRegion;
+    if (!sr?.center || !Number.isFinite(Number(sr.center.latitude))) return null;
     return {
-      center: { latitude: leafletCentroid[0], longitude: leafletCentroid[1] },
-      radiusMeters: 8800,
-      confidence: backtrackResult?.confidence || 88,
+      center: sr.center,
+      radiusMeters: Number(sr.radiusMeters) || 0,
+      confidence: sr.confidence,
       type: "Estimated Source Region",
     };
-  }, [leafletCentroid, backtrackResult?.confidence]);
+  }, [backtrackResult]);
 
-  const sourceCenter = [
-    Number(activeSourceRegion.center.latitude),
-    Number(activeSourceRegion.center.longitude),
-  ];
-  const sourceRadiusMeters = 8800;
+  const sourceCenter = activeSourceRegion
+    ? [Number(activeSourceRegion.center.latitude), Number(activeSourceRegion.center.longitude)]
+    : null;
+  const sourceRadiusMeters = activeSourceRegion?.radiusMeters || 0;
 
   const backtrackedCenterline = useMemo(() => {
     if (!backtrackResult?.trajectory) return [];
@@ -2457,8 +2491,62 @@ function App() {
               Centroid: {sourceCenter[0].toFixed(4)}°N, {sourceCenter[1].toFixed(4)}°E
               <br />
               Uncertainty Radius: {(sourceRadiusMeters / 1000).toFixed(2)} km
+              {activeSourceRegion.confidence != null && (
+                <>
+                  <br />
+                  Source-region probability mass: {activeSourceRegion.confidence}%
+                </>
+              )}
             </Tooltip>
           </Circle>
+        )}
+
+        {/* PREDICTED FOOTPRINT (GREEN) — forward simulation particle envelope */}
+        {layers.spill && predictedFootprintRing.length >= 3 && (
+          <Polygon
+            positions={predictedFootprintRing}
+            pathOptions={{
+              color: "#059669",
+              weight: 2,
+              opacity: 0.95,
+              fillColor: "#10b981",
+              fillOpacity: 0.2,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          >
+            <Tooltip sticky direction="top">
+              <strong>Predicted footprint</strong>
+              <br />
+              Simulated particle envelope from the estimated release —
+              <br />
+              not an observed slick.
+            </Tooltip>
+          </Polygon>
+        )}
+
+        {/* ESTIMATED RELEASE POINT (RED) */}
+        {releasePoint && (
+          <CircleMarker
+            center={releasePoint.position}
+            radius={6}
+            pathOptions={{
+              color: "#dc2626",
+              weight: 3,
+              fillColor: "#ffffff",
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip direction="right" offset={[10, 0]} permanent>
+              <strong>Estimated release</strong>
+              {releasePoint.time && (
+                <>
+                  <br />
+                  {new Date(releasePoint.time).toISOString().replace("T", " ").substring(0, 16)} UTC
+                </>
+              )}
+            </Tooltip>
+          </CircleMarker>
         )}
 
         {/* HINDCAST BACKEND CANDIDATE REGIONS */}
