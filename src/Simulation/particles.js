@@ -125,10 +125,6 @@ export function cloudPositions(cloud, tMs, out) {
       res[i * 2 + 1] = Number.NaN;
       continue;
     }
-    // preformed: the whole mass rides the trajectory together, with only a
-    // short deterministic lag per particle so the body keeps a comet tail.
-    // Otherwise: particles enter over time and trail back to the release,
-    // reproducing a continuous discharge stretching into a plume.
     // preformed: the whole mass rides the trajectory together at the ACTUAL
     // clock time — no per-particle lag, no wobble, no birth animation. The
     // clock may run in either direction; position and spread are pure
