@@ -31,6 +31,7 @@ export default function InvestigationList({
   onOpenIncident,
   onOpenDetect,
   onRunHindcast,
+  onResetInvestigation,
   isBacktracking = false,
   actionLabel = "Run hindcast",
   pipelineStage = 0,
@@ -108,9 +109,21 @@ export default function InvestigationList({
         <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>
           {isBacktracking ? "Running…" : actionLabel}
         </button>
-        <button type="button" className="inv-action" onClick={onOpenDetect}>
-          SAR detect
-        </button>
+        {pipelineStage > 0 && onResetInvestigation ? (
+          <button
+            type="button"
+            className="inv-action"
+            onClick={onResetInvestigation}
+            disabled={isBacktracking}
+            title="Clear all analysis results and start again from the detection"
+          >
+            Reset analysis
+          </button>
+        ) : (
+          <button type="button" className="inv-action" onClick={onOpenDetect}>
+            SAR detect
+          </button>
+        )}
       </div>
 
       {ranked[0] && (

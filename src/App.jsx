@@ -1268,6 +1268,17 @@ function App() {
     (vessel) => vessel.id === selectedVesselId
   );
 
+  // The counterfactual describes exactly one vessel. Showing it under any
+  // other candidate would attribute one ship's drift evidence to another.
+  const selectedCounterfactual = useMemo(() => {
+    if (!counterfactualResult) return null;
+    const cfMmsi = counterfactualResult.vessel_mmsi;
+    if (cfMmsi == null || !selectedVessel) return counterfactualResult;
+    return String(cfMmsi) === String(selectedVessel.mmsi)
+      ? counterfactualResult
+      : null;
+  }, [counterfactualResult, selectedVessel]);
+
   /* =======================================================
      MAP LAYERS
   ======================================================= */
@@ -1296,10 +1307,13 @@ function App() {
   // Which slick ID is the active seed (for button highlight)
   const [activeSeedId, setActiveSeedId] = useState(null);
 
-  // Fire-and-forget warm-up on mount so both services are ready
+  // Fire-and-forget warm-up on mount so the backend is ready.
+  // Detection is deliberately NOT auto-loaded: the scene stays empty until
+  // the operator loads a SAR detection, which reveals the slick and unlocks
+  // the hindcast stage. (The previous auto-load here also called two
+  // functions that were never imported — a ReferenceError waiting on the
+  // VITE_USE_MODAL_ML flag.)
   useEffect(() => {
-    const useModalMl = import.meta.env.VITE_USE_MODAL_ML === "true";
-    if (useModalMl) warmDetectionService();
     warmBackend();
     getBackendHealth()
       .then(() => {
@@ -1310,26 +1324,6 @@ function App() {
         setBackendOnline(false);
         setBackendHost(getActiveBackendUrl());
       });
-
-    if (useModalMl) {
-      fetchDemoDetection()
-        .then((geojson) => {
-          setDetectionResult(geojson);
-          setLayers((prev) => ({ ...prev, detectedSlicks: true }));
-          const feature = geojson?.features?.[0];
-          if (!feature) return;
-          const next = incidentFromDetection(feature, INCIDENT_SEED);
-          setIncident(next);
-          const slick = slickFromDetection(feature);
-          setActiveSlick({
-            ...slick,
-            id: CANONICAL_INCIDENT_ID,
-            timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
-          });
-          setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
-        })
-        .catch(() => {});
-    }
 
     // Prefetch replay metadata for the Replay panel, but do NOT surface any
     // vessels yet: candidates appear only after "Run hindcast" queries AIS
@@ -1780,6 +1774,23 @@ function App() {
         : 0;
   const pipelineActionLabel = ["Run hindcast", "Run attribution", "Forward simulation", "Replay forward"][pipelineStage];
 
+  // Clear every backend-derived result so the investigation can be run
+  // again from the detection. Without this the pipeline is one-shot: the
+  // hindcast can never be repeated and a stage that yields nothing usable
+  // leaves the case stuck with no way back short of a page reload.
+  const handleResetInvestigation = useCallback(() => {
+    setIsPlaying(false);
+    setBacktrackResult(null);
+    setAttributionResult(null);
+    setForwardResult(null);
+    setCounterfactualResult(null);
+    setBackendVessels(null);
+    setSelectedVesselId(null);
+    setBackendError(null);
+    setTransposeNotice(null);
+    setBacktrackStatusText("");
+  }, []);
+
   // One dispatcher keeps every existing button working: each press advances
   // the investigation by exactly one stage.
   const handleRunBacktrack = useCallback(async () => {
@@ -1796,7 +1807,11 @@ function App() {
         setIsPlaying(true);
       }
     } catch (err) {
-      setBackendError(describeHindcastFailure(err?.message || String(err)));
+      // describeHindcastFailure only recognises a few remote-forcing cases
+      // and returns null otherwise (including for every local backend), so
+      // fall back to the raw message — a failed stage must never be silent.
+      const raw = err?.message || String(err);
+      setBackendError(describeHindcastFailure(raw) || raw);
     } finally {
       setIsBacktracking(false);
       setBacktrackStatusText("");
@@ -1857,9 +1872,13 @@ function App() {
   };
 
   const getProgressPosition = (vessel, progressRatio) => {
-    const trajectory = vessel.trajectory || [];
+    const trajectory = vessel?.trajectory || [];
     if (!trajectory.length) {
-      return [vessel.position.latitude, vessel.position.longitude];
+      // position is null for a vessel the backend returned without a usable
+      // AIS track; callers treat null as "nothing to draw".
+      const lat = Number(vessel?.position?.latitude);
+      const lon = Number(vessel?.position?.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
     }
     if (trajectory.length === 1) {
       return [trajectory[0].latitude, trajectory[0].longitude];
@@ -2064,6 +2083,7 @@ function App() {
               onOpenIncident={() => setActiveItem("incident")}
               onOpenDetect={() => setActiveItem("detect")}
               onRunHindcast={handleRunBacktrack}
+              onResetInvestigation={handleResetInvestigation}
               isBacktracking={isBacktracking}
               actionLabel={pipelineActionLabel}
               pipelineStage={pipelineStage}
@@ -2091,7 +2111,7 @@ function App() {
                   allVessels={scoredVessels}
                   onSelectVessel={handleSelectVessel}
                   onClose={handleDeselect}
-                  counterfactualResult={counterfactualResult}
+                  counterfactualResult={selectedCounterfactual}
                 />
               )}
               {activeItem === "legend" && (
@@ -2127,7 +2147,7 @@ function App() {
               {activeItem === "evidence" && (
                 <EvidencePanel
                   vessel={selectedVessel}
-                  counterfactualResult={counterfactualResult}
+                  counterfactualResult={selectedCounterfactual}
                   onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
                 />
               )}

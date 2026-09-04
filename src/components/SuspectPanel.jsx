@@ -1006,14 +1006,16 @@ export function SuspectPanel({
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Release Location</span>
               <div style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#0f172a", marginTop: "3px" }}>
-                {releaseLocation ? `${Number(releaseLocation.lat || 35.585).toFixed(4)}°N, ${Number(releaseLocation.lon || 34.870).toFixed(4)}°E` : "35.5850°N, 34.8700°E"}
+                {Number.isFinite(Number(releaseLocation?.lat)) && Number.isFinite(Number(releaseLocation?.lon))
+                  ? `${Number(releaseLocation.lat).toFixed(4)}°N, ${Number(releaseLocation.lon).toFixed(4)}°E`
+                  : "—"}
               </div>
             </div>
 
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Min Distance</span>
               <div style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#0f172a", marginTop: "3px" }}>
-                {(minDistanceKm ?? 0).toFixed(1)} km to polygon
+                {minDistanceKm != null ? `${Number(minDistanceKm).toFixed(1)} km to polygon` : "—"}
               </div>
             </div>
 
@@ -1065,7 +1067,7 @@ export function SuspectPanel({
             }}
           >
             {explanation ||
-              "Selected AIS position at 2024-08-26T08:45:00+00:00 because it was inside the release window and closest to the source polygon (0.00 km)."}
+              "No backend justification for this vessel yet — run attribution to score it against the source region."}
           </div>
         </section>
 
