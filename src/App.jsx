@@ -2817,6 +2817,7 @@ function App() {
               <OperationCard
                 vessel={selectedVessel || topVessel}
                 photoSrc="/vessels/mt-cyprus-sun.png"
+                pipelineStage={pipelineStage}
               />
             </div>
 
@@ -2861,7 +2862,7 @@ function App() {
             {isBacktracking && (
               <div className="run-card" role="status">
                 <div className="run-card-head">
-                  <strong>Hindcast</strong>
+                  <strong>{["Hindcast", "Attribution", "Forward simulation", "Replay"][pipelineStage] || "Analysis"}</strong>
                   <span className="run-badge">Running</span>
                 </div>
                 <p>{backtrackStatusText || "Connecting…"}</p>
