@@ -20,7 +20,6 @@ const NAV = [
 function Sidebar({
   activeItem,
   onSelect,
-  onTriggerBacktrack,
   backendOnline,
 }) {
 

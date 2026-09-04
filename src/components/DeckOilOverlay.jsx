@@ -18,14 +18,6 @@ import "./DeckOilOverlay.css";
    remain visible while oil travels underneath them.
 ========================================================= */
 
-const CATEGORY_COLORS = {
-  initial: [56, 189, 248], // Sky cyan oil sheen
-  sheen: [56, 189, 248],   // Sky cyan oil sheen
-  active: [30, 58, 95],    // Marine petroleum slate
-  stranded: [15, 23, 42],  // Deep oil black core
-  core: [15, 23, 42],      // Deep oil black core
-};
-
 class OilCanvasLayer {
   constructor() {
     this._particles = [];

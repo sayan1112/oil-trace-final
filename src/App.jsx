@@ -73,12 +73,11 @@ import {
   vesselsNearCentroid,
 } from "./services/backendApi";
 import DriftCloudOverlay from "./components/DriftCloudOverlay";
-import { generateOilSimulation, buildObservedSlickFrame, trackFromVesselTrajectory } from "./Simulation/oilSimulation";
-import { buildCloud, overlayFrameFromCloud } from "./Simulation/particles";
-import { displaySpillPolygon, observedSlickRing } from "./Simulation/slickShape";
+import { generateOilSimulation, buildObservedSlickFrame } from "./Simulation/oilSimulation";
+import { buildCloud } from "./Simulation/particles";
+import { observedSlickRing } from "./Simulation/slickShape";
 import { defaultCurrentField } from "./Simulation/currentField";
 import { defaultWindField } from "./Simulation/windField";
-import { backtrackOil } from "./Simulation/backtracking";
 import { compassLabel, msToKnots } from "./utils/compass";
 
 /* =========================================================
@@ -287,10 +286,6 @@ function createVesselIcon({
    GEOGRAPHIC DATA
 ========================================================= */
 
-function polygonFromIncident(inc) {
-  return displaySpillPolygon(inc);
-}
-
 function centroidFromIncident(inc) {
   return [
     Number(inc?.centroid?.latitude ?? inc?.location?.latitude),
@@ -433,7 +428,7 @@ function MapFocusController({ storyPoints, scenePoints, stageKey }) {
     const pts = scenePoints.length ? scenePoints : storyPoints;
     if (!pts.length) return;
     map.setMaxBounds(L.latLngBounds(pts).pad(2.5));
-    map.options.maxBoundsViscosity = 0.6;
+    L.Util.setOptions(map, { maxBoundsViscosity: 0.6 });
     if (map.getMinZoom() < 6) map.setMinZoom(6);
   }, [map, storyPoints, scenePoints]);
 
@@ -962,12 +957,20 @@ function App() {
   const [incident, setIncident] = useState(INCIDENT_SEED);
   const leafletCentroid = centroidFromIncident(incident);
   const spillPolygon = useMemo(() => {
+    // The observed slick layer renders the REAL detection footprint
+    // (incident.spillPolygon is [lat, lon] pairs derived from the detection
+    // geometry by incidentFromDetection). The synthetic display ring is only
+    // a last resort when no real geometry exists at all.
+    const real = (incident?.spillPolygon || []).filter(
+      (p) => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1])
+    );
+    if (real.length >= 3) return real;
     return observedSlickRing({
       latitude: leafletCentroid[0],
       longitude: leafletCentroid[1],
       areaKm2: incident?.areaKm2 || 266.926,
     });
-  }, [leafletCentroid, incident?.areaKm2]);
+  }, [incident, leafletCentroid]);
 
   const simulatedCurrentVectors = useMemo(() => {
     const [clat, clng] = centroidFromIncident(incident);
@@ -1032,7 +1035,6 @@ function App() {
   const [backtrackResult, setBacktrackResult] = useState(null);
   const [attributionResult, setAttributionResult] = useState(null);
   const [isBacktracking, setIsBacktracking] = useState(false);
-  const [backtrackVisible, setBacktrackVisible] = useState(false);
   const [backtrackStatusText, setBacktrackStatusText] = useState("");
 
   // Live backend investigation artifacts (null until the pipeline runs)
@@ -1107,11 +1109,6 @@ function App() {
     [backendVessels, incident]
   );
 
-  const oilClock = useMemo(() => {
-    const detected = Date.parse(incident.detectedAt);
-    const t1 = Number.isFinite(detected) ? detected : Date.UTC(2024, 7, 26, 12);
-    return { t0: t1 - 6 * 60 * 60 * 1000, t1 };
-  }, [incident]);
 
   // Seed vessel for the local oil simulation: prefer backend-flagged culprit,
   // then the attribution winner, then the tanker from the demo scene. The
@@ -1208,7 +1205,7 @@ function App() {
     pushGeom(forwardResult?.trajectory);
     pushGeom(forwardResult?.predicted_footprint);
     return pts.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
-  }, [activeSlick, calculatedSourceRegion, backtrackResult, forwardResult]);
+  }, [activeSlick, calculatedSourceRegion, backtrackResult, forwardResult, spillPolygon]);
 
   // "Scene": story + every vessel's track — spill AND ships in frame.
   const scenePoints = useMemo(() => {
@@ -1232,12 +1229,25 @@ function App() {
      drift particle cloud - everything stays in sync.
   ======================================================= */
 
+  // ONE shared UTC investigation clock. Its window comes from the backend
+  // replay (start/end or the frame timestamps themselves) whenever that is
+  // available; the detection-time fallback only covers the moments before
+  // the replay metadata has loaded.
   const simRange = useMemo(() => {
+    const replayStart = Date.parse(replayMeta?.start_time_utc);
+    const replayEnd = Date.parse(replayMeta?.end_time_utc);
+    if (Number.isFinite(replayStart) && Number.isFinite(replayEnd) && replayEnd > replayStart) {
+      return { t0: replayStart, t1: replayEnd };
+    }
+    const frameTs = (replayMeta?.frames || [])
+      .map((f) => Date.parse(f?.timestamp_utc))
+      .filter(Number.isFinite);
+    if (frameTs.length >= 2) {
+      return { t0: Math.min(...frameTs), t1: Math.max(...frameTs) };
+    }
     const detected = Date.parse(incident?.detectedAt) || Date.UTC(2024, 7, 26, 12);
-    const t0 = detected - 6 * 60 * 60 * 1000;
-    const t1 = detected;
-    return { t0, t1 };
-  }, [incident]);
+    return { t0: detected - 6 * 60 * 60 * 1000, t1: detected };
+  }, [replayMeta, incident]);
 
   const [simMs, setSimMs] = useState(Date.UTC(2024, 7, 26, 6));
 
@@ -1354,6 +1364,20 @@ function App() {
     setDetectionResult(geojson);
     // Auto-enable the detected slicks layer when results arrive
     setLayers((prev) => ({ ...prev, detectedSlicks: true }));
+
+    // The detection response is the canonical incident state: geometry,
+    // centroid, area, confidence and observation time all flow from here
+    // into every panel and map layer — no component keeps its own copy.
+    const feature = geojson?.features?.[0];
+    if (!feature) return;
+    setIncident(incidentFromDetection(feature, INCIDENT_SEED));
+    const slick = slickFromDetection(feature);
+    setActiveSlick({
+      ...slick,
+      id: CANONICAL_INCIDENT_ID,
+      timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
+    });
+    setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
   }, []);
 
   const handleSeedOverride = useCallback(({ lat, lon }, slickId) => {
@@ -1429,40 +1453,6 @@ function App() {
     replayProgress > 0.02 ||
     (Number.isFinite(simMs) && simRange && simMs > simRange.t0 + 1500);
 
-  const currentReplayFrame = useMemo(() => {
-    if (!replayMeta?.frames?.length) return null;
-    if (!Number.isFinite(simMs) || !simRange) {
-      return replayMeta.frames[replayMeta.frames.length - 1];
-    }
-    let closest = replayMeta.frames[0];
-    let minDiff = Infinity;
-    for (const frame of replayMeta.frames) {
-      const ft = Date.parse(frame.timestamp_utc);
-      const diff = Math.abs(ft - simMs);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = frame;
-      }
-    }
-    return closest;
-  }, [replayMeta, simMs, simRange]);
-
-  const activeSlickPolygon = useMemo(() => {
-    const frameSlick = currentReplayFrame?.slick?.geometry;
-    if (frameSlick?.coordinates?.[0]?.length >= 3) {
-      return frameSlick.coordinates[0].map(([lon, lat]) => [lat, lon]);
-    }
-    if (spillPolygon?.length >= 3) {
-      return spillPolygon;
-    }
-    return [
-      [35.58, 34.80],
-      [35.58, 34.95],
-      [35.70, 34.95],
-      [35.70, 34.80],
-      [35.58, 34.80],
-    ];
-  }, [currentReplayFrame, spillPolygon]);
 
   const openDriftCloud = useMemo(() => {
     if (
@@ -1523,15 +1513,6 @@ function App() {
   }, [forwardResult, backtrackResult, replayMeta]);
 
   const hasOpenDrift = Boolean(openDriftCloud);
-  const driftTimeMs = Number.isFinite(simMs)
-    ? simMs
-    : openDriftCloud
-      ? openDriftCloud.t0 + oilProgressRatio * (openDriftCloud.t1 - openDriftCloud.t0)
-      : null;
-  const openDriftFrame = useMemo(
-    () => (openDriftCloud ? overlayFrameFromCloud(openDriftCloud, driftTimeMs) : null),
-    [openDriftCloud, driftTimeMs],
-  );
 
   // OpenDrift Lagrangian particle plume bound directly to timeline scrubber.
   // Once the hindcast pipeline has run, the detected slick stays at rest and
@@ -1603,7 +1584,6 @@ function App() {
 
   // STAGE 1 — hindcast
   const handleRunHindcastStage = useCallback(async () => {
-    setBacktrackVisible(true);
     setActiveItem("map");
 
     let slick = null;
@@ -1633,91 +1613,38 @@ function App() {
     setCounterfactualResult(null);
     setAttributionResult(null);
 
-    setBacktrackStatusText("Reconstructing oil transport…");
-    const local = backtrackOil({
-      incident,
-      centroid: {
-        latitude: slick.centroid.lat,
-        longitude: slick.centroid.lon,
-      },
-    });
-    if (local) {
-      setBacktrackResult(local);
-      setBacktrackVisible(true);
-    }
-
+    // The backend OpenDrift hindcast is the ONLY source of the backward
+    // reconstruction. No local physics preview (drift physics do not belong
+    // in the frontend) and no synthetic fallback: if the call fails, the
+    // error propagates to the dispatcher and is shown to the operator.
     setBacktrackStatusText("OpenDrift hindcast…");
-    let hc = null;
-    try {
-      hc = await runHindcast(slick, 6);
-    } catch (e) {
-      console.warn("Live OpenDrift hindcast failed or unavailable; using physical backtracking reconstruction:", e);
-    }
+    const hc = await runHindcast(slick, 6);
 
-    if (hc) {
-      const sourceRegion = sourceRegionForFrontend(hc.source_region);
-      setBacktrackResult({
-        sourceRegion,
-        sourceEstimate: {
-          latitude: sourceRegion.center.latitude,
-          longitude: sourceRegion.center.longitude,
-        },
+    const sourceRegion = sourceRegionForFrontend(hc.source_region);
+    setBacktrackResult({
+      sourceRegion,
+      sourceEstimate: {
+        latitude: sourceRegion.center.latitude,
+        longitude: sourceRegion.center.longitude,
+      },
+      confidence: sourceRegion.confidence,
+      uncertainty: {
+        radiusMeters: sourceRegion.radiusMeters,
+        radiusKm: Number((sourceRegion.radiusMeters / 1000).toFixed(2)),
         confidence: sourceRegion.confidence,
-        uncertainty: {
-          radiusMeters: sourceRegion.radiusMeters,
-          radiusKm: Number((sourceRegion.radiusMeters / 1000).toFixed(2)),
-          confidence: sourceRegion.confidence,
-          particleConvergence: "Backend OpenDrift hindcast",
-        },
-        trajectory: trajectoryPoints(hc.backward_trajectory),
-        backend: hc,
-      });
-      setIncident((prev) => ({ ...prev, sourceRegion }));
-      setBackendOnline(true);
-      setBackendHost(getActiveBackendUrl());
+        particleConvergence: "Backend OpenDrift hindcast",
+      },
+      trajectory: trajectoryPoints(hc.backward_trajectory),
+      backend: hc,
+    });
+    setIncident((prev) => ({ ...prev, sourceRegion }));
+    setBackendOnline(true);
+    setBackendHost(getActiveBackendUrl());
 
-      const simTs = (hc.trajectory_timestamps_utc || [])
-        .map((t) => Date.parse(t))
-        .filter(Number.isFinite);
-      if (simTs.length) setSimMs(Math.min(...simTs));
-    } else if (local) {
-      const tEnd = incident.detectedAt || new Date().toISOString();
-      const tStart = shiftIsoHours(tEnd, -6);
-      const traj = local.trajectory || [];
-      const syntheticBackend = {
-        source_region: {
-          id: "sr-med-local",
-          slick_id: CANONICAL_INCIDENT_ID,
-          generated_at_utc: tEnd,
-          candidate_regions: [
-            {
-              id: "sr-cand-1",
-              geometry: local.sourceRegion.geometry,
-              centroid: {
-                lat: local.sourceEstimate.latitude,
-                lon: local.sourceEstimate.longitude,
-              },
-              probability: (local.confidence || 88) / 100,
-              start_time_utc: tStart,
-              end_time_utc: tEnd,
-            },
-          ],
-        },
-        backward_trajectory: {
-          type: "LineString",
-          coordinates: traj.map((p) => [p.longitude, p.latitude]),
-        },
-        trajectory_timestamps_utc: traj.map((p) =>
-          new Date(Date.parse(tEnd) - (p.timeMinutes || 0) * 60 * 1000).toISOString()
-        ),
-      };
-      setBacktrackResult({
-        ...local,
-        backend: syntheticBackend,
-      });
-      setIncident((prev) => ({ ...prev, sourceRegion: local.sourceRegion }));
-      setSimMs(Date.parse(tStart));
-    }
+    const simTs = (hc.trajectory_timestamps_utc || [])
+      .map((t) => Date.parse(t))
+      .filter(Number.isFinite);
+    if (simTs.length) setSimMs(Math.min(...simTs));
 
     setIsPlaying(true);
 
@@ -1746,108 +1673,24 @@ function App() {
       ? shiftIsoHours(region.end_time_utc, 12)
       : CANONICAL_AIS_END;
 
+    // Backend AIS + attribution only. A failure or an empty result is shown
+    // as exactly that — candidates are never invented, because a fabricated
+    // ranking looks identical to a real one and would surface at the worst
+    // possible moment: when the backend has actually computed nothing.
     setBacktrackStatusText("Scanning AIS traffic in the source region…");
-    let vessels = [];
-    try {
-      vessels = await getCandidateVessels(bbox, start, end);
-    } catch (e) {
-      console.warn("Failed to fetch vessels from API:", e);
-    }
-
-    if (!vessels || !vessels.length) {
-      vessels = (incidentData.incident.vessels || []).map((v) => ({
-        mmsi: String(v.mmsi),
-        name: v.name,
-        vessel_type: v.type,
-        track_points: (v.trajectory || []).map((p) => ({
-          timestamp_utc: p.time,
-          position: { lat: p.latitude, lon: p.longitude },
-          sog: p.speedKnots,
-          cog: p.heading,
-        })),
-        track_geometry: {
-          type: "LineString",
-          coordinates: (v.trajectory || []).map((p) => [p.longitude, p.latitude]),
-        },
-      }));
+    const vessels = await getCandidateVessels(bbox, start, end);
+    if (!vessels.length) {
+      setTransposeNotice(describeEmptyMediterraneanAis());
+      return;
     }
 
     setBacktrackStatusText("Ranking candidates…");
-    let attribution = null;
-    try {
-      attribution = await runAttribution(
-        CANONICAL_INCIDENT_ID,
-        hc.source_region,
-        vessels,
-        10
-      );
-    } catch (e) {
-      console.warn("Backend attribution unavailable:", e);
-    }
-
-    if (!attribution || !attribution.top_candidates?.length) {
-      attribution = {
-        incident_id: CANONICAL_INCIDENT_ID,
-        all_attributions: vessels.map((v, idx) => ({
-          mmsi: v.mmsi,
-          vessel_name: v.name,
-          overall_score: v.mmsi === "211000001" ? 98.12 : v.mmsi === "211000002" ? 62.60 : 35.0,
-          rank: idx + 1,
-          breakdown: {
-            spatial: {
-              score: v.mmsi === "211000001" ? 100 : 57,
-              explanation:
-                v.mmsi === "211000001"
-                  ? "Reconstructed route intersects source polygon (100%)."
-                  : "Route passes 5.5 km north.",
-            },
-            temporal: {
-              score: v.mmsi === "211000001" ? 100 : 100,
-              explanation: "AIS timestamp inside release window.",
-            },
-            trajectory: {
-              score: v.mmsi === "211000001" ? 100 : 20,
-              explanation:
-                v.mmsi === "211000001"
-                  ? "Trajectory intersects source polygon."
-                  : "Trajectory diverges.",
-            },
-          },
-        })),
-        top_candidates: [
-          {
-            vessel_mmsi: "211000001",
-            vessel_name: "MT CYPRUS SUN",
-            overall_score: 98.12,
-            spatial_score: 1.0,
-            temporal_score: 1.0,
-            trajectory_score: 1.0,
-            min_distance_km: 0.0,
-            release_location: { lat: 35.585, lon: 34.87 },
-            release_time_utc: "2024-08-26T08:45:00Z",
-            forward_request: {
-              incident_id: CANONICAL_INCIDENT_ID,
-              vessel_mmsi: "211000001",
-              release_location: { lat: 35.585, lon: 34.87 },
-              release_time_utc: "2024-08-26T08:45:00Z",
-              observation_time_utc: incident.detectedAt,
-              duration_hours: 4,
-            },
-          },
-          {
-            vessel_mmsi: "211000002",
-            vessel_name: "MV LEVANT STAR",
-            overall_score: 62.6,
-            spatial_score: 0.57,
-            temporal_score: 1.0,
-            trajectory_score: 0.2,
-            min_distance_km: 5.54,
-            release_location: { lat: 35.75, lon: 34.8833 },
-            release_time_utc: "2024-08-26T08:20:00Z",
-          },
-        ],
-      };
-    }
+    const attribution = await runAttribution(
+      CANONICAL_INCIDENT_ID,
+      hc.source_region,
+      vessels,
+      10
+    );
     setAttributionResult(attribution);
 
     // Present only the two most probable ships — the roster drives the
@@ -1861,8 +1704,13 @@ function App() {
         normalized.map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
       );
     }
-    setTransposeNotice(null);
-  }, [backtrackResult, activeSlick, incident]);
+    // Surface the engine's own caution flag instead of hiding it.
+    setTransposeNotice(
+      attribution?.no_strong_candidate
+        ? "The attribution engine reports NO STRONG CANDIDATE — treat this ranking as weak supporting evidence only."
+        : null
+    );
+  }, [backtrackResult, activeSlick]);
 
   // STAGE 3 — forward (counterfactual) simulation for the top suspect
   const handleRunForwardStage = useCallback(async () => {
@@ -1870,64 +1718,20 @@ function App() {
     const top = attributionResult?.top_candidates?.[0];
     if (!slick || !top?.forward_request) return;
 
+    // Backend forward + counterfactual only — a fabricated trajectory or a
+    // canned 91% agreement would be manufactured evidence. On failure the
+    // dispatcher's error toast tells the operator what actually happened.
     setBacktrackStatusText("Forward simulation from estimated release…");
-    let fwd = null;
-    try {
-      fwd = await runForwardSimulation(top.forward_request);
-    } catch (e) {
-      console.warn("Backend forward simulation unavailable:", e);
-    }
-
-    if (!fwd) {
-      fwd = {
-        incident_id: CANONICAL_INCIDENT_ID,
-        vessel_mmsi: top.vessel_mmsi,
-        release_location: top.release_location,
-        release_time_utc: top.release_time_utc,
-        trajectory: {
-          type: "LineString",
-          coordinates: [
-            [top.release_location.lon, top.release_location.lat],
-            [
-              (top.release_location.lon + slick.centroid.lon) / 2,
-              (top.release_location.lat + slick.centroid.lat) / 2,
-            ],
-            [slick.centroid.lon, slick.centroid.lat],
-          ],
-        },
-        trajectory_timestamps_utc: [
-          top.release_time_utc,
-          shiftIsoHours(slick.timestamp_utc, -1),
-          slick.timestamp_utc,
-        ],
-      };
-    }
+    const fwd = await runForwardSimulation(top.forward_request);
     setForwardResult(fwd);
 
     setBacktrackStatusText("Counterfactual: comparing with observed slick…");
-    let cf = null;
-    try {
-      cf = await runCounterfactual(
-        CANONICAL_INCIDENT_ID,
-        fwd.vessel_mmsi,
-        fwd,
-        slick
-      );
-    } catch (e) {
-      console.warn("Backend counterfactual unavailable:", e);
-    }
-
-    if (!cf) {
-      cf = {
-        incident_id: CANONICAL_INCIDENT_ID,
-        vessel_mmsi: fwd.vessel_mmsi,
-        spatial_agreement: 0.91,
-        centroid_distance_km: 0.28,
-        trajectory_reaches_slick: true,
-        explanation:
-          "Counterfactual forward drift matches observed SAR slick with 91% spatial IoU overlap.",
-      };
-    }
+    const cf = await runCounterfactual(
+      CANONICAL_INCIDENT_ID,
+      fwd.vessel_mmsi,
+      fwd,
+      slick
+    );
     setCounterfactualResult(cf);
 
     setBackendVessels((prev) =>
@@ -2184,7 +1988,6 @@ function App() {
   };
 
   const handleSpillClick = () => {
-    setBacktrackVisible(false);
     handleDeselect();
   };
 
@@ -2416,6 +2219,13 @@ function App() {
         zoomAnimation={false}
         fadeAnimation={false}
         markerZoomAnimation={false}
+        /* Calmer interaction: half-step zoom increments, a full wheel
+           notch per half-step instead of Leaflet's touchy default, and a
+           small debounce so trackpads don't jump several levels at once. */
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={120}
+        wheelDebounceTime={60}
       >
         <MapBackgroundClick onDeselect={handleDeselect} />
 
@@ -2585,7 +2395,7 @@ function App() {
             <Tooltip sticky direction="top">
               <strong>Candidate Vessel Intersection</strong>
               <br />
-              Top Suspect: {scoredVessels.find((v) => v.candidateRank === 1).name} (
+              Top candidate: {scoredVessels.find((v) => v.candidateRank === 1).name} (
               {Math.round(scoredVessels.find((v) => v.candidateRank === 1).attributionConfidence * 100)}% Confidence)
             </Tooltip>
           </Polyline>
@@ -3048,8 +2858,8 @@ function App() {
               startMs={clockStart}
               endMs={clockEnd}
               currentMs={clockNow}
-              currentLat={culpritVessel ? getReplayPosition(culpritVessel)?.[0] : incident.centroid.latitude}
-              currentLng={culpritVessel ? getReplayPosition(culpritVessel)?.[1] : incident.centroid.longitude}
+              currentLat={incident.centroid.latitude}
+              currentLng={incident.centroid.longitude}
               events={timelineEvents}
               isPlaying={isPlaying}
               onPlayPause={() => guardedSetIsPlaying((prev) => !prev)}

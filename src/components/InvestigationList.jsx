@@ -15,13 +15,6 @@ function statusClass(pct) {
   return "delivered";
 }
 
-function formatCoord(lat, lon) {
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "—";
-  const ns = lat >= 0 ? "N" : "S";
-  const ew = lon >= 0 ? "E" : "W";
-  return `${Math.abs(lat).toFixed(3)}°${ns}  ${Math.abs(lon).toFixed(3)}°${ew}`;
-}
-
 const WORKFLOW_STEPS = [
   { id: "detect", num: "01", label: "Detection", hint: "SAR oil slick" },
   { id: "hindcast", num: "02", label: "Hindcast", hint: "Backtrack source" },
@@ -30,12 +23,9 @@ const WORKFLOW_STEPS = [
 ];
 
 export default function InvestigationList({
-  incident,
   vessels = [],
-  detectionCount = 0,
   selectedVesselId,
   onSelectVessel,
-  onOpenIncident,
   onOpenDetect,
   onRunHindcast,
   onResetInvestigation,
@@ -54,7 +44,7 @@ export default function InvestigationList({
   const [queryLocal, setQueryLocal] = useState("");
   const query = queryProp ?? queryLocal;
   const setQuery = onQueryChange || setQueryLocal;
-  const [filter, setFilter] = useState("all");
+  const [filter] = useState("all");
 
   const ranked = useMemo(
     () => [...vessels].sort((a, b) => (a.candidateRank || 99) - (b.candidateRank || 99)),
@@ -74,8 +64,6 @@ export default function InvestigationList({
     });
   }, [ranked, query, filter]);
 
-  const lat = Number(incident?.centroid?.latitude ?? incident?.location?.latitude);
-  const lon = Number(incident?.centroid?.longitude ?? incident?.location?.longitude);
   const isLocal = /localhost|127\.0\.0\.1/i.test(String(backendHost || ""));
   const linkLabel =
     backendOnline === true
