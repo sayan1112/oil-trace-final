@@ -65,8 +65,11 @@ export default function DriftCloudOverlay({
     return buildCloud({
       points,
       timesUtc: forward.trajectory_timestamps_utc,
-      count: 700,
-      startSpreadKm: 0.18,
+      // Deliberately sparse: particles are staggered along the travelled
+      // path (each has its own alongT), so a modest count reads as a
+      // narrow-at-release, widening-downstream plume rather than a blob.
+      count: 180,
+      startSpreadKm: 0.12,
       endSpreadKm: Math.min(
         2.2,
         envelopeRadiusKm(forward.predicted_footprint || slickGeometry, 1.6)
@@ -160,7 +163,7 @@ export default function DriftCloudOverlay({
       return pts;
     };
 
-    const drawCloud = (cloud, now, direction, fill, trailStroke, bufRef, label, side) => {
+    const drawCloud = (cloud, now, direction, fill, trailStroke, bufRef, label, side, dotScale = 1.35) => {
       const pos =
         cloud.kind === "polygon"
           ? polygonCloudPositions(cloud, now, bufRef.current)
@@ -179,7 +182,7 @@ export default function DriftCloudOverlay({
         ctx.stroke();
       }
       ctx.fillStyle = fill;
-      const cr = r * 1.35;
+      const cr = r * dotScale;
       for (let i = 0; i < cloud.count; i += 1) {
         const lat = pos[i * 2];
         const lng = pos[i * 2 + 1];
@@ -216,8 +219,8 @@ export default function DriftCloudOverlay({
       if (now >= fc.t0) {
         drawCloud(
           fc, now, "forward",
-          "rgba(22, 140, 65, 0.9)", "rgba(34, 197, 94, 0.45)", fwdBufRef,
-          "FORWARD DRIFT · release → slick", "right"
+          "rgba(22, 140, 65, 0.62)", "rgba(34, 197, 94, 0.45)", fwdBufRef,
+          "FORWARD DRIFT · release → slick", "right", 1.05
         );
         if (rel && now - fc.t0 <= RELEASE_PULSE_SIM_MS) {
           const f = (now - fc.t0) / RELEASE_PULSE_SIM_MS;

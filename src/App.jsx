@@ -89,20 +89,6 @@ L.Icon.Default.mergeOptions({
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-const centroidPinIcon = L.divIcon({
-  className: "spill-pin-marker",
-  html: `
-    <div style="width:16px; height:22px; filter:drop-shadow(0 1.5px 3px rgba(0,0,0,0.35)); pointer-events:none;">
-      <svg viewBox="0 0 16 22" width="16" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 0C3.58 0 0 3.58 0 8c0 5.8 8 14 8 14s8-8.2 8-14c0-4.42-3.58-8-8-8z" fill="#2563eb" stroke="#1d4ed8" stroke-width="1"/>
-        <circle cx="8" cy="8" r="2.8" fill="#ffffff"/>
-      </svg>
-    </div>
-  `,
-  iconSize: [16, 22],
-  iconAnchor: [8, 22],
-});
-
 /* =========================================================
    INCIDENT DATA
 ========================================================= */
@@ -279,13 +265,6 @@ function createVesselIcon({
 /* =========================================================
    GEOGRAPHIC DATA
 ========================================================= */
-
-function centroidFromIncident(inc) {
-  return [
-    Number(inc?.centroid?.latitude ?? inc?.location?.latitude),
-    Number(inc?.centroid?.longitude ?? inc?.location?.longitude),
-  ];
-}
 
 /* =========================================================
    MAP HELPERS
@@ -949,7 +928,6 @@ function LegendPanel({ onClose }) {
 
 function App() {
   const [incident, setIncident] = useState(INCIDENT_SEED);
-  const leafletCentroid = centroidFromIncident(incident);
   const spillPolygon = useMemo(() => {
     // The observed slick layer renders ONLY the real detection footprint
     // (incident.spillPolygon is [lat, lon] pairs derived from the detection
@@ -979,6 +957,16 @@ function App() {
   const [transposeNotice, setTransposeNotice] = useState(null);
   const [replayMeta, setReplayMeta] = useState(null);
   const [activeSlick, setActiveSlick] = useState(null); // slick sent to the backend
+
+  // Observed slick centroid: the detection's own centroid, never a
+  // hardcoded coordinate and never shared with source/release markers.
+  const observedCentroid = useMemo(() => {
+    const c = activeSlick?.centroid;
+    const lat = Number(c?.lat ?? incident?.centroid?.latitude);
+    const lon = Number(c?.lon ?? incident?.centroid?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
+  }, [activeSlick, incident]);
+
 
   const calculatedSourceRegion = backtrackResult?.sourceRegion || null;
 
@@ -1994,55 +1982,6 @@ function App() {
           timeMs={clockNow}
         />
 
-        {/* API DETECTED SLICK POLYGONS (from Detection Service) */}
-        {layers.detectedSlicks && detectionResult && detectionResult.features.map((feature) => {
-          const { id, confidence, area_km2, centroid: slickCentroid } = feature.properties;
-          const geometry = feature.geometry;
-          // Convert GeoJSON [lon, lat] coords to Leaflet [lat, lon]
-          const toLeaflet = (coords) => coords.map(([lon, lat]) => [lat, lon]);
-
-          const ringPositions =
-            geometry.type === "Polygon"
-              ? [toLeaflet(geometry.coordinates[0])]
-              : geometry.coordinates.map((poly) => toLeaflet(poly[0]));
-
-          const slickColor = confidence >= 0.75 ? "#06b6d4" : "#22d3ee";
-          const confidencePct = Math.round(confidence * 100);
-
-          return (
-            <Fragment key={`api-slick-${id}`}>
-              {/* Outer ring(s) */}
-              {ringPositions.map((ring, ri) => (
-                <Polygon
-                  key={`ring-${id}-${ri}`}
-                  positions={ring}
-                  pathOptions={{
-                    color: slickColor,
-                    weight: 2,
-                    opacity: 0.9,
-                    fillColor: slickColor,
-                    fillOpacity: 0.12,
-                    lineCap: "round",
-                    lineJoin: "round",
-                    dashArray: "6 5",
-                  }}
-                >
-                  <Tooltip sticky direction="top">
-                    <strong>API Detection: {id}</strong>
-                    <br />
-                    Area: {area_km2.toFixed(1)} km²
-                    <br />
-                    Confidence: {confidencePct}%
-                    {confidence < 0.75 && <em> (uncertain)</em>}
-                    <br />
-                    Centroid: {slickCentroid.lat.toFixed(4)}°N {slickCentroid.lon.toFixed(4)}°E
-                  </Tooltip>
-                </Polygon>
-              ))}
-            </Fragment>
-          );
-        })}
-
         {/* OIL SPILL REGION (RED POLYGON) - Clean 6-sided polygon matching Screenshot 1 & 2 */}
         {hasDetection && layers.spill && spillPolygon.length >= 3 && (
           <Polygon
@@ -2118,9 +2057,7 @@ function App() {
             <Tooltip sticky direction="top">
               <strong>Predicted footprint</strong>
               <br />
-              Simulated particle envelope from the estimated release —
-              <br />
-              not an observed slick.
+              Modelled forward-drift envelope — not an observed slick.
             </Tooltip>
           </Polygon>
         )}
@@ -2201,15 +2138,25 @@ function App() {
           </Fragment>
         ))}
 
-        {/* SPILL CENTROID PIN MARKER */}
-        {hasDetection && layers.spill && (
-          <Marker position={leafletCentroid} icon={centroidPinIcon}>
-            <Tooltip direction="top" offset={[0, -22]}>
-              <strong>Spill Centroid</strong>
+        {/* OBSERVED SLICK CENTROID — from the detection response, distinct
+            from the probable-source centroid and the estimated release. */}
+        {hasDetection && layers.spill && observedCentroid && (
+          <CircleMarker
+            center={observedCentroid}
+            radius={5}
+            pathOptions={{
+              color: "#b91c1c",
+              weight: 2.5,
+              fillColor: "#ffffff",
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -6]}>
+              <strong>Observed slick centroid</strong>
               <br />
-              {leafletCentroid[0].toFixed(5)}°N, {leafletCentroid[1].toFixed(5)}°E
+              {observedCentroid[0].toFixed(5)}°N, {observedCentroid[1].toFixed(5)}°E
             </Tooltip>
-          </Marker>
+          </CircleMarker>
         )}
 
         {/* MAP TOOLBAR */}
@@ -2398,60 +2345,40 @@ function App() {
         })}
       </MapContainer>
 
-            {/* PERMANENT MAP KEY — the observed slick facts, the source
-                estimate with its KDE density mass, and a plain-language key
-                for every layer currently on the map. Always visible; no
-                hover required. All values come from backend state. */}
-            <div className="map-key" aria-label="Map key">
-              {hasDetection && (
-                <div className="map-key-block">
-                  <p className="map-key-title">
-                    <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
-                    Observed SAR slick
-                  </p>
-                  <p className="map-key-line">
-                    {incident.satellite?.imageId || "Oil/00067"} · {new Date(incident.detectedAt).toISOString().replace("T", " · ").substring(0, 18)} UTC
-                  </p>
-                  <p className="map-key-line">
-                    {Number(incident.centroid?.latitude).toFixed(5)}°N · {Number(incident.centroid?.longitude).toFixed(5)}°E
-                    {" · "}{Number(incident.areaKm2).toFixed(1)} km² · ML {Math.round((incident.detectionConfidence || 0) * 100)}%
-                  </p>
-                </div>
-              )}
-              {pipelineStage >= 1 && pipelineStage <= 2 && candidateRegionsList[0] && (
-                <div className="map-key-block">
-                  <p className="map-key-title">
-                    <span className="map-key-swatch" style={{ background: "rgba(59,130,246,0.12)", border: "1.5px dashed #3b82f6" }} />
-                    Probable source region
-                  </p>
-                  <p className="map-key-line">
-                    KDE density mass {(candidateRegionsList[0].probability * 100).toFixed(0)}%
-                    {backtrackResult?.confidence != null ? ` · source confidence ${backtrackResult.confidence}%` : ""}
-                  </p>
-                  {candidateRegionsList[0].startTime && (
-                    <p className="map-key-line">
-                      Window {new Date(candidateRegionsList[0].startTime).toISOString().substring(11, 16)} → {new Date(candidateRegionsList[0].endTime).toISOString().substring(11, 16)} UTC
-                    </p>
-                  )}
-                </div>
+            {/* COMPACT MAP LEGEND — layer semantics only. Coordinates,
+                area, confidence and evidence live in the side panels. */}
+            <div className="map-key" aria-label="Map legend">
+              <p className="map-key-line">
+                <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
+                Observed SAR slick
+              </p>
+              {pipelineStage >= 1 && (
+                <p className="map-key-line">
+                  <span className="map-key-swatch" style={{ background: "rgba(59,130,246,0.12)", border: "1.5px dashed #3b82f6" }} />
+                  Probable source
+                </p>
               )}
               {pipelineStage === 1 && (
-                <p className="map-key-line muted">
-                  <span className="map-key-dot" style={{ background: "#0db2c8" }} /> Hindcast reconstruction — modelled drift back to the probable source
+                <p className="map-key-line">
+                  <span className="map-key-dot" style={{ background: "#0db2c8" }} />
+                  Backward reconstruction
                 </p>
               )}
               {pipelineStage >= 2 && (
-                <p className="map-key-line muted">
-                  <span className="map-key-dot" style={{ background: "#2563eb" }} /> Candidate vessel — AIS trajectory ranked by attribution
+                <p className="map-key-line">
+                  <span className="map-key-dot" style={{ background: "#2563eb" }} />
+                  AIS candidate
                 </p>
               )}
               {pipelineStage === 3 && (
                 <>
-                  <p className="map-key-line muted">
-                    <span className="map-key-dot" style={{ background: "#ffffff", border: "2px solid #dc2626" }} /> Estimated release — backend-derived location &amp; time
+                  <p className="map-key-line">
+                    <span className="map-key-dot" style={{ background: "#ffffff", border: "2px solid #dc2626" }} />
+                    Estimated release
                   </p>
-                  <p className="map-key-line muted">
-                    <span className="map-key-swatch" style={{ background: "rgba(16,185,129,0.2)", border: "1.5px solid #059669" }} /> Predicted footprint — forward counterfactual model output
+                  <p className="map-key-line">
+                    <span className="map-key-swatch" style={{ background: "rgba(16,185,129,0.2)", border: "1.5px solid #059669" }} />
+                    Predicted footprint
                   </p>
                 </>
               )}
