@@ -1,8 +1,15 @@
-export default function OperationCard({ vessel, photoSrc }) {
+const NEXT_STEP_COPY = [
+  "No ranked vessel yet. Run hindcast to trace the slick back to its probable source region.",
+  "Probable source region estimated. Run attribution to scan AIS traffic inside it and rank candidate vessels.",
+  "Candidates ranked. Run the forward simulation to test the leading suspect's release against the observed slick.",
+  "No ranked vessel selected.",
+];
+
+export default function OperationCard({ vessel, photoSrc, pipelineStage = 0 }) {
   if (!vessel) {
     return (
       <article className="op-card is-empty">
-        <p>No ranked vessel yet. Run hindcast to load AIS candidates from the backend.</p>
+        <p>{NEXT_STEP_COPY[pipelineStage] || NEXT_STEP_COPY[0]}</p>
       </article>
     );
   }

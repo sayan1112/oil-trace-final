@@ -964,6 +964,36 @@ path.leaflet-interactive {
   border-bottom: 0;
 }
 
+/* "What the map is showing" — larger type so it survives a projector. */
+.legend-items-lg .legend-item {
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.35;
+  color: #334155;
+  min-height: 44px;
+}
+
+.legend-items-lg .legend-item strong {
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.legend-swatch {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 15px;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.legend-dot {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
 /* Oil particles: exact simulation colors from oilSimulation/DeckOilOverlay. */
 .legend-particle {
   width: 10px;
@@ -3627,19 +3657,26 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   font-weight: 700;
 }
 
+/* Narrow the working column instead of removing it. Hiding .command-stage
+   here wiped out the case queue, detection panel, vessel dossier, Evidence,
+   Replay and the legend on any 1024-wide projector or a 1280 screen at 125%
+   zoom, leaving a sidebar of buttons that did nothing. */
 @media (max-width: 1100px) {
   .app.command-center {
     grid-template-columns: 84px minmax(0, 1fr);
   }
 
   .command-shell {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 300px minmax(0, 1fr);
     padding: 8px;
+    gap: 8px;
     border-radius: 24px;
   }
+}
 
-  .command-stage {
-    display: none;
+@media (max-width: 880px) {
+  .command-shell {
+    grid-template-columns: 250px minmax(0, 1fr);
   }
 }
 

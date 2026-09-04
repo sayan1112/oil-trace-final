@@ -910,19 +910,17 @@ function LegendPanel({ onClose }) {
 
       <div className="legend-content">
         <section className="legend-group">
-          <div className="legend-group-title">OIL / LAGRANGIAN DRIFT</div>
-          <div className="legend-items">
-            <div className="legend-item"><span className="legend-particle legend-particle-initial" /><span>Dispersed / leading-edge oil</span></div>
-            <div className="legend-item"><span className="legend-particle legend-particle-active" /><span>Active drifting oil</span></div>
-            <div className="legend-item"><span className="legend-particle legend-particle-stranded" /><span>High-concentration oil core</span></div>
-            <div className="legend-item"><span className="legend-drift-trail" /><span>Particle drift history</span></div>
-            <div className="legend-item"><span className="legend-oil-centerline" /><span>Oil transport flow lines</span></div>
-            <div className="legend-item"><span className="legend-backtrack-path" /><span>Backtracked transport path</span></div>
-            <div className="legend-item"><span className="legend-spill-boundary" /><span>Oil Spill Region (Red Polygon)</span></div>
-            <div className="legend-item"><span className="legend-spill-centroid" /><span>Spill Centroid Pin</span></div>
-            <div className="legend-item"><span className="legend-source-region" /><span>Estimated Source Region (Blue Circle)</span></div>
-            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#0284c7" }} /><span>Simulated ocean current</span></div>
-            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#f59e0b" }} /><span>Simulated wind field</span></div>
+          <div className="legend-group-title">WHAT THE MAP IS SHOWING</div>
+          <div className="legend-items legend-items-lg">
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(239,68,68,0.32)", border: "2px solid #ef4444" }} /><span><strong>Observed slick</strong> — detected by SAR</span></div>
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(59,130,246,0.10)", border: "2px dashed #3b82f6" }} /><span><strong>Probable source region</strong> — where the oil came from (hindcast)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#ffffff", border: "3px solid #dc2626" }} /><span><strong>Estimated release</strong> — suspected leak point &amp; time</span></div>
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(16,185,129,0.2)", border: "2px solid #059669" }} /><span><strong>Predicted footprint</strong> — where the simulated oil ends up</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#0db2c8" }} /><span><strong>Backward drift</strong> — slick traced back to source (before release)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#22c55e" }} /><span><strong>Forward drift</strong> — oil released and drifting to the slick (after release)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#64748b" }} /><span>Observed slick particle field</span></div>
+            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#0284c7" }} /><span>Ocean current field</span></div>
+            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#f59e0b" }} /><span>Wind field</span></div>
           </div>
         </section>
 
@@ -947,9 +945,9 @@ function LegendPanel({ onClose }) {
         </section>
 
         <div className="legend-note">
-          <strong>SIMULATED LAGRANGIAN PARTICLE DRIFT</strong>
-          <p>Particles are advected by the simulated ocean current and wind fields. Green marks the dispersed leading edge, blue marks active drift, and red marks the densest oil core.</p>
-          <p>The dark dashed flow lines are generated from the same current + wind field and start inside the dense oil core, so they remain attached to the visible plume.</p>
+          <strong>EVIDENCE, NOT ACCUSATION</strong>
+          <p>Drift clouds are OpenDrift/OpenOil Lagrangian particles advected by the backend&apos;s ocean-current and wind forcing. The teal cloud plays before the estimated release, tracing the slick backwards; the green cloud plays after it, carrying the simulated leak forward to the observed slick.</p>
+          <p>Scores are spatial, temporal and physical-consistency evidence — never proof of vessel responsibility.</p>
         </div>
       </div>
     </aside>
@@ -1052,6 +1050,7 @@ function App() {
 
   const candidateRegionsList = useMemo(() => {
     const raw =
+      backtrackResult?.backend?.source_region?.candidate_regions ||
       backtrackResult?.source_region?.candidate_regions ||
       calculatedSourceRegion?.candidate_regions ||
       [];
@@ -1073,6 +1072,33 @@ function App() {
       };
     }).filter((r) => r.ring.length >= 3);
   }, [backtrackResult, calculatedSourceRegion]);
+
+  // Forward simulation's predicted particle envelope (stage 3).
+  const predictedFootprintRing = useMemo(() => {
+    const geom = forwardResult?.predicted_footprint;
+    const coords = geom?.coordinates?.[0] || [];
+    return coords
+      .map(([lon, lat]) => [Number(lat), Number(lon)])
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+  }, [forwardResult]);
+
+  // Estimated release point: from the forward run once it exists, otherwise
+  // from the attribution's leading candidate.
+  const releasePoint = useMemo(() => {
+    const src = forwardResult?.release_location
+      ? { loc: forwardResult.release_location, t: forwardResult.release_time_utc }
+      : attributionResult?.top_candidates?.[0]?.release_location
+        ? {
+            loc: attributionResult.top_candidates[0].release_location,
+            t: attributionResult.top_candidates[0].release_time_utc,
+          }
+        : null;
+    if (!src) return null;
+    const lat = Number(src.loc.lat ?? src.loc.latitude);
+    const lon = Number(src.loc.lon ?? src.loc.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { position: [lat, lon], time: src.t };
+  }, [forwardResult, attributionResult]);
 
   const scoredVessels = useMemo(
     // Vessels appear only once the hindcast pipeline has queried AIS —
@@ -1240,6 +1266,17 @@ function App() {
     (vessel) => vessel.id === selectedVesselId
   );
 
+  // The counterfactual describes exactly one vessel. Showing it under any
+  // other candidate would attribute one ship's drift evidence to another.
+  const selectedCounterfactual = useMemo(() => {
+    if (!counterfactualResult) return null;
+    const cfMmsi = counterfactualResult.vessel_mmsi;
+    if (cfMmsi == null || !selectedVessel) return counterfactualResult;
+    return String(cfMmsi) === String(selectedVessel.mmsi)
+      ? counterfactualResult
+      : null;
+  }, [counterfactualResult, selectedVessel]);
+
   /* =======================================================
      MAP LAYERS
   ======================================================= */
@@ -1268,49 +1305,49 @@ function App() {
   // Which slick ID is the active seed (for button highlight)
   const [activeSeedId, setActiveSeedId] = useState(null);
 
-  // Fire-and-forget warm-up on mount so both services are ready
+  // Fire-and-forget warm-up on mount so the backend is ready.
+  // Detection is deliberately NOT auto-loaded: the scene stays empty until
+  // the operator loads a SAR detection, which reveals the slick and unlocks
+  // the hindcast stage. (The previous auto-load here also called two
+  // functions that were never imported — a ReferenceError waiting on the
+  // VITE_USE_MODAL_ML flag.)
   useEffect(() => {
-    const useModalMl = import.meta.env.VITE_USE_MODAL_ML === "true";
-    if (useModalMl) warmDetectionService();
     warmBackend();
-    getBackendHealth()
-      .then(() => {
-        setBackendOnline(true);
-        setBackendHost(getActiveBackendUrl());
-      })
-      .catch(() => {
-        setBackendOnline(false);
-        setBackendHost(getActiveBackendUrl());
-      });
 
-    if (useModalMl) {
-      fetchDemoDetection()
-        .then((geojson) => {
-          setDetectionResult(geojson);
-          setLayers((prev) => ({ ...prev, detectedSlicks: true }));
-          const feature = geojson?.features?.[0];
-          if (!feature) return;
-          const next = incidentFromDetection(feature, INCIDENT_SEED);
-          setIncident(next);
-          const slick = slickFromDetection(feature);
-          setActiveSlick({
-            ...slick,
-            id: CANONICAL_INCIDENT_ID,
-            timestamp_utc: slick.timestamp_utc || INCIDENT_SEED.detectedAt,
-          });
-          setActiveSeedId(feature.properties?.id || CANONICAL_INCIDENT_ID);
+    // Poll health rather than probing once on mount: a single check meant
+    // that a backend which was down at page load (or restarted afterwards)
+    // left the badge stuck reading "Local offline" forever, and a backend
+    // that died mid-session still showed as online.
+    let cancelled = false;
+    const checkHealth = () => {
+      getBackendHealth()
+        .then(() => {
+          if (cancelled) return;
+          setBackendOnline(true);
+          setBackendHost(getActiveBackendUrl());
         })
-        .catch(() => {});
-    }
+        .catch(() => {
+          if (cancelled) return;
+          setBackendOnline(false);
+          setBackendHost(getActiveBackendUrl());
+        });
+    };
+    checkHealth();
+    const healthTimer = setInterval(checkHealth, 15000);
 
     // Prefetch replay metadata for the Replay panel, but do NOT surface any
     // vessels yet: candidates appear only after "Run hindcast" queries AIS
     // and the attribution pipeline scores them.
     getReplay(CANONICAL_INCIDENT_ID)
       .then((replay) => {
-        setReplayMeta(replay);
+        if (!cancelled) setReplayMeta(replay);
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      clearInterval(healthTimer);
+    };
   }, []);
 
   const handleDetectionResult = useCallback((geojson) => {
@@ -1813,10 +1850,12 @@ function App() {
     }
     setAttributionResult(attribution);
 
+    // Present only the two most probable ships — the roster drives the
+    // candidate list, the map markers, and their AIS tracks alike.
     const normalized = vesselsNearCentroid(
       normalizeVessels(vessels, attribution),
       { lat: slick.centroid.lat, lon: slick.centroid.lon }
-    );
+    ).slice(0, 2);
     if (normalized.length) {
       setBackendVessels(
         normalized.map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
@@ -1929,6 +1968,23 @@ function App() {
         : 0;
   const pipelineActionLabel = ["Run hindcast", "Run attribution", "Forward simulation", "Replay forward"][pipelineStage];
 
+  // Clear every backend-derived result so the investigation can be run
+  // again from the detection. Without this the pipeline is one-shot: the
+  // hindcast can never be repeated and a stage that yields nothing usable
+  // leaves the case stuck with no way back short of a page reload.
+  const handleResetInvestigation = useCallback(() => {
+    setIsPlaying(false);
+    setBacktrackResult(null);
+    setAttributionResult(null);
+    setForwardResult(null);
+    setCounterfactualResult(null);
+    setBackendVessels(null);
+    setSelectedVesselId(null);
+    setBackendError(null);
+    setTransposeNotice(null);
+    setBacktrackStatusText("");
+  }, []);
+
   // One dispatcher keeps every existing button working: each press advances
   // the investigation by exactly one stage.
   const handleRunBacktrack = useCallback(async () => {
@@ -1945,7 +2001,11 @@ function App() {
         setIsPlaying(true);
       }
     } catch (err) {
-      setBackendError(describeHindcastFailure(err?.message || String(err)));
+      // describeHindcastFailure only recognises a few remote-forcing cases
+      // and returns null otherwise (including for every local backend), so
+      // fall back to the raw message — a failed stage must never be silent.
+      const raw = err?.message || String(err);
+      setBackendError(describeHindcastFailure(raw) || raw);
     } finally {
       setIsBacktracking(false);
       setBacktrackStatusText("");
@@ -2006,9 +2066,13 @@ function App() {
   };
 
   const getProgressPosition = (vessel, progressRatio) => {
-    const trajectory = vessel.trajectory || [];
+    const trajectory = vessel?.trajectory || [];
     if (!trajectory.length) {
-      return [vessel.position.latitude, vessel.position.longitude];
+      // position is null for a vessel the backend returned without a usable
+      // AIS track; callers treat null as "nothing to draw".
+      const lat = Number(vessel?.position?.latitude);
+      const lon = Number(vessel?.position?.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
     }
     if (trajectory.length === 1) {
       return [trajectory[0].latitude, trajectory[0].longitude];
@@ -2126,20 +2190,24 @@ function App() {
 
   const appThemeClass = "app-light";
 
+  // The uncertainty circle is the backend hindcast's own estimate — its
+  // centre, radius and confidence all come from /hindcast. Before the
+  // hindcast runs there is no source region to draw.
   const activeSourceRegion = useMemo(() => {
+    const sr = backtrackResult?.sourceRegion;
+    if (!sr?.center || !Number.isFinite(Number(sr.center.latitude))) return null;
     return {
-      center: { latitude: leafletCentroid[0], longitude: leafletCentroid[1] },
-      radiusMeters: 8800,
-      confidence: backtrackResult?.confidence || 88,
+      center: sr.center,
+      radiusMeters: Number(sr.radiusMeters) || 0,
+      confidence: sr.confidence,
       type: "Estimated Source Region",
     };
-  }, [leafletCentroid, backtrackResult?.confidence]);
+  }, [backtrackResult]);
 
-  const sourceCenter = [
-    Number(activeSourceRegion.center.latitude),
-    Number(activeSourceRegion.center.longitude),
-  ];
-  const sourceRadiusMeters = 8800;
+  const sourceCenter = activeSourceRegion
+    ? [Number(activeSourceRegion.center.latitude), Number(activeSourceRegion.center.longitude)]
+    : null;
+  const sourceRadiusMeters = activeSourceRegion?.radiusMeters || 0;
 
   const backtrackedCenterline = useMemo(() => {
     if (!backtrackResult?.trajectory) return [];
@@ -2209,9 +2277,14 @@ function App() {
               onOpenIncident={() => setActiveItem("incident")}
               onOpenDetect={() => setActiveItem("detect")}
               onRunHindcast={handleRunBacktrack}
+              onResetInvestigation={handleResetInvestigation}
               isBacktracking={isBacktracking}
               actionLabel={pipelineActionLabel}
               pipelineStage={pipelineStage}
+              hasDetection={hasDetection}
+              counterfactualResult={counterfactualResult}
+              topVessel={topVessel}
+              onSelectTopVessel={handleSelectVessel}
               backendOnline={backendOnline}
               backendHost={backendHost}
               query={queueQuery}
@@ -2236,7 +2309,7 @@ function App() {
                   allVessels={scoredVessels}
                   onSelectVessel={handleSelectVessel}
                   onClose={handleDeselect}
-                  counterfactualResult={counterfactualResult}
+                  counterfactualResult={selectedCounterfactual}
                 />
               )}
               {activeItem === "legend" && (
@@ -2272,7 +2345,7 @@ function App() {
               {activeItem === "evidence" && (
                 <EvidencePanel
                   vessel={selectedVessel}
-                  counterfactualResult={counterfactualResult}
+                  counterfactualResult={selectedCounterfactual}
                   onClose={() => setActiveItem(selectedVessel ? "vessels" : "map")}
                 />
               )}
@@ -2636,8 +2709,70 @@ function App() {
               Centroid: {sourceCenter[0].toFixed(4)}°N, {sourceCenter[1].toFixed(4)}°E
               <br />
               Uncertainty Radius: {(sourceRadiusMeters / 1000).toFixed(2)} km
+              {activeSourceRegion.confidence != null && (
+                <>
+                  <br />
+                  Source-region probability mass: {activeSourceRegion.confidence}%
+                </>
+              )}
             </Tooltip>
           </Circle>
+        )}
+
+        {/* PREDICTED FOOTPRINT (GREEN) — forward simulation particle envelope */}
+        {layers.spill && predictedFootprintRing.length >= 3 && (
+          <Polygon
+            positions={predictedFootprintRing}
+            pathOptions={{
+              color: "#059669",
+              weight: 2,
+              opacity: 0.95,
+              fillColor: "#10b981",
+              fillOpacity: 0.2,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          >
+            <Tooltip sticky direction="top">
+              <strong>Predicted footprint</strong>
+              <br />
+              Simulated particle envelope from the estimated release —
+              <br />
+              not an observed slick.
+            </Tooltip>
+          </Polygon>
+        )}
+
+        {/* ESTIMATED RELEASE POINT (RED) */}
+        {releasePoint && (
+          <CircleMarker
+            center={releasePoint.position}
+            radius={6}
+            pathOptions={{
+              color: "#dc2626",
+              weight: 3,
+              fillColor: "#ffffff",
+              fillOpacity: 1,
+            }}
+          >
+            {/* Pinned only while the release point is the newest finding.
+                Once the forward simulation runs, the plume needs that space,
+                so the label drops back to hover. */}
+            <Tooltip
+              key={forwardResult ? "release-hover" : "release-pinned"}
+              direction="right"
+              offset={[10, 0]}
+              permanent={!forwardResult}
+            >
+              <strong>Estimated release</strong>
+              {releasePoint.time && (
+                <>
+                  <br />
+                  {new Date(releasePoint.time).toISOString().replace("T", " ").substring(0, 16)} UTC
+                </>
+              )}
+            </Tooltip>
+          </CircleMarker>
         )}
 
         {/* HINDCAST BACKEND CANDIDATE REGIONS */}
@@ -2882,6 +3017,7 @@ function App() {
               <OperationCard
                 vessel={selectedVessel || topVessel}
                 photoSrc="/vessels/mt-cyprus-sun.png"
+                pipelineStage={pipelineStage}
               />
             </div>
 
@@ -2926,7 +3062,7 @@ function App() {
             {isBacktracking && (
               <div className="run-card" role="status">
                 <div className="run-card-head">
-                  <strong>Hindcast</strong>
+                  <strong>{["Hindcast", "Attribution", "Forward simulation", "Replay"][pipelineStage] || "Analysis"}</strong>
                   <span className="run-badge">Running</span>
                 </div>
                 <p>{backtrackStatusText || "Connecting…"}</p>

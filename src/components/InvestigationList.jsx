@@ -22,6 +22,13 @@ function formatCoord(lat, lon) {
   return `${Math.abs(lat).toFixed(3)}°${ns}  ${Math.abs(lon).toFixed(3)}°${ew}`;
 }
 
+const WORKFLOW_STEPS = [
+  { id: "detect", num: "01", label: "Detection", hint: "SAR oil slick" },
+  { id: "hindcast", num: "02", label: "Hindcast", hint: "Backtrack source" },
+  { id: "attribution", num: "03", label: "Attribution", hint: "Rank vessels" },
+  { id: "forward", num: "04", label: "Forward", hint: "Counterfactual" },
+];
+
 export default function InvestigationList({
   incident,
   vessels = [],
@@ -31,9 +38,14 @@ export default function InvestigationList({
   onOpenIncident,
   onOpenDetect,
   onRunHindcast,
+  onResetInvestigation,
   isBacktracking = false,
   actionLabel = "Run hindcast",
   pipelineStage = 0,
+  hasDetection = false,
+  counterfactualResult,
+  topVessel,
+  onSelectTopVessel,
   backendOnline,
   backendHost,
   query: queryProp,
@@ -88,6 +100,89 @@ export default function InvestigationList({
         </span>
       </header>
 
+      {/* Investigation workflow — the operator can always see which stage the
+          case has reached and what the next action produces. */}
+      <ol className="inv-workflow" aria-label="Investigation workflow">
+        {WORKFLOW_STEPS.map((step, index) => {
+          // Step 01 is complete once a detection is loaded; steps 02-04 map
+          // onto pipelineStage 1-3.
+          const done = index === 0 ? hasDetection : pipelineStage >= index;
+          const isActive =
+            index === 0 ? !hasDetection : hasDetection && pipelineStage === index - 1;
+          return (
+            <li
+              key={step.id}
+              className={`inv-step ${done ? "is-done" : ""} ${isActive && !done ? "is-active" : ""}`}
+            >
+              <span className="inv-step-num" aria-hidden="true">
+                {done ? "✓" : step.num}
+              </span>
+              <span className="inv-step-text">
+                <strong>{step.label}</strong>
+                <small>{step.hint}</small>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* Verdict — the conclusion of the whole investigation, surfaced here
+          instead of being buried inside the vessel dossier's scroll area. */}
+      {counterfactualResult && topVessel && (
+        <div className="inv-verdict">
+          <div className="inv-verdict-head">
+            <span className="inv-verdict-kicker">Result · counterfactual</span>
+            <span className={`inv-verdict-strength ${/strong/i.test(counterfactualResult.evidence_strength || "") ? "is-strong" : ""}`}>
+              {counterfactualResult.evidence_strength
+                ? `${counterfactualResult.evidence_strength} evidence`
+                : "Scored"}
+            </span>
+          </div>
+          <button type="button" className="inv-verdict-vessel" onClick={() => onSelectTopVessel?.(topVessel)}>
+            <strong>{topVessel.name || topVessel.mmsi}</strong>
+            <span>
+              MMSI {topVessel.mmsi}
+              {confidencePct(topVessel.attributionConfidence) != null
+                ? ` · ${confidencePct(topVessel.attributionConfidence)}% attribution`
+                : ""}
+            </span>
+          </button>
+          <div className="inv-verdict-metrics">
+            <div>
+              <small
+                title="Share of the simulated oil that lands inside the observed slick. Unlike Jaccard overlap this is not penalised by the observed slick being larger than a short discharge."
+              >
+                Lands in slick
+              </small>
+              <strong>
+                {counterfactualResult.predicted_containment != null
+                  ? `${Math.round(counterfactualResult.predicted_containment * 100)}%`
+                  : counterfactualResult.spatial_agreement != null
+                    ? `${Math.round(counterfactualResult.spatial_agreement * 100)}%`
+                    : "—"}
+              </strong>
+            </div>
+            <div>
+              <small>Centroid offset</small>
+              <strong>
+                {counterfactualResult.centroid_distance_km != null
+                  ? `${Number(counterfactualResult.centroid_distance_km).toFixed(2)} km`
+                  : "—"}
+              </strong>
+            </div>
+            <div>
+              <small>Reaches slick</small>
+              <strong className={counterfactualResult.trajectory_reaches_slick ? "is-yes" : "is-no"}>
+                {counterfactualResult.trajectory_reaches_slick ? "Yes" : "No"}
+              </strong>
+            </div>
+          </div>
+          <p className="inv-verdict-note">
+            Physical-consistency evidence from the forward simulation — not proof of responsibility.
+          </p>
+        </div>
+      )}
+
       <div className="inv-search">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />
@@ -103,14 +198,25 @@ export default function InvestigationList({
       </div>
 
 
-
       <div className="inv-actions">
         <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>
           {isBacktracking ? "Running…" : actionLabel}
         </button>
-        <button type="button" className="inv-action" onClick={onOpenDetect}>
-          SAR detect
-        </button>
+        {pipelineStage > 0 && onResetInvestigation ? (
+          <button
+            type="button"
+            className="inv-action"
+            onClick={onResetInvestigation}
+            disabled={isBacktracking}
+            title="Clear all analysis results and start again from the detection"
+          >
+            Reset analysis
+          </button>
+        ) : (
+          <button type="button" className="inv-action" onClick={onOpenDetect}>
+            SAR detect
+          </button>
+        )}
       </div>
 
       {ranked[0] && (

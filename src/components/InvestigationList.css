@@ -216,6 +216,204 @@
   font-size: 11px;
 }
 
+/* ── Investigation workflow stepper ─────────────────────────────── */
+.inv-workflow {
+  list-style: none;
+  margin: 0;
+  padding: 4px 18px 14px;
+  display: grid;
+  gap: 2px;
+}
+
+.inv-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.inv-step-num {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #eef2f7;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+}
+
+.inv-step-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.inv-step-text strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.inv-step-text small {
+  font-size: 10px;
+  color: #b6c0cc;
+}
+
+.inv-step.is-active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.inv-step.is-active .inv-step-num {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.inv-step.is-active .inv-step-text strong {
+  color: #1e3a8a;
+}
+
+.inv-step.is-active .inv-step-text small {
+  color: #3b82f6;
+}
+
+.inv-step.is-done .inv-step-num {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.inv-step.is-done .inv-step-text strong {
+  color: #334155;
+}
+
+.inv-step.is-done .inv-step-text small {
+  color: #94a3b8;
+}
+
+/* ── Verdict card ────────────────────────────────────────────────── */
+.inv-verdict {
+  margin: 0 18px 14px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.08);
+}
+
+.inv-verdict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.inv-verdict-kicker {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.inv-verdict-strength {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.inv-verdict-strength.is-strong {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.inv-verdict-vessel {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0 0 9px;
+  cursor: pointer;
+}
+
+.inv-verdict-vessel strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.inv-verdict-vessel span {
+  display: block;
+  font-size: 10.5px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.inv-verdict-vessel:hover strong {
+  text-decoration: underline;
+}
+
+.inv-verdict-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.inv-verdict-metrics > div {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 7px;
+}
+
+.inv-verdict-metrics small {
+  display: block;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.inv-verdict-metrics strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.inv-verdict-metrics strong.is-yes {
+  color: #15803d;
+}
+
+.inv-verdict-metrics strong.is-no {
+  color: #dc2626;
+}
+
+.inv-verdict-note {
+  margin: 8px 0 0;
+  font-size: 9.5px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
 .inv-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
