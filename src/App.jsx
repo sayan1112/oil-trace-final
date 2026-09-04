@@ -910,19 +910,17 @@ function LegendPanel({ onClose }) {
 
       <div className="legend-content">
         <section className="legend-group">
-          <div className="legend-group-title">OIL / LAGRANGIAN DRIFT</div>
-          <div className="legend-items">
-            <div className="legend-item"><span className="legend-particle legend-particle-initial" /><span>Dispersed / leading-edge oil</span></div>
-            <div className="legend-item"><span className="legend-particle legend-particle-active" /><span>Active drifting oil</span></div>
-            <div className="legend-item"><span className="legend-particle legend-particle-stranded" /><span>High-concentration oil core</span></div>
-            <div className="legend-item"><span className="legend-drift-trail" /><span>Particle drift history</span></div>
-            <div className="legend-item"><span className="legend-oil-centerline" /><span>Oil transport flow lines</span></div>
-            <div className="legend-item"><span className="legend-backtrack-path" /><span>Backtracked transport path</span></div>
-            <div className="legend-item"><span className="legend-spill-boundary" /><span>Oil Spill Region (Red Polygon)</span></div>
-            <div className="legend-item"><span className="legend-spill-centroid" /><span>Spill Centroid Pin</span></div>
-            <div className="legend-item"><span className="legend-source-region" /><span>Estimated Source Region (Blue Circle)</span></div>
-            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#0284c7" }} /><span>Simulated ocean current</span></div>
-            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#f59e0b" }} /><span>Simulated wind field</span></div>
+          <div className="legend-group-title">WHAT THE MAP IS SHOWING</div>
+          <div className="legend-items legend-items-lg">
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(239,68,68,0.32)", border: "2px solid #ef4444" }} /><span><strong>Observed slick</strong> — detected by SAR</span></div>
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(59,130,246,0.10)", border: "2px dashed #3b82f6" }} /><span><strong>Probable source region</strong> — where the oil came from (hindcast)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#ffffff", border: "3px solid #dc2626" }} /><span><strong>Estimated release</strong> — suspected leak point &amp; time</span></div>
+            <div className="legend-item"><span className="legend-swatch" style={{ background: "rgba(16,185,129,0.2)", border: "2px solid #059669" }} /><span><strong>Predicted footprint</strong> — where the simulated oil ends up</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#0db2c8" }} /><span><strong>Backward drift</strong> — slick traced back to source (before release)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#22c55e" }} /><span><strong>Forward drift</strong> — oil released and drifting to the slick (after release)</span></div>
+            <div className="legend-item"><span className="legend-dot" style={{ background: "#64748b" }} /><span>Observed slick particle field</span></div>
+            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#0284c7" }} /><span>Ocean current field</span></div>
+            <div className="legend-item"><span className="legend-line" style={{ backgroundColor: "#f59e0b" }} /><span>Wind field</span></div>
           </div>
         </section>
 
@@ -947,9 +945,9 @@ function LegendPanel({ onClose }) {
         </section>
 
         <div className="legend-note">
-          <strong>SIMULATED LAGRANGIAN PARTICLE DRIFT</strong>
-          <p>Particles are advected by the simulated ocean current and wind fields. Green marks the dispersed leading edge, blue marks active drift, and red marks the densest oil core.</p>
-          <p>The dark dashed flow lines are generated from the same current + wind field and start inside the dense oil core, so they remain attached to the visible plume.</p>
+          <strong>EVIDENCE, NOT ACCUSATION</strong>
+          <p>Drift clouds are OpenDrift/OpenOil Lagrangian particles advected by the backend&apos;s ocean-current and wind forcing. The teal cloud plays before the estimated release, tracing the slick backwards; the green cloud plays after it, carrying the simulated leak forward to the observed slick.</p>
+          <p>Scores are spatial, temporal and physical-consistency evidence — never proof of vessel responsibility.</p>
         </div>
       </div>
     </aside>
