@@ -1074,8 +1074,25 @@ export function SuspectPanel({
           </div>
         </section>
 
-        {/* COUNTERFACTUAL PHYSICAL VALIDATION */}
+        {/* COUNTERFACTUAL PHYSICAL VALIDATION — this panel owns the full
+            reasoning for the SELECTED candidate; the case queue carries only
+            the compact cross-candidate comparison. */}
         <section className="panel-section" style={{ borderTop: "1px solid rgba(148, 163, 184, 0.15)", paddingTop: "14px", marginBottom: "16px" }}>
+          <p style={{ margin: "0 0 10px", fontSize: "11.5px", lineHeight: 1.5, color: "#475569" }}>
+            If oil had been released from{" "}
+            <strong style={{ color: "#0f172a" }}>{name || selectedVessel.mmsi}</strong> at its
+            estimated release state
+            {releaseTime
+              ? ` (${new Date(releaseTime).toISOString().replace("T", " ").substring(0, 16)} UTC`
+              : ""}
+            {releaseLocation
+              ? `, ${Number(releaseLocation.lat).toFixed(4)}°N ${Number(releaseLocation.lon).toFixed(4)}°E)`
+              : releaseTime
+                ? ")"
+                : ""}
+            , the backend drift model predicts the following against the
+            observed SAR slick.
+          </p>
           <div className="section-heading-row">
             <h3 className="section-title">Counterfactual Plausibility</h3>
             <span
