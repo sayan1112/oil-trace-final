@@ -34,6 +34,11 @@ export default function InvestigationList({
   pipelineStage = 0,
   hasDetection = false,
   counterfactualResult,
+  counterfactualResults = {},
+  commonTestResults = {},
+  commonReleaseIso,
+  counterfactualNotes = {},
+  cfProgress,
   topVessel,
   onSelectTopVessel,
   backendOnline,
@@ -168,6 +173,80 @@ export default function InvestigationList({
           <p className="inv-verdict-note">
             Physical-consistency evidence from the forward simulation — not proof of responsibility.
           </p>
+        </div>
+      )}
+
+      {/* COUNTERFACTUAL COMPARISON — every candidate tested under the same
+          release time and the same backend physics, so the numbers are
+          comparable. Values are the backend's; unavailable means exactly
+          that, never a fabricated score. */}
+      {(cfProgress || Object.keys(counterfactualResults).length > 0) && (
+        <div className="inv-cf-panel">
+          <p className="inv-cf-head">
+            Counterfactual forward test
+            {cfProgress && (
+              <span className="inv-cf-progress">
+                {cfProgress.done} / {cfProgress.total} tested
+              </span>
+            )}
+          </p>
+          {ranked.map((v) => {
+            const key = String(v.mmsi);
+            const cf = counterfactualResults[key];
+            const common = commonTestResults[key];
+            const note = counterfactualNotes[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`inv-cf-row ${String(selectedVesselId) === key ? "is-on" : ""}`}
+                onClick={() => onSelectVessel?.(v)}
+              >
+                <span className="inv-cf-name">{v.name || key}</span>
+                {cf || common ? (
+                  <>
+                    {cf && (
+                      <span className="inv-cf-metrics">
+                        <em>attribution release</em>
+                        <span title="Share of the modelled oil landing inside the observed slick">
+                          {cf.predicted_containment != null
+                            ? `${Math.round(cf.predicted_containment * 100)}% in slick`
+                            : `${Math.round((cf.spatial_agreement || 0) * 100)}% overlap`}
+                        </span>
+                        <span className={cf.trajectory_reaches_slick ? "is-yes" : "is-no"}>
+                          {cf.trajectory_reaches_slick ? "reaches" : "misses"}
+                        </span>
+                        {cf.centroid_distance_km != null && (
+                          <span>{Number(cf.centroid_distance_km).toFixed(2)} km</span>
+                        )}
+                      </span>
+                    )}
+                    {common && (
+                      <span className="inv-cf-metrics is-secondary">
+                        <em>
+                          common{commonReleaseIso ? ` ${commonReleaseIso.substring(11, 16)}Z` : ""}
+                        </em>
+                        <span>
+                          {common.predicted_containment != null
+                            ? `${Math.round(common.predicted_containment * 100)}% in slick`
+                            : `${Math.round((common.spatial_agreement || 0) * 100)}% overlap`}
+                        </span>
+                        <span className={common.trajectory_reaches_slick ? "is-yes" : "is-no"}>
+                          {common.trajectory_reaches_slick ? "reaches" : "misses"}
+                        </span>
+                        {common.centroid_distance_km != null && (
+                          <span>{Number(common.centroid_distance_km).toFixed(2)} km</span>
+                        )}
+                      </span>
+                    )}
+                    {note && <span className="inv-cf-unavailable">{note}</span>}
+                  </>
+                ) : (
+                  <span className="inv-cf-unavailable">{note || "Not tested"}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

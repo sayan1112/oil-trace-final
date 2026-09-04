@@ -1,7 +1,7 @@
 const NEXT_STEP_COPY = [
   "No ranked vessel yet. Run hindcast to trace the slick back to its probable source region.",
   "Probable source region estimated. Run attribution to scan AIS traffic inside it and rank candidate vessels.",
-  "Candidates ranked. Run the forward simulation to test the top candidate's estimated release against the observed slick.",
+  "Candidates ranked. Run counterfactual forward tests for the eligible vessels and compare their predicted drift with the observed slick.",
   "No ranked vessel selected.",
 ];
 

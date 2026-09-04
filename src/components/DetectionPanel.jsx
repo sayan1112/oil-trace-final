@@ -144,6 +144,7 @@ function SlickCard({ feature, activeSeedId, onUseSeed }) {
 /* ── Main panel ──────────────────────────────────────────── */
 export function DetectionPanel({
   onDetectionResult,
+  getRunGeneration,
   onClose,
   onSeedOverride,
   onClearSeed,
@@ -161,6 +162,7 @@ export function DetectionPanel({
 
   /* ── Demo fetch ─────────────────────────────────────── */
   const handleLoadDemo = useCallback(async () => {
+    const gen = getRunGeneration?.();
     setStatus("loading-demo");
     setError(null);
     try {
@@ -168,23 +170,24 @@ export function DetectionPanel({
         const geojson = await canonicalMediterraneanDemo();
         setResult(geojson);
         setStatus("success");
-        onDetectionResult(geojson);
+        onDetectionResult(geojson, gen);
         return;
       }
       const geojson = await fetchDemoDetection();
       setResult(geojson);
       setStatus("success");
-      onDetectionResult(geojson);
+      onDetectionResult(geojson, gen);
     } catch (err) {
       setError(err.message || "Failed to load demo detection.");
       setStatus("error");
     }
-  }, [onDetectionResult]);
+  }, [onDetectionResult, getRunGeneration]);
 
   /* ── Live inference ─────────────────────────────────── */
   const handleFile = useCallback(
     async (file) => {
       if (!file) return;
+      const gen = getRunGeneration?.();
       setUploadedFileName(file.name);
       setStatus("loading-live");
       setError(null);
@@ -201,13 +204,13 @@ export function DetectionPanel({
         }
         setResult(geojson);
         setStatus("success");
-        onDetectionResult(geojson);
+        onDetectionResult(geojson, gen);
       } catch (err) {
         setError(err.message || "Detection failed. Please try again.");
         setStatus("error");
       }
     },
-    [onDetectionResult]
+    [onDetectionResult, getRunGeneration]
   );
 
   const handleInputChange = (e) => {

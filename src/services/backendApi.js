@@ -493,3 +493,29 @@ export function describeHindcastFailure(message) {
 export function describeEmptyMediterraneanAis() {
   return "GET /vessels for 33.5–36°E / 34.5–36.5°N (25–26 Aug 2024) returned no ships. The deployed AIS sample is still Norway-only, so none are drawn here.";
 }
+
+/**
+ * Real AIS position of a normalized vessel at an exact UTC instant.
+ *
+ * Interpolates between the two surrounding timestamped AIS points. Returns
+ * null when the instant falls outside the vessel's own track — callers must
+ * treat that as "no valid AIS release state" rather than inventing one.
+ * This is the single place AIS timestamps are turned into a position.
+ */
+export function aisPositionAt(vessel, tMs) {
+  const pts = (vessel?.trajectory || [])
+    .map((p) => ({ ms: Date.parse(p.time), lat: +p.latitude, lon: +p.longitude }))
+    .filter((p) => Number.isFinite(p.ms) && Number.isFinite(p.lat) && Number.isFinite(p.lon))
+    .sort((a, b) => a.ms - b.ms);
+  if (pts.length < 2 || !Number.isFinite(tMs)) return null;
+  if (tMs < pts[0].ms || tMs > pts[pts.length - 1].ms) return null;
+  let i = 1;
+  while (i < pts.length && pts[i].ms < tMs) i++;
+  const a = pts[i - 1];
+  const b = pts[i] || a;
+  const f = b.ms === a.ms ? 0 : (tMs - a.ms) / (b.ms - a.ms);
+  return {
+    lat: a.lat + (b.lat - a.lat) * f,
+    lon: a.lon + (b.lon - a.lon) * f,
+  };
+}

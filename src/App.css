@@ -4038,10 +4038,12 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 
 /* ── Permanent map key (§19-21): always-visible labels, no hover needed ── */
+/* Legend lives on the RIGHT, under the intel rail: it must never overlap
+   the centred timeline, its controls, or the right-hand panels. */
 .map-key {
   position: absolute;
-  left: 14px;
-  bottom: 118px; /* clear of the timeline bar */
+  right: 14px;
+  top: 420px;
   z-index: 1240;
   max-width: 190px;
   background: rgba(255, 255, 255, 0.92);
