@@ -203,6 +203,19 @@ export default function DriftCloudOverlay({
         }
         const tip = toXY(trail[trail.length - 1]);
         drawArrowHead(toXY(trail[trail.length - 2]), tip, solid);
+        // Anchor ring at the origin end of the travelled path. The physical
+        // displacement here is genuinely small (a few km against a slick
+        // over ten km wide), so mark both ends rather than exaggerate the
+        // motion: the ring is where the cloud began, the tip is where the
+        // clock has taken it.
+        const anchor = toXY(trail[0]);
+        ctx.strokeStyle = solid;
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(anchor.x, anchor.y, 5.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
         if (label) drawLabel(tip, label, solid, side);
       }
     };
@@ -211,7 +224,7 @@ export default function DriftCloudOverlay({
     if (st === 1 && bc) {
       drawCloud(
         bc, Number.isFinite(t) ? t : bc.t1, "backward",
-        "rgba(11, 130, 150, 0.9)", "rgba(13, 178, 200, 0.45)", backBufRef,
+        "rgba(13, 121, 140, 0.88)", "rgba(13, 148, 172, 0.65)", backBufRef,
         "HINDCAST RECONSTRUCTION · to probable source", "left"
       );
     } else if (st === 3 && fc) {
@@ -219,8 +232,8 @@ export default function DriftCloudOverlay({
       if (now >= fc.t0) {
         drawCloud(
           fc, now, "forward",
-          "rgba(22, 140, 65, 0.62)", "rgba(34, 197, 94, 0.45)", fwdBufRef,
-          "FORWARD DRIFT · release → slick", "right", 1.05
+          "rgba(21, 128, 61, 0.86)", "rgba(34, 197, 94, 0.6)", fwdBufRef,
+          "FORWARD DRIFT · release → slick", "right", 1.15
         );
         if (rel && now - fc.t0 <= RELEASE_PULSE_SIM_MS) {
           const f = (now - fc.t0) / RELEASE_PULSE_SIM_MS;

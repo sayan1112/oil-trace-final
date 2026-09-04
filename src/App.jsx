@@ -1980,14 +1980,11 @@ function App() {
               actionLabel={pipelineActionLabel}
               pipelineStage={pipelineStage}
               hasDetection={hasDetection}
-              counterfactualResult={selectedCounterfactual}
               counterfactualResults={counterfactualResults}
               commonTestResults={commonTestResults}
               commonReleaseIso={commonReleaseIso}
               counterfactualNotes={counterfactualNotes}
               cfProgress={cfProgress}
-              topVessel={selectedVessel || topVessel}
-              onSelectTopVessel={handleSelectVessel}
               backendOnline={backendOnline}
               backendHost={backendHost}
               query={queueQuery}
@@ -2515,8 +2512,9 @@ function App() {
 
             {/* COMPACT MAP LEGEND — layer semantics only. Coordinates,
                 area, confidence and evidence live in the side panels. */}
+            {hasDetection && (
             <div className="map-key" aria-label="Map legend">
-              {hasDetection && (
+              {(
                 <p className="map-key-line">
                   <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
                   Observed SAR slick
@@ -2553,6 +2551,7 @@ function App() {
                 </>
               )}
             </div>
+            )}
 
             <div className="command-ops-row">
               <OperationCard

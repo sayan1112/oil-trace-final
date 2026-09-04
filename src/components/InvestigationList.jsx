@@ -33,14 +33,11 @@ export default function InvestigationList({
   actionLabel = "Run hindcast",
   pipelineStage = 0,
   hasDetection = false,
-  counterfactualResult,
   counterfactualResults = {},
   commonTestResults = {},
   commonReleaseIso,
   counterfactualNotes = {},
   cfProgress,
-  topVessel,
-  onSelectTopVessel,
   backendOnline,
   backendHost,
   query: queryProp,
@@ -119,67 +116,9 @@ export default function InvestigationList({
         })}
       </ol>
 
-      {/* Verdict — the conclusion of the whole investigation, surfaced here
-          instead of being buried inside the vessel dossier's scroll area. */}
-      {counterfactualResult && topVessel && (
-        <div className="inv-verdict">
-          <div className="inv-verdict-head">
-            <span className="inv-verdict-kicker">Result · counterfactual</span>
-            <span className={`inv-verdict-strength ${/strong/i.test(counterfactualResult.evidence_strength || "") ? "is-strong" : ""}`}>
-              {counterfactualResult.evidence_strength
-                ? `${counterfactualResult.evidence_strength} evidence`
-                : "Scored"}
-            </span>
-          </div>
-          <button type="button" className="inv-verdict-vessel" onClick={() => onSelectTopVessel?.(topVessel)}>
-            <strong>{topVessel.name || topVessel.mmsi}</strong>
-            <span>
-              MMSI {topVessel.mmsi}
-              {confidencePct(topVessel.attributionConfidence) != null
-                ? ` · ${confidencePct(topVessel.attributionConfidence)}% attribution`
-                : ""}
-            </span>
-          </button>
-          <div className="inv-verdict-metrics">
-            <div>
-              <small
-                title="Share of the simulated oil that lands inside the observed slick. Unlike Jaccard overlap this is not penalised by the observed slick being larger than a short discharge."
-              >
-                Lands in slick
-              </small>
-              <strong>
-                {counterfactualResult.predicted_containment != null
-                  ? `${Math.round(counterfactualResult.predicted_containment * 100)}%`
-                  : counterfactualResult.spatial_agreement != null
-                    ? `${Math.round(counterfactualResult.spatial_agreement * 100)}%`
-                    : "—"}
-              </strong>
-            </div>
-            <div>
-              <small>Centroid offset</small>
-              <strong>
-                {counterfactualResult.centroid_distance_km != null
-                  ? `${Number(counterfactualResult.centroid_distance_km).toFixed(2)} km`
-                  : "—"}
-              </strong>
-            </div>
-            <div>
-              <small>Reaches slick</small>
-              <strong className={counterfactualResult.trajectory_reaches_slick ? "is-yes" : "is-no"}>
-                {counterfactualResult.trajectory_reaches_slick ? "Yes" : "No"}
-              </strong>
-            </div>
-          </div>
-          <p className="inv-verdict-note">
-            Physical-consistency evidence from the forward simulation — not proof of responsibility.
-          </p>
-        </div>
-      )}
-
-      {/* COUNTERFACTUAL COMPARISON — every candidate tested under the same
-          release time and the same backend physics, so the numbers are
-          comparable. Values are the backend's; unavailable means exactly
-          that, never a fabricated score. */}
+      {/* COUNTERFACTUAL COMPARISON — this list owns the at-a-glance
+          comparison across candidates; the selected vessel's full reasoning
+          lives in the vessel panel, not here. All values are the backend's. */}
       {(cfProgress || Object.keys(counterfactualResults).length > 0) && (
         <div className="inv-cf-panel">
           <p className="inv-cf-head">
@@ -190,63 +129,66 @@ export default function InvestigationList({
               </span>
             )}
           </p>
-          {ranked.map((v) => {
-            const key = String(v.mmsi);
-            const cf = counterfactualResults[key];
-            const common = commonTestResults[key];
-            const note = counterfactualNotes[key];
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`inv-cf-row ${String(selectedVesselId) === key ? "is-on" : ""}`}
-                onClick={() => onSelectVessel?.(v)}
-              >
-                <span className="inv-cf-name">{v.name || key}</span>
-                {cf || common ? (
-                  <>
-                    {cf && (
-                      <span className="inv-cf-metrics">
-                        <em>attribution release</em>
-                        <span title="Share of the modelled oil landing inside the observed slick">
-                          {cf.predicted_containment != null
-                            ? `${Math.round(cf.predicted_containment * 100)}% in slick`
-                            : `${Math.round((cf.spatial_agreement || 0) * 100)}% overlap`}
-                        </span>
-                        <span className={cf.trajectory_reaches_slick ? "is-yes" : "is-no"}>
-                          {cf.trajectory_reaches_slick ? "reaches" : "misses"}
-                        </span>
-                        {cf.centroid_distance_km != null && (
-                          <span>{Number(cf.centroid_distance_km).toFixed(2)} km</span>
-                        )}
+
+          <div className="inv-cf-table" role="table">
+            <div className="inv-cf-tr inv-cf-th" role="row">
+              <span>Candidate</span>
+              <span>Attr.</span>
+              <span>In slick</span>
+              <span>Offset</span>
+            </div>
+            {ranked.map((v) => {
+              const key = String(v.mmsi);
+              const cf = counterfactualResults[key];
+              const common = commonTestResults[key];
+              const note = counterfactualNotes[key];
+              const attr = confidencePct(v.attributionConfidence);
+              const pctIn = (r) =>
+                r?.predicted_containment != null
+                  ? Math.round(r.predicted_containment * 100)
+                  : r?.spatial_agreement != null
+                    ? Math.round(r.spatial_agreement * 100)
+                    : null;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="row"
+                  className={`inv-cf-tr ${String(selectedVesselId) === key ? "is-on" : ""}`}
+                  onClick={() => onSelectVessel?.(v)}
+                >
+                  <span className="inv-cf-name">{v.name || key}</span>
+                  <span>{attr != null ? `${attr}%` : "—"}</span>
+                  {cf ? (
+                    <>
+                      <span className={cf.trajectory_reaches_slick ? "is-yes" : ""}>
+                        {pctIn(cf) != null ? `${pctIn(cf)}%` : "—"}
                       </span>
-                    )}
-                    {common && (
-                      <span className="inv-cf-metrics is-secondary">
-                        <em>
-                          common{commonReleaseIso ? ` ${commonReleaseIso.substring(11, 16)}Z` : ""}
-                        </em>
-                        <span>
-                          {common.predicted_containment != null
-                            ? `${Math.round(common.predicted_containment * 100)}% in slick`
-                            : `${Math.round((common.spatial_agreement || 0) * 100)}% overlap`}
-                        </span>
-                        <span className={common.trajectory_reaches_slick ? "is-yes" : "is-no"}>
-                          {common.trajectory_reaches_slick ? "reaches" : "misses"}
-                        </span>
-                        {common.centroid_distance_km != null && (
-                          <span>{Number(common.centroid_distance_km).toFixed(2)} km</span>
-                        )}
+                      <span>
+                        {cf.centroid_distance_km != null
+                          ? `${Number(cf.centroid_distance_km).toFixed(1)} km`
+                          : "—"}
                       </span>
-                    )}
-                    {note && <span className="inv-cf-unavailable">{note}</span>}
-                  </>
-                ) : (
-                  <span className="inv-cf-unavailable">{note || "Not tested"}</span>
-                )}
-              </button>
-            );
-          })}
+                    </>
+                  ) : (
+                    <span className="inv-cf-span2">
+                      {note ? "Unavailable" : "Not tested"}
+                    </span>
+                  )}
+                  {(note || common) && (
+                    <span className="inv-cf-sub">
+                      {note ||
+                        `Common-time sensitivity test ${commonReleaseIso ? commonReleaseIso.substring(11, 16) + "Z" : ""}: ${pctIn(common)}% in slick, ${common.trajectory_reaches_slick ? "reaches" : "misses"}`}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="inv-cf-foot">
+            Candidate-specific test uses each vessel&apos;s attributed release
+            state. Supports physical consistency; does not prove responsibility.
+          </p>
         </div>
       )}
 
@@ -274,7 +216,6 @@ export default function InvestigationList({
             type="button"
             className="inv-action"
             onClick={onResetInvestigation}
-            disabled={isBacktracking}
             title="Clear all analysis results and start again from the detection"
           >
             Reset analysis
