@@ -733,7 +733,7 @@ function EvidencePanel({
               border: "1px solid rgba(34, 197, 94, 0.3)",
             }}
           >
-            {counterfactualResult?.evidence_strength || (vessel.candidateRank === 1 ? "Strong" : "Weak")} Evidence
+            {counterfactualResult?.evidence_strength ? `${counterfactualResult.evidence_strength} Evidence` : "Not yet validated"}
           </span>
         </div>
 
@@ -741,21 +741,29 @@ function EvidencePanel({
           <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
             <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Spatial Agreement</span>
             <div style={{ fontSize: "14px", fontWeight: 800, color: "#0284c7", marginTop: "3px", fontFamily: "monospace" }}>
-              {Math.round((counterfactualResult?.spatial_agreement ?? (vessel.candidateRank === 1 ? 0.91 : 0.12)) * 100)}% IoU
+              {counterfactualResult?.spatial_agreement != null
+                ? `${Math.round(counterfactualResult.spatial_agreement * 100)}% IoU`
+                : "—"}
             </div>
           </div>
 
           <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
             <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Trajectory Reaches Slick</span>
-            <div style={{ fontSize: "12px", fontWeight: 800, color: (counterfactualResult?.trajectory_reaches_slick ?? (vessel.candidateRank === 1)) ? "#16a34a" : "#dc2626", marginTop: "3px" }}>
-              {(counterfactualResult?.trajectory_reaches_slick ?? (vessel.candidateRank === 1)) ? "TRUE (Intersection)" : "FALSE (Diverged)"}
+            <div style={{ fontSize: "12px", fontWeight: 800, color: counterfactualResult == null ? "#64748b" : counterfactualResult.trajectory_reaches_slick ? "#16a34a" : "#dc2626", marginTop: "3px" }}>
+              {counterfactualResult == null
+                ? "—"
+                : counterfactualResult.trajectory_reaches_slick
+                  ? "TRUE (Intersection)"
+                  : "FALSE (Diverged)"}
             </div>
           </div>
 
           <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
             <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Centroid Offset</span>
             <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginTop: "3px", fontFamily: "monospace" }}>
-              {(counterfactualResult?.centroid_distance_km ?? (vessel.candidateRank === 1 ? 0.84 : 14.2)).toFixed(2)} km
+              {counterfactualResult?.centroid_distance_km != null
+                ? `${counterfactualResult.centroid_distance_km.toFixed(2)} km`
+                : "—"}
             </div>
           </div>
 
@@ -782,9 +790,7 @@ function EvidencePanel({
           }}
         >
           {counterfactualResult?.explanation ||
-            (vessel.candidateRank === 1
-              ? "Simulated forward particle cloud initialized at vessel crossing time drifts directly into observed SAR footprint."
-              : "Simulated trajectory fails to intersect observed slick geometry within physical limits.")}
+            "Counterfactual validation has not run yet. Run hindcast to simulate this vessel's forward drift against the observed slick."}
         </div>
       </section>
 

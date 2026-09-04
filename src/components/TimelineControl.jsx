@@ -27,6 +27,7 @@ export function TimelineControl({
   events = [],
   isPlaying = false,
   onPlayPause,
+  playDisabled = false,
   onSeekMs,
   playbackSpeed = 1,
   onSpeedChange,
@@ -128,6 +129,9 @@ export function TimelineControl({
             type="button"
             className={`control-btn play-pause-btn ${isPlaying ? "is-playing" : ""}`}
             onClick={onPlayPause}
+            disabled={playDisabled}
+            title={playDisabled ? "Run hindcast to enable replay" : undefined}
+            style={playDisabled ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
           >
             {isPlaying ? (
               <svg viewBox="0 0 24 24" aria-hidden="true">

@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import "./InvestigationList.css";
 
 function confidencePct(value) {
+  if (value == null) return null;
   const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n <= 1 ? Math.round(n * 100) : Math.round(n)));
 }
 
 function statusClass(pct) {
+  if (pct == null) return "delivered";
   if (pct >= 70) return "in-transit";
   if (pct >= 40) return "queued";
   return "delivered";
@@ -30,6 +32,8 @@ export default function InvestigationList({
   onOpenDetect,
   onRunHindcast,
   isBacktracking = false,
+  actionLabel = "Run hindcast",
+  pipelineStage = 0,
   backendOnline,
   backendHost,
   query: queryProp,
@@ -49,8 +53,8 @@ export default function InvestigationList({
     const q = query.trim().toLowerCase();
     return ranked.filter((v) => {
       const pct = confidencePct(v.attributionConfidence);
-      if (filter === "ranked" && pct < 40) return false;
-      if (filter === "high" && pct < 70) return false;
+      if (filter === "ranked" && (pct ?? 0) < 40) return false;
+      if (filter === "high" && (pct ?? 0) < 70) return false;
       if (!q) return true;
       return [v.name, v.id, v.mmsi, v.type, v.flag]
         .filter(Boolean)
@@ -102,7 +106,7 @@ export default function InvestigationList({
 
       <div className="inv-actions">
         <button type="button" className="inv-action primary" onClick={onRunHindcast} disabled={isBacktracking}>
-          {isBacktracking ? "Running pipeline…" : "Run hindcast"}
+          {isBacktracking ? "Running…" : actionLabel}
         </button>
         <button type="button" className="inv-action" onClick={onOpenDetect}>
           SAR detect
@@ -112,11 +116,13 @@ export default function InvestigationList({
       {ranked[0] && (
         <div className="inv-top-hit">
           <div>
-            <p>Top candidate</p>
+            <p>{confidencePct(ranked[0].attributionConfidence) == null ? "Nearby vessel" : "Top candidate"}</p>
             <strong>{ranked[0].name || ranked[0].mmsi}</strong>
           </div>
           <button type="button" className="inv-action" onClick={() => onSelectVessel?.(ranked[0])}>
-            {confidencePct(ranked[0].attributionConfidence)}% inspect
+            {confidencePct(ranked[0].attributionConfidence) == null
+              ? "inspect"
+              : `${confidencePct(ranked[0].attributionConfidence)}% inspect`}
           </button>
         </div>
       )}
@@ -141,7 +147,9 @@ export default function InvestigationList({
               <div className="inv-case-top">
                 <strong>#{vessel.mmsi || vessel.id}</strong>
                 <span className={`inv-badge ${statusClass(pct)}`}>
-                  {pct >= 70 ? "High" : pct >= 40 ? "Medium" : "Low"} · {pct}%
+                  {pct == null
+                    ? "Not scored"
+                    : `${pct >= 70 ? "High" : pct >= 40 ? "Medium" : "Low"} · ${pct}%`}
                 </span>
               </div>
               <div className="inv-route">
@@ -166,8 +174,9 @@ export default function InvestigationList({
         })}
         {!visible.length && (
           <p className="inv-empty">
-            No Mediterranean AIS tracks on the live API yet. Run hindcast after the backend Med deploy
-            (MT Cyprus Sun / 211000001). Norway sample ships are not drawn on this scene.
+            {pipelineStage >= 1
+              ? "Probable source region estimated. Run attribution to scan AIS traffic inside it and rank candidate vessels."
+              : "No candidates yet. Run hindcast to trace the slick back to its probable source region."}
           </p>
         )}
       </div>

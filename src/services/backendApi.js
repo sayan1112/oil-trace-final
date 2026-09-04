@@ -224,57 +224,61 @@ export function normalizeVessels(vessels, attr) {
         }))
         .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
       const id = String(v.mmsi);
-      const isCulprit = id === "211000001" || v.is_culprit === true || v.isCulprit === true;
-      const overall = +(a?.overall_score ?? c?.overall_score ?? (isCulprit ? 98.12 : id === "211000002" ? 62.60 : 55.07));
-      const rank = +(a?.rank ?? c?.rank ?? (isCulprit ? 1 : id === "211000002" ? 2 : 3));
+      const a = am.get(id);
+      const c = cm.get(id);
+      // Scores exist only when the backend attribution ran; never fabricate them.
+      const hasAttr = Boolean(a || c);
+      const isCulprit = v.is_culprit === true || v.isCulprit === true;
+      const overall = hasAttr ? +(a?.overall_score ?? c?.overall_score ?? 0) : null;
+      const rank = hasAttr ? +(a?.rank ?? c?.rank ?? 99) : null;
       const b = a?.evidence_breakdown || {};
-      const rel = +(c?.ais_reliability_score ?? (b.source_probability?.score ? b.source_probability.score / 100 : (isCulprit ? 0.875 : id === "211000002" ? 0.8333 : 0.0)));
-      const sc = (x) => +(x ?? 0);
-      const ev = {
-        spatial: {
-          score: sc(c?.spatial_score) || (b.spatial?.score ? b.spatial.score / 100 : (isCulprit ? 1.0 : id === "211000002" ? 0.5744 : 1.0)),
-          label: isCulprit ? "Reconstructed route intersects source polygon (100.0%)." : (b.spatial?.explanation || (id === "211000002" ? "Spatial proximity score: 57.44% (min dist: 5.54 km)." : "Reconstructed route intersects source polygon (100.0%).")),
-        },
-        temporal: {
-          score: sc(c?.temporal_score) || (b.temporal?.score ? b.temporal.score / 100 : (isCulprit ? 1.0 : id === "211000002" ? 1.0 : 0.0022)),
-          label: isCulprit ? "AIS timestamp observed inside release window [06:00-12:00 UTC]." : (b.temporal?.explanation || (id === "211000002" ? "AIS timestamp observed inside release window." : "No AIS timestamp inside release window. Gaussian decay score: 0.22%")),
-        },
-        trajectory: {
-          score: sc(c?.trajectory_score) || (b.trajectory?.score ? b.trajectory.score / 100 : (isCulprit ? 1.0 : id === "211000002" ? 0.0 : 1.0)),
-          label: isCulprit ? "Reconstructed trajectory segment intersects the source polygon (100.0%)." : (b.trajectory?.explanation || (id === "211000002" ? "No trajectory segment intersects the source polygon." : "Trajectory segment intersects source polygon.")),
-        },
-        drift: { score: isCulprit ? 0.91 : 0.15, label: isCulprit ? "OpenOil Lagrangian plume matches observed SAR slick (91% IoU)." : "Counterfactual trajectory diverges." },
-        aisReliability: {
-          score: rel,
-          status: rel >= 0.7 ? "Good" : rel >= 0.4 ? "Warning" : "Critical",
-          label: `AIS data reliability: ${(rel * 100).toFixed(1)}%. Hourly-bin coverage with gap penalty.`,
-        },
-      };
+      const rel = hasAttr
+        ? +(c?.ais_reliability_score ?? (b.source_probability?.score != null ? b.source_probability.score / 100 : 0))
+        : null;
+      const sc = (x, fallback) => (x != null ? +x : fallback != null ? +fallback : 0);
+      const ev = hasAttr
+        ? {
+            spatial: {
+              score: sc(c?.spatial_score, b.spatial?.score != null ? b.spatial.score / 100 : 0),
+              label: b.spatial?.explanation || "Spatial proximity computed by backend attribution.",
+            },
+            temporal: {
+              score: sc(c?.temporal_score, b.temporal?.score != null ? b.temporal.score / 100 : 0),
+              label: b.temporal?.explanation || "Temporal window computed by backend attribution.",
+            },
+            trajectory: {
+              score: sc(c?.trajectory_score, b.trajectory?.score != null ? b.trajectory.score / 100 : 0),
+              label: b.trajectory?.explanation || "Trajectory compatibility computed by backend attribution.",
+            },
+            drift: { score: 0, label: "Counterfactual not run for this vessel." },
+            aisReliability: {
+              score: rel ?? 0,
+              status: (rel ?? 0) >= 0.7 ? "Good" : (rel ?? 0) >= 0.4 ? "Warning" : "Critical",
+              label: `AIS data reliability: ${((rel ?? 0) * 100).toFixed(1)}%. Hourly-bin coverage with gap penalty.`,
+            },
+          }
+        : null;
       return {
         id: String(v.mmsi),
         mmsi: String(v.mmsi),
-        name: v.name || (id === "211000001" ? "MT CYPRUS SUN" : id === "211000002" ? "MV LEVANT STAR" : id === "211000003" ? "FV KARPASIA" : `MMSI ${v.mmsi}`),
-        type: v.vessel_type || (id === "211000001" ? "Tanker" : id === "211000002" ? "Cargo" : "Fishing"),
+        name: v.name || `MMSI ${v.mmsi}`,
+        type: v.vessel_type || "Vessel",
         flag: "AIS",
         position: pts.length
           ? { latitude: pts.at(-1).latitude, longitude: pts.at(-1).longitude }
-          : { latitude: 35.6353, longitude: 34.8704 },
-        speedKnots: pts.at(-1)?.speedKnots ?? 12.5,
+          : null,
+        speedKnots: pts.at(-1)?.speedKnots ?? null,
         heading: pts.at(-1)?.heading ?? 0,
         candidateRank: rank,
-        attributionConfidence: Math.max(0, Math.min(1, overall / 100)),
+        attributionConfidence: overall == null ? null : Math.max(0, Math.min(1, overall / 100)),
         is_culprit: isCulprit,
         isCulprit,
         overallScore: overall,
-        minDistanceKm: c?.min_distance_km ?? (isCulprit ? 0.0 : id === "211000002" ? 5.54 : 0.0),
-        releaseLocation: c?.release_location ?? (isCulprit ? { lat: 35.5850, lon: 34.8700 } : id === "211000002" ? { lat: 35.7500, lon: 34.8833 } : null),
-        releaseTime: c?.release_time_utc ?? (isCulprit ? "2024-08-26T08:45:00Z" : id === "211000002" ? "2024-08-26T08:20:00Z" : null),
-        observationTime: c?.observation_time_utc ?? "2024-08-26T12:00:00Z",
-        explanation: c?.explanation ?? (isCulprit
-          ? "Selected AIS position at 2024-08-26T08:45:00+00:00 because it was inside the release window and closest to the source polygon (0.00 km)."
-          : id === "211000002"
-          ? "Selected AIS position at 2024-08-26T08:20:00+00:00 because it was inside the release window and closest to the source polygon (5.54 km)."
-          : "No AIS timestamp inside release window. Gaussian decay score: 0.0022 (τ=2.0 h)."),
+        minDistanceKm: c?.min_distance_km ?? null,
+        releaseLocation: c?.release_location ?? null,
+        releaseTime: c?.release_time_utc ?? null,
+        observationTime: c?.observation_time_utc ?? null,
+        explanation: c?.explanation ?? null,
         aisGaps: v.ais_gaps || [],
         forwardRequest: c?.forward_request || null,
         evidence: ev,
@@ -284,8 +288,8 @@ export function normalizeVessels(vessels, attr) {
     })
     .sort(
       (x, y) =>
-        x.candidateRank - y.candidateRank ||
-        y.attributionConfidence - x.attributionConfidence
+        (x.candidateRank ?? 99) - (y.candidateRank ?? 99) ||
+        (y.attributionConfidence ?? 0) - (x.attributionConfidence ?? 0)
     );
 }
 
@@ -391,55 +395,31 @@ export function vesselsFromReplay(replay) {
       const lat = Number(coords?.[1]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
       const id = String(vessel.mmsi);
-      const isCulprit = id === "211000001" || vessel.is_culprit === true || vessel.isCulprit === true;
+      const isCulprit = vessel.is_culprit === true || vessel.isCulprit === true;
       if (!byMmsi.has(id)) {
+        // Replay frames carry AIS state only — no attribution has run, so
+        // ranks, confidences, and evidence stay null until /attribute returns.
         byMmsi.set(id, {
           id,
           mmsi: id,
-          name: vessel.name || (id === "211000001" ? "MT CYPRUS SUN" : id === "211000002" ? "MV LEVANT STAR" : id === "211000003" ? "FV KARPASIA" : `MMSI ${id}`),
-          type: vessel.vessel_type || (id === "211000001" ? "Tanker" : id === "211000002" ? "Cargo" : "Fishing"),
+          name: vessel.name || `MMSI ${id}`,
+          type: vessel.vessel_type || "Vessel",
           flag: "AIS",
           position: { latitude: lat, longitude: lon },
-          speedKnots: 12.5,
+          speedKnots: null,
           heading: 0,
-          candidateRank: isCulprit ? 1 : id === "211000002" ? 2 : 3,
-          attributionConfidence: isCulprit ? 0.9812 : id === "211000002" ? 0.6260 : 0.5507,
-          overallScore: isCulprit ? 98.12 : id === "211000002" ? 62.60 : 55.07,
-          minDistanceKm: isCulprit ? 0.0 : id === "211000002" ? 5.54 : 0.0,
-          releaseLocation: isCulprit ? { lat: 35.5850, lon: 34.8700 } : id === "211000002" ? { lat: 35.7500, lon: 34.8833 } : null,
-          releaseTime: isCulprit ? "2024-08-26T08:45:00Z" : id === "211000002" ? "2024-08-26T08:20:00Z" : null,
-          observationTime: "2024-08-26T12:00:00Z",
-          explanation: isCulprit
-            ? "Selected AIS position at 2024-08-26T08:45:00+00:00 because it was inside the release window and closest to the source polygon (0.00 km)."
-            : id === "211000002"
-            ? "Selected AIS position at 2024-08-26T08:20:00+00:00 because it was inside the release window and closest to the source polygon (5.54 km)."
-            : "No AIS timestamp inside release window. Gaussian decay score: 0.0022 (τ=2.0 h).",
+          candidateRank: null,
+          attributionConfidence: null,
+          overallScore: null,
+          minDistanceKm: null,
+          releaseLocation: null,
+          releaseTime: null,
+          observationTime: null,
+          explanation: null,
           aisGaps: [],
           is_culprit: isCulprit,
           isCulprit,
-          evidence: {
-            spatial: {
-              score: isCulprit ? 1.0 : id === "211000002" ? 0.5744 : 1.0,
-              label: isCulprit ? "Reconstructed route intersects source polygon (100.0%)." : (id === "211000002" ? "Spatial proximity score: 57.44% (min dist: 5.54 km)." : "Reconstructed route intersects source polygon (100.0%)."),
-            },
-            temporal: {
-              score: isCulprit ? 1.0 : id === "211000002" ? 1.0 : 0.0022,
-              label: isCulprit ? "AIS timestamp observed inside release window [06:00-12:00 UTC]." : (id === "211000002" ? "AIS timestamp observed inside release window." : "No AIS timestamp inside release window. Gaussian decay score: 0.22%"),
-            },
-            trajectory: {
-              score: isCulprit ? 1.0 : id === "211000002" ? 0.0 : 1.0,
-              label: isCulprit ? "Reconstructed trajectory segment intersects the source polygon (100.0%)." : (id === "211000002" ? "No trajectory segment intersects the source polygon." : "Trajectory segment intersects source polygon."),
-            },
-            drift: {
-              score: isCulprit ? 0.91 : 0.15,
-              label: isCulprit ? "OpenOil Lagrangian plume matches observed SAR slick (91% IoU)." : "Counterfactual trajectory diverges.",
-            },
-            aisReliability: {
-              score: isCulprit ? 0.875 : id === "211000002" ? 0.8333 : 0.0,
-              status: isCulprit || id === "211000002" ? "Good" : "Critical",
-              label: `AIS data reliability: ${isCulprit ? "87.5%" : id === "211000002" ? "83.3%" : "0.0%"}. Hourly-bin coverage with gap penalty.`,
-            },
-          },
+          evidence: null,
           trajectory: [],
         });
       }
