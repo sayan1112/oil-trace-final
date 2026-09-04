@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import { buildCloud, cloudPositions, centroidAt, envelopeRadiusKm } from "../Simulation/particles";
+import { buildCloud, cloudPositions, buildPolygonCloud, polygonCloudPositions, centroidAt, envelopeRadiusKm } from "../Simulation/particles";
 
 // Deterministic visualization of the BACKEND drift results. The overlay owns
 // no clock and no physics: particle positions are pure functions of the
@@ -43,19 +43,19 @@ export default function DriftCloudOverlay({
       ([lon, lat]) => [lat, lon]
     );
     const region = hindcast.source_region?.candidate_regions?.[0];
-    // Each trajectory point keeps ITS backend timestamp. buildCloud sorts
-    // samples by time, so position(06:00)=source end, position(12:00)=slick
-    // end — exactly the backend's semantics. The ×1.7 on the slick envelope
-    // compensates the gaussian radial profile so the visible body covers
-    // the footprint rather than just its core.
-    return buildCloud({
+    // Structure-preserving cloud: its particles are sampled inside the
+    // OBSERVED detection polygon, so the first hindcast frame (12:00 UTC)
+    // coincides exactly with the observed footprint. Each trajectory point
+    // keeps ITS backend timestamp — position(06:00)=source end,
+    // position(12:00)=slick end — and the whole body translates coherently,
+    // easing toward the source-region envelope at the earliest time.
+    return buildPolygonCloud({
       points,
       timesUtc: hindcast.trajectory_timestamps_utc,
-      count: 650,
-      startSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
-      endSpreadKm: envelopeRadiusKm(slickGeometry, 1.8) * 1.7,
+      geometry: slickGeometry,
+      count: 620,
+      endSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
       seed: "oiltrace-back",
-      preformed: true,
     });
   }, [hindcast, slickGeometry]);
 
@@ -161,7 +161,10 @@ export default function DriftCloudOverlay({
     };
 
     const drawCloud = (cloud, now, direction, fill, trailStroke, bufRef, label, side) => {
-      const pos = cloudPositions(cloud, now, bufRef.current);
+      const pos =
+        cloud.kind === "polygon"
+          ? polygonCloudPositions(cloud, now, bufRef.current)
+          : cloudPositions(cloud, now, bufRef.current);
       bufRef.current = pos;
       const trail = travelledPath(cloud, now, direction);
       if (trail.length >= 2) {

@@ -2058,12 +2058,13 @@ function App() {
             }}
             eventHandlers={{ click: handleSpillClick }}
           >
-            <Tooltip sticky direction="top">
-              <strong>Oil Spill Region</strong>
-              <br />
-              Area: {incident.areaKm2 || "266.9"} km²
-              <br />
-              Detection: {getConfidencePercent(incident.detectionConfidence)}% (Sentinel-1 SAR)
+            <Tooltip
+              permanent
+              direction="right"
+              offset={[8, 0]}
+              className="map-layer-label map-layer-label-slick"
+            >
+              OBSERVED SAR SLICK
             </Tooltip>
           </Polygon>
         )}
@@ -2170,16 +2171,13 @@ function App() {
                 fillOpacity: Math.min(0.22, Math.max(0.08, region.probability * 0.16)),
               }}
             >
-              <Tooltip sticky direction="top">
-                <strong>Probable Source Region: {region.id}</strong>
-                <br />
-                KDE Density Mass: {(region.probability * 100).toFixed(1)}% ({region.probability.toFixed(2)})
-                {region.startTime && (
-                  <>
-                    <br />
-                    Window: {new Date(region.startTime).toISOString().substring(11, 16)}Z → {new Date(region.endTime).toISOString().substring(11, 16)}Z
-                  </>
-                )}
+              <Tooltip
+                permanent
+                direction="left"
+                offset={[-8, 0]}
+                className="map-layer-label map-layer-label-source"
+              >
+                PROBABLE SOURCE · KDE mass {(region.probability * 100).toFixed(0)}%
               </Tooltip>
             </Polygon>
             {region.centroid && (
@@ -2235,7 +2233,13 @@ function App() {
         />
 
         {/* VESSELS + TRAJECTORIES */}
-        {scoredVessels.map((vessel) => {
+        {scoredVessels
+          .filter((vessel) =>
+            pipelineStage === 3 && forwardResult?.vessel_mmsi
+              ? String(vessel.mmsi) === String(forwardResult.vessel_mmsi)
+              : true
+          )
+          .map((vessel) => {
           const isSelected = selectedVesselId === vessel.id;
           const hasSelection = Boolean(selectedVesselId);
           const showVesselTooltip = !selectedVesselId;

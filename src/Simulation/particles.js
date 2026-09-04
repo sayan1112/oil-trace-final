@@ -221,3 +221,67 @@ export function samplePointsInPolygon(geometry, count, seed = "observed-slick") 
   }
   return pts;
 }
+
+// Cloud whose initial shape IS the observed slick polygon.
+//
+// Particle offsets are sampled deterministically inside the detection
+// geometry and expressed relative to its centroid; at time T each particle
+// sits at trajectoryPosition(T) + offset × scale(T), where scale eases from
+// 1.0 at the slick end of the trajectory to endScale at the source end.
+// So the first hindcast frame coincides EXACTLY with the observed footprint,
+// and the whole body then translates coherently along the backend
+// trajectory while keeping its relative structure. Deterministic; no
+// physics; no randomness beyond the seeded sampler.
+export function buildPolygonCloud({ points, timesUtc, geometry, count, endSpreadKm, seed }) {
+  if (!points?.length || !timesUtc?.length || !geometry) return null;
+  const n = Math.min(points.length, timesUtc.length);
+  const samples = [];
+  for (let i = 0; i < n; i++)
+    samples.push({ t: new Date(timesUtc[i]).getTime(), lat: points[i][0], lon: points[i][1] });
+  samples.sort((a, b) => a.t - b.t);
+
+  const inPoly = samplePointsInPolygon(geometry, count, seed);
+  if (!inPoly.length) return null;
+  let cLat = 0, cLon = 0;
+  for (const [la, lo] of inPoly) { cLat += la; cLon += lo; }
+  cLat /= inPoly.length; cLon /= inPoly.length;
+  const kmLon = KM_PER_DEG_LAT * Math.cos((cLat * Math.PI) / 180);
+  // offsets in km, preserved for the life of the cloud
+  const offsets = new Float64Array(inPoly.length * 2);
+  let meanR = 0;
+  for (let i = 0; i < inPoly.length; i++) {
+    const dyKm = (inPoly[i][0] - cLat) * KM_PER_DEG_LAT;
+    const dxKm = (inPoly[i][1] - cLon) * kmLon;
+    offsets[i * 2] = dyKm;
+    offsets[i * 2 + 1] = dxKm;
+    meanR += Math.hypot(dxKm, dyKm);
+  }
+  meanR = Math.max(0.2, meanR / inPoly.length);
+  const endScale = Math.max(0.15, Math.min(3, (Number(endSpreadKm) || meanR) / meanR));
+  return {
+    kind: "polygon",
+    samples,
+    offsets,
+    count: inPoly.length,
+    endScale,
+    t0: samples[0].t,
+    t1: samples[samples.length - 1].t,
+  };
+}
+
+// Positions for a polygon cloud at real time t (either clock direction).
+export function polygonCloudPositions(cloud, tMs, out) {
+  const { samples, offsets, count, endScale, t0, t1 } = cloud;
+  const res = out && out.length === count * 2 ? out : new Float64Array(count * 2);
+  const now = Math.min(t1, Math.max(t0, Number.isFinite(tMs) ? tMs : t1));
+  const c = centroidAt(samples, now);
+  // frac 1 at the slick end (t1) → endScale at the source end (t0)
+  const frac = (now - t0) / Math.max(1, t1 - t0);
+  const scale = endScale + (1 - endScale) * frac;
+  const kmLon = KM_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180);
+  for (let i = 0; i < count; i++) {
+    res[i * 2] = c.lat + (offsets[i * 2] * scale) / KM_PER_DEG_LAT;
+    res[i * 2 + 1] = c.lon + (offsets[i * 2 + 1] * scale) / kmLon;
+  }
+  return res;
+}
