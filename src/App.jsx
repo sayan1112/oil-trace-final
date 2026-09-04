@@ -2085,6 +2085,10 @@ function App() {
               isBacktracking={isBacktracking}
               actionLabel={pipelineActionLabel}
               pipelineStage={pipelineStage}
+              hasDetection={hasDetection}
+              counterfactualResult={counterfactualResult}
+              topVessel={topVessel}
+              onSelectTopVessel={handleSelectVessel}
               backendOnline={backendOnline}
               backendHost={backendHost}
               query={queueQuery}
