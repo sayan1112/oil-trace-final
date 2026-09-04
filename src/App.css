@@ -3502,14 +3502,14 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
 
 .run-card {
   position: absolute;
-  left: 14px;
-  top: 156px;
+  left: 16px;
+  top: 408px;
   bottom: auto;
   z-index: 1100;
-  width: 248px;
+  width: 256px;
   padding: 12px 14px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 16px 36px rgba(17, 19, 24, 0.14);
   color: #17181c;

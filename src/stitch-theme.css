@@ -851,6 +851,118 @@
   background: rgba(0, 0, 0, 0.08) !important;
 }
 
+/* Floating Hindcast / Pipeline Status Card — Positioned directly below the zoom/map toolbar */
+.command-center .run-card {
+  position: absolute !important;
+  top: 408px !important;
+  left: 16px !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 1100 !important;
+  width: 256px !important;
+  max-width: calc(100% - 32px) !important;
+  padding: 12px 14px !important;
+  background: var(--glass) !important;
+  backdrop-filter: var(--glass-blur) saturate(1.4) !important;
+  -webkit-backdrop-filter: var(--glass-blur) saturate(1.4) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--box-radius) !important;
+  box-shadow: var(--glass-shadow) !important;
+  color: #1e293b !important;
+  pointer-events: auto !important;
+  animation: runCardPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes runCardPop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.command-center .run-card-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.command-center .run-card-head strong {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+}
+
+.command-center .run-badge {
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #059669 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  letter-spacing: 0.02em !important;
+}
+
+.command-center .run-card p {
+  margin: 6px 0 10px !important;
+  color: #64748b !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+}
+
+.command-center .run-rail {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.command-center .run-rail span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #94a3b8 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+
+.command-center .run-rail span.is-on {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0284c7 !important;
+}
+
+/* Dark mode adjustments for run-card */
+.app-dark.command-center .run-card-head strong {
+  color: #f8fafc !important;
+}
+
+.app-dark.command-center .run-card p {
+  color: #94a3b8 !important;
+}
+
+.app-dark.command-center .run-rail span {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #64748b !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.app-dark.command-center .run-rail span.is-on {
+  background: #38bdf8 !important;
+  color: #0f172a !important;
+  border-color: #38bdf8 !important;
+}
+
 /* Bottom Timeline & Playback Bar - Centered at bottom with bottom-4 margin */
 .timeline-card {
   position: absolute !important;
