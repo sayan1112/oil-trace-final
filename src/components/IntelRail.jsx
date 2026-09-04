@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { compassLabel } from "../utils/compass";
 
 function pct(value) {
   if (value == null) return null;
@@ -17,7 +16,6 @@ function rankTone(value) {
 
 export default function IntelRail({
   vessels = [],
-  env,
   onSelectVessel,
   selectedVesselId,
 }) {
@@ -30,6 +28,9 @@ export default function IntelRail({
 
   return (
     <aside className="intel-rail" aria-label="Environmental conditions and sources">
+      {/* No fabricated wind/current numbers: the API does not expose point
+          samples of the forcing, so this card names the forcing datasets
+          and says exactly that. */}
       <div className={`intel-card ${envOpen ? "is-open" : "is-collapsed"}`}>
         <button
           type="button"
@@ -37,41 +38,25 @@ export default function IntelRail({
           onClick={() => setEnvOpen((prev) => !prev)}
           aria-expanded={envOpen}
         >
-          <h3>Environmental conditions</h3>
+          <h3>Drift forcing</h3>
           <span className="intel-chevron" aria-hidden="true">{envOpen ? "−" : "+"}</span>
         </button>
         {envOpen && (
           <>
             <ul className="intel-env">
               <li>
-                <span>Wind speed</span>
-                <strong>{env.windKn.toFixed(0)} kn</strong>
+                <span>Ocean currents</span>
+                <strong>CMEMS Mediterranean</strong>
               </li>
               <li>
-                <span>Wind direction</span>
-                <strong>
-                  {compassLabel(env.windDir)} ({Math.round(env.windDir)}°)
-                </strong>
-              </li>
-              <li>
-                <span>Sea current</span>
-                <strong>
-                  {env.currentKn.toFixed(1)} kn · {compassLabel(env.currentDir)}
-                </strong>
-              </li>
-              <li>
-                <span>Wave height</span>
-                <strong>{env.waveM.toFixed(1)} m</strong>
-              </li>
-              <li>
-                <span>Sea temperature</span>
-                <strong>{env.tempC}°C</strong>
+                <span>Wind</span>
+                <strong>ERA5 · 10 m</strong>
               </li>
             </ul>
             <p className="intel-note">
-              Illustrative values from the frontend display fields. The
-              simulation itself is forced by CMEMS currents and ERA5 wind on
-              the backend, which does not expose point samples via the API.
+              These NetCDF fields force the OpenDrift/OpenOil simulation on
+              the backend. Point samples are not exposed by the current API,
+              so no local values are shown.
             </p>
           </>
         )}

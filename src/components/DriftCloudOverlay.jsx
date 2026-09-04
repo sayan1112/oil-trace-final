@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-import { buildCloud, cloudPositions, overlayFrameFromCloud, envelopeRadiusKm } from "../Simulation/particles";
+import { buildCloud, cloudPositions, centroidAt, envelopeRadiusKm } from "../Simulation/particles";
 
-// OpenDrift-style particle clouds for the BACKEND simulations, all driven by
-// the app's ONE master simulation clock (`timeMs`):
+// Deterministic visualization of the BACKEND drift results. The overlay owns
+// no clock and no physics: particle positions are pure functions of the
+// master UTC clock evaluated against the backend trajectory timestamps.
 //
-//   • teal cloud  — backward-hindcast reconstruction (probable source region
-//     converging onto the observed slick) across the whole window
-//   • black cloud — released oil: appears exactly when the clock reaches the
-//     backend's estimated release time, then drifts along the forward
-//     trajectory and spreads to the predicted footprint
-//   • a red pulse marks the release moment at the release location
+//   HINDCAST stage — a coherent cloud whose position at time T is the
+//     backend backward trajectory's position at that ACTUAL timestamp.
+//     The clock plays BACKWARD (12:00 → 06:00), so the cloud starts over
+//     the observed slick and converges onto the probable source region.
+//     Timestamps are never reversed or re-scaled.
 //
-// Everything is a deterministic, seeded visualisation of backend outputs —
-// centroid paths, timestamps and spread envelopes come from the API
-// responses; nothing is computed locally. The overlay owns no clock: the
-// Replay panel and the chip below both steer the same master clock.
+//   FORWARD stage — oil appears at the backend release time/location and
+//     follows the /forward trajectory to the predicted footprint.
+//
+// The trail drawn here is the single representative backend trajectory —
+// no duplicate polylines elsewhere.
 
 const RELEASE_PULSE_SIM_MS = 8 * 60 * 1000;
 
@@ -24,7 +25,7 @@ export default function DriftCloudOverlay({
   hindcast,
   forward,
   slickGeometry,
-  visible,
+  stage = 0,
   timeMs,
 }) {
   const map = useMap();
@@ -33,54 +34,30 @@ export default function DriftCloudOverlay({
   const backBufRef = useRef(null);
   const fwdBufRef = useRef(null);
 
-  /* ── Clouds from backend outputs ─────────────────────────────────── */
+  /* ── Clouds straight from backend outputs (no time reinterpretation) ── */
 
   const backCloud = useMemo(() => {
     if (!hindcast?.backward_trajectory || !hindcast?.trajectory_timestamps_utc?.length)
       return null;
-    let points = (hindcast.backward_trajectory.coordinates || []).map(
+    const points = (hindcast.backward_trajectory.coordinates || []).map(
       ([lon, lat]) => [lat, lon]
     );
-    let timesUtc = hindcast.trajectory_timestamps_utc;
-    // The teal packet must visibly travel BACK from the slick to the source
-    // (that is the story of a hindcast), so keep slick→source point order
-    // and give it ascending display times for the animation clock.
-    const descending =
-      timesUtc.length >= 2 &&
-      Date.parse(timesUtc[0]) > Date.parse(timesUtc[timesUtc.length - 1]);
-    if (descending) {
-      timesUtc = [...timesUtc].reverse();
-    } else {
-      points = [...points].reverse();
-    }
-    let times = timesUtc.map((t) => Date.parse(t));
     const region = hindcast.source_region?.candidate_regions?.[0];
-
-    // Pace the backward phase to finish by the estimated release moment —
-    // the geometry stays exactly what the backend hindcast computed; only
-    // the animation timing is compressed.
-    const relT = forward?.release_time_utc ? Date.parse(forward.release_time_utc) : NaN;
-    if (Number.isFinite(relT) && relT > times[0]) {
-      const t0 = times[0];
-      const span0 = Math.max(1, times[times.length - 1] - t0);
-      times = times.map((t) => t0 + ((t - t0) / span0) * (relT - t0));
-    }
+    // Each trajectory point keeps ITS backend timestamp. buildCloud sorts
+    // samples by time, so position(06:00)=source end, position(12:00)=slick
+    // end — exactly the backend's semantics. The ×1.7 on the slick envelope
+    // compensates the gaussian radial profile so the visible body covers
+    // the footprint rather than just its core.
     return buildCloud({
       points,
-      timesUtc: times,
-      // Dense enough to read as a coherent oil mass covering the observed
-      // slick, which then travels backward as one body toward the source.
-      // The ×1.7 compensates for the gaussian radial profile (typical
-      // particle sits at ~0.4-0.75 of the nominal spread), so the cloud's
-      // visible body actually fills the slick envelope instead of a core.
-      count: 1500,
-      startSpreadKm: envelopeRadiusKm(slickGeometry, 1.8) * 1.7,
-      endSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
+      timesUtc: hindcast.trajectory_timestamps_utc,
+      count: 650,
+      startSpreadKm: envelopeRadiusKm(region?.geometry, 2.5),
+      endSpreadKm: envelopeRadiusKm(slickGeometry, 1.8) * 1.7,
       seed: "oiltrace-back",
-      // The detected slick already exists in full when the trace starts.
       preformed: true,
     });
-  }, [hindcast, forward, slickGeometry]);
+  }, [hindcast, slickGeometry]);
 
   const fwdCloud = useMemo(() => {
     if (!forward?.trajectory || !forward?.trajectory_timestamps_utc?.length) return null;
@@ -88,10 +65,8 @@ export default function DriftCloudOverlay({
     return buildCloud({
       points,
       timesUtc: forward.trajectory_timestamps_utc,
-      count: 1800,
+      count: 700,
       startSpreadKm: 0.18,
-      // Spread out to the observed slick's own envelope so the travelling
-      // oil visually arrives at the detected slick footprint.
       endSpreadKm: Math.min(
         2.2,
         envelopeRadiusKm(forward.predicted_footprint || slickGeometry, 1.6)
@@ -106,11 +81,9 @@ export default function DriftCloudOverlay({
     return [+loc.lat, +loc.lon];
   }, [forward]);
 
-  /* ── Drawing (both clouds, one clock) ────────────────────────────── */
+  /* ── Drawing ─────────────────────────────────────────────────────── */
 
   const stateRef = useRef({});
-  stateRef.current = { visible, backCloud, fwdCloud, releaseLatLng, timeMs };
-
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const origin = originRef.current;
@@ -120,19 +93,17 @@ export default function DriftCloudOverlay({
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const { visible: vis, backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t } =
+    const { backCloud: bc, fwdCloud: fc, releaseLatLng: rel, timeMs: t, stage: st } =
       stateRef.current;
-    if (!vis || (!bc && !fc)) return;
-    const tMs = Number.isFinite(t) ? t : (fc || bc).t0;
+    if (!bc && !fc) return;
     const zoom = map.getZoom();
     const r = Math.max(1.05, Math.min(2.8, 1.15 * Math.pow(1.12, 10.5 - zoom)));
 
-    const toXY = (pair) => {
-      const point = map.latLngToLayerPoint([pair[1], pair[0]]);
+    const toXY = ([lat, lon]) => {
+      const point = map.latLngToLayerPoint([lat, lon]);
       return { x: point.x - origin.x, y: point.y - origin.y };
     };
 
-    // Small arrowhead at b, pointing along a→b.
     const drawArrowHead = (a, b, color) => {
       const dx = b.x - a.x, dy = b.y - a.y;
       const len = Math.hypot(dx, dy);
@@ -149,8 +120,6 @@ export default function DriftCloudOverlay({
       ctx.stroke();
     };
 
-    // Label chip riding the leading edge of a cloud; side keeps the two
-    // labels from colliding when the packets cross paths.
     const drawLabel = (tip, text, color, side = "right") => {
       ctx.font = "700 11px Inter, system-ui, sans-serif";
       const tw = ctx.measureText(text).width;
@@ -170,10 +139,31 @@ export default function DriftCloudOverlay({
       ctx.fillText(text, x + pad, y + 14);
     };
 
-    const drawCloud = (cloud, fill, trailStroke, bufRef, label, side) => {
-      const pos = cloudPositions(cloud, tMs, bufRef.current);
+    // The travelled portion of the backend trajectory at real time `now`.
+    //   forward:  from t0 up to now — arrows point with increasing time.
+    //   backward: from t1 (slick) down to now — arrows point with
+    //             DECREASING time, i.e. toward the probable source.
+    const travelledPath = (cloud, now, direction) => {
+      const clamped = Math.min(cloud.t1, Math.max(cloud.t0, now));
+      const cur = centroidAt(cloud.samples, clamped);
+      const pts = [];
+      if (direction === "forward") {
+        for (const s of cloud.samples) if (s.t <= clamped) pts.push([s.lat, s.lon]);
+        pts.push([cur.lat, cur.lon]);
+      } else {
+        for (let i = cloud.samples.length - 1; i >= 0; i--) {
+          const s = cloud.samples[i];
+          if (s.t >= clamped) pts.push([s.lat, s.lon]);
+        }
+        pts.push([cur.lat, cur.lon]);
+      }
+      return pts;
+    };
+
+    const drawCloud = (cloud, now, direction, fill, trailStroke, bufRef, label, side) => {
+      const pos = cloudPositions(cloud, now, bufRef.current);
       bufRef.current = pos;
-      const trail = overlayFrameFromCloud(cloud, tMs).trails[0]?.path || [];
+      const trail = travelledPath(cloud, now, direction);
       if (trail.length >= 2) {
         ctx.beginPath();
         trail.forEach((pair, index) => {
@@ -199,8 +189,6 @@ export default function DriftCloudOverlay({
         ctx.arc(x, y, cr, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Direction arrows along the travelled path + a moving label chip so
-      // forward and backward can never be confused.
       if (trail.length >= 2) {
         const solid = fill.replace(/[\d.]+\)$/, "0.95)");
         const step = Math.max(3, Math.floor(trail.length / 4));
@@ -213,37 +201,41 @@ export default function DriftCloudOverlay({
       }
     };
 
-    // Two phases, never on screen together:
-    //   PHASE 1 (before release) — teal backward hindcast traces from the
-    //     slick to the backend's estimated source region.
-    //   PHASE 2 (after release)  — the teal analysis clears and the green
-    //     forward drift plays alone from the release point toward the slick.
-    const releaseGate = fc ? fc.t0 - 1000 : Infinity;
-    if (tMs < releaseGate) {
-      if (bc && tMs >= bc.t0) {
-        drawCloud(bc, "rgba(11, 130, 150, 0.9)", "rgba(13, 178, 200, 0.45)", backBufRef, "BACKWARD · tracing to source", "left");
-      }
-    } else if (fc) {
-      drawCloud(fc, "rgba(22, 140, 65, 0.9)", "rgba(34, 197, 94, 0.45)", fwdBufRef, "FORWARD · oil drifting to slick", "right");
-    }
-
-    if (fc && rel && tMs >= fc.t0) {
-      const since = tMs - fc.t0;
-      if (since <= RELEASE_PULSE_SIM_MS) {
-        const f = since / RELEASE_PULSE_SIM_MS;
-        const p = map.latLngToLayerPoint(rel);
-        const x = p.x - origin.x;
-        const y = p.y - origin.y;
-        ctx.strokeStyle = `rgba(180, 83, 9, ${(1 - f) * 0.7})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(x, y, 8 + f * 28, 0, Math.PI * 2);
-        ctx.stroke();
+    // Stage-scoped: exactly one reconstruction on screen at a time.
+    if (st === 1 && bc) {
+      drawCloud(
+        bc, Number.isFinite(t) ? t : bc.t1, "backward",
+        "rgba(11, 130, 150, 0.9)", "rgba(13, 178, 200, 0.45)", backBufRef,
+        "HINDCAST RECONSTRUCTION · to probable source", "left"
+      );
+    } else if (st === 3 && fc) {
+      const now = Number.isFinite(t) ? t : fc.t0;
+      if (now >= fc.t0) {
+        drawCloud(
+          fc, now, "forward",
+          "rgba(22, 140, 65, 0.9)", "rgba(34, 197, 94, 0.45)", fwdBufRef,
+          "FORWARD DRIFT · release → slick", "right"
+        );
+        if (rel && now - fc.t0 <= RELEASE_PULSE_SIM_MS) {
+          const f = (now - fc.t0) / RELEASE_PULSE_SIM_MS;
+          const p = map.latLngToLayerPoint(rel);
+          ctx.strokeStyle = `rgba(180, 83, 9, ${(1 - f) * 0.7})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(p.x - origin.x, p.y - origin.y, 8 + f * 28, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
     }
   }, [map]);
+
   const drawRef = useRef(draw);
-  drawRef.current = draw;
+
+  useEffect(() => {
+    stateRef.current = { backCloud, fwdCloud, releaseLatLng, timeMs, stage };
+    drawRef.current = draw;
+    drawRef.current();
+  }, [timeMs, stage, backCloud, fwdCloud, releaseLatLng, draw]);
 
   /* ── Canvas lifecycle in the overlay pane ────────────────────────── */
 
@@ -284,8 +276,6 @@ export default function DriftCloudOverlay({
       canvasRef.current = null;
     };
   }, [map]);
-
-  useEffect(() => { drawRef.current(); }, [timeMs, visible, backCloud, fwdCloud, draw]);
 
   return null;
 }

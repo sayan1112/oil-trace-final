@@ -97,7 +97,7 @@ export function buildCloud({ points, timesUtc, count, startSpreadKm, endSpreadKm
 }
 
 // Centroid position at time t (piecewise-linear over backend timestamps).
-function centroidAt(samples, t) {
+export function centroidAt(samples, t) {
   if (t <= samples[0].t) return samples[0];
   const last = samples[samples.length - 1];
   if (t >= last.t) return last;
@@ -129,13 +129,19 @@ export function cloudPositions(cloud, tMs, out) {
     // short deterministic lag per particle so the body keeps a comet tail.
     // Otherwise: particles enter over time and trail back to the release,
     // reproducing a continuous discharge stretching into a plume.
+    // preformed: the whole mass rides the trajectory together at the ACTUAL
+    // clock time — no per-particle lag, no wobble, no birth animation. The
+    // clock may run in either direction; position and spread are pure
+    // functions of the timestamp, so backward playback needs no time tricks.
     const alongT = preformed
-      ? Math.max(t0, now - birthFrac * 0.18 * span)
+      ? Math.min(t1, Math.max(t0, now))
       : t0 + birthFrac * Math.max(0, now - t0);
     const c = centroidAt(samples, alongT);
-    const age = Math.max(0, Math.min(1, (now - birthT) / span));
-    const spread = startSpreadKm + (endSpreadKm - startSpreadKm) * Math.sqrt(age);
-    const wob = 1 + 0.12 * Math.sin(ph + age * 6.2);
+    const frac = Math.max(0, Math.min(1, (alongT - t0) / span));
+    const spread = preformed
+      ? startSpreadKm + (endSpreadKm - startSpreadKm) * frac
+      : startSpreadKm + (endSpreadKm - startSpreadKm) * Math.sqrt(Math.max(0, Math.min(1, (now - birthT) / span)));
+    const wob = preformed ? 1 : 1 + 0.12 * Math.sin(ph + ((now - birthT) / span) * 6.2);
     const rKm = rad * spread * wob;
     const kmLon = KM_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180);
     res[i * 2] = c.lat + (Math.sin(ang) * rKm) / KM_PER_DEG_LAT;
@@ -178,4 +184,40 @@ export function overlayFrameFromCloud(cloud, tMs) {
     trails: trailPath.length >= 2 ? [{ id: "opendrift-path", path: trailPath }] : [],
     flowLines: [],
   };
+}
+
+// Deterministic sample of points STRICTLY INSIDE a GeoJSON polygon —
+// the static visual texture of the OBSERVED slick. Seeded PRNG rejection
+// sampling: same geometry + seed → identical points, no animation, no
+// physics, and no point can fall outside the observation.
+export function samplePointsInPolygon(geometry, count, seed = "observed-slick") {
+  const ring =
+    geometry?.type === "Polygon" ? geometry.coordinates?.[0] :
+    geometry?.type === "MultiPolygon" ? geometry.coordinates?.[0]?.[0] : null;
+  if (!ring || ring.length < 4) return [];
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  for (const [lon, lat] of ring) {
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  const inside = (lon, lat) => {
+    let odd = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) &&
+          lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) odd = !odd;
+    }
+    return odd;
+  };
+  const rnd = mulberry32(hashSeed(seed));
+  const pts = [];
+  let guard = count * 60;
+  while (pts.length < count && guard-- > 0) {
+    const lon = minLon + rnd() * (maxLon - minLon);
+    const lat = minLat + rnd() * (maxLat - minLat);
+    if (inside(lon, lat)) pts.push([lat, lon]);
+  }
+  return pts;
 }
