@@ -2557,7 +2557,15 @@ function App() {
               fillOpacity: 1,
             }}
           >
-            <Tooltip direction="right" offset={[10, 0]} permanent>
+            {/* Pinned only while the release point is the newest finding.
+                Once the forward simulation runs, the plume needs that space,
+                so the label drops back to hover. */}
+            <Tooltip
+              key={forwardResult ? "release-hover" : "release-pinned"}
+              direction="right"
+              offset={[10, 0]}
+              permanent={!forwardResult}
+            >
               <strong>Estimated release</strong>
               {releasePoint.time && (
                 <>
