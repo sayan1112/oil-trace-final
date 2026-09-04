@@ -4095,3 +4095,19 @@ button:not(.candidate-entry-card):not(.spotlight-action-btn) {
   border-radius: 50%;
   box-sizing: border-box;
 }
+
+/* On-map layer identity chips (§22) — small, permanent, no hover needed */
+.map-layer-label {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-radius: 6px !important;
+  padding: 2px 7px !important;
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12) !important;
+}
+
+.map-layer-label::before { display: none !important; }
+
+.map-layer-label-slick { color: #b91c1c !important; border: 1px solid #fca5a5 !important; }
+.map-layer-label-source { color: #1d4ed8 !important; border: 1px solid #93c5fd !important; }
