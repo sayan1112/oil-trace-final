@@ -1313,24 +1313,41 @@ function App() {
   // VITE_USE_MODAL_ML flag.)
   useEffect(() => {
     warmBackend();
-    getBackendHealth()
-      .then(() => {
-        setBackendOnline(true);
-        setBackendHost(getActiveBackendUrl());
-      })
-      .catch(() => {
-        setBackendOnline(false);
-        setBackendHost(getActiveBackendUrl());
-      });
+
+    // Poll health rather than probing once on mount: a single check meant
+    // that a backend which was down at page load (or restarted afterwards)
+    // left the badge stuck reading "Local offline" forever, and a backend
+    // that died mid-session still showed as online.
+    let cancelled = false;
+    const checkHealth = () => {
+      getBackendHealth()
+        .then(() => {
+          if (cancelled) return;
+          setBackendOnline(true);
+          setBackendHost(getActiveBackendUrl());
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setBackendOnline(false);
+          setBackendHost(getActiveBackendUrl());
+        });
+    };
+    checkHealth();
+    const healthTimer = setInterval(checkHealth, 15000);
 
     // Prefetch replay metadata for the Replay panel, but do NOT surface any
     // vessels yet: candidates appear only after "Run hindcast" queries AIS
     // and the attribution pipeline scores them.
     getReplay(CANONICAL_INCIDENT_ID)
       .then((replay) => {
-        setReplayMeta(replay);
+        if (!cancelled) setReplayMeta(replay);
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      clearInterval(healthTimer);
+    };
   }, []);
 
   const handleDetectionResult = useCallback((geojson) => {
