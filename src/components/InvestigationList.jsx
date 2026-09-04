@@ -149,11 +149,17 @@ export default function InvestigationList({
           </button>
           <div className="inv-verdict-metrics">
             <div>
-              <small>Footprint overlap</small>
+              <small
+                title="Share of the simulated oil that lands inside the observed slick. Unlike Jaccard overlap this is not penalised by the observed slick being larger than a short discharge."
+              >
+                Lands in slick
+              </small>
               <strong>
-                {counterfactualResult.spatial_agreement != null
-                  ? `${Math.round(counterfactualResult.spatial_agreement * 100)}%`
-                  : "—"}
+                {counterfactualResult.predicted_containment != null
+                  ? `${Math.round(counterfactualResult.predicted_containment * 100)}%`
+                  : counterfactualResult.spatial_agreement != null
+                    ? `${Math.round(counterfactualResult.spatial_agreement * 100)}%`
+                    : "—"}
               </strong>
             </div>
             <div>
