@@ -522,3 +522,71 @@
   white-space: nowrap;
   border-top: 1px solid #eceff3;
 }
+
+/* ── Counterfactual comparison ──────────────────────────────────── */
+.inv-cf-panel {
+  margin: 0 18px 14px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.inv-cf-head {
+  margin: 0 0 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+}
+
+.inv-cf-progress { color: #1d4ed8; font-weight: 800; letter-spacing: 0; }
+
+.inv-cf-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid #f1f5f9;
+  padding: 7px 2px;
+  cursor: pointer;
+}
+
+.inv-cf-row:first-of-type { border-top: 0; }
+.inv-cf-row.is-on { background: #eff6ff; border-radius: 7px; }
+
+.inv-cf-name { font-size: 12px; font-weight: 750; color: #0f172a; }
+
+.inv-cf-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #475569;
+}
+
+.inv-cf-metrics .is-yes { color: #15803d; font-weight: 700; }
+.inv-cf-metrics .is-no { color: #dc2626; font-weight: 700; }
+
+.inv-cf-unavailable { font-size: 10px; color: #94a3b8; font-style: italic; }
+
+.inv-cf-metrics em {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+.inv-cf-metrics.is-secondary { color: #94a3b8; }
+.inv-cf-metrics.is-secondary em { color: #94a3b8; }

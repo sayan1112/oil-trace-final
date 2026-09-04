@@ -57,6 +57,7 @@ import {
   trajectoryPoints,
   sourceRegionForFrontend,
   slickFromDetection,
+  aisPositionAt,
   slickFromIncident,
   normalizeVessels,
   buildFrontendScoring,
@@ -949,8 +950,37 @@ function App() {
 
   // Live backend investigation artifacts (null until the pipeline runs)
   const [backendVessels, setBackendVessels] = useState(null);
-  const [forwardResult, setForwardResult] = useState(null);
-  const [counterfactualResult, setCounterfactualResult] = useState(null);
+  // Per-candidate counterfactual state, keyed by MMSI. Candidate A's result
+  // is never overwritten when candidate B finishes.
+  const [forwardResults, setForwardResults] = useState({});
+  const [counterfactualResults, setCounterfactualResults] = useState({});
+  const [counterfactualNotes, setCounterfactualNotes] = useState({});
+  const [commonTestResults, setCommonTestResults] = useState({});
+  const [commonReleaseIso, setCommonReleaseIso] = useState(null);
+  const [cfProgress, setCfProgress] = useState(null);
+  const [selectedVesselId, setSelectedVesselId] = useState(null);
+
+  // The selected candidate's OWN results. Selecting another vessel switches
+  // the plume, release marker, footprint and evidence to that vessel's
+  // cached backend result — nothing is recomputed and nothing is stale.
+  const selectedForward = useMemo(() => {
+    const key = String(selectedVesselId ?? "");
+    if (key && forwardResults[key]) return forwardResults[key];
+    const first = Object.keys(forwardResults)[0];
+    return first ? forwardResults[first] : null;
+  }, [forwardResults, selectedVesselId]);
+
+  const selectedCounterfactual = useMemo(() => {
+    const key = String(selectedVesselId ?? "");
+    if (key && counterfactualResults[key]) return counterfactualResults[key];
+    const first = Object.keys(counterfactualResults)[0];
+    return first && !key ? counterfactualResults[first] : null;
+  }, [counterfactualResults, selectedVesselId]);
+
+  const anyForward = useMemo(
+    () => Object.keys(forwardResults).length > 0,
+    [forwardResults]
+  );
   const [backendError, setBackendError] = useState(null);
   const [backendOnline, setBackendOnline] = useState(null); // null=checking
   const [backendHost, setBackendHost] = useState("");
@@ -997,18 +1027,18 @@ function App() {
 
   // Forward simulation's predicted particle envelope (stage 3).
   const predictedFootprintRing = useMemo(() => {
-    const geom = forwardResult?.predicted_footprint;
+    const geom = selectedForward?.predicted_footprint;
     const coords = geom?.coordinates?.[0] || [];
     return coords
       .map(([lon, lat]) => [Number(lat), Number(lon)])
       .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
-  }, [forwardResult]);
+  }, [selectedForward]);
 
   // Estimated release point: from the forward run once it exists, otherwise
   // from the attribution's leading candidate.
   const releasePoint = useMemo(() => {
-    const src = forwardResult?.release_location
-      ? { loc: forwardResult.release_location, t: forwardResult.release_time_utc }
+    const src = selectedForward?.release_location
+      ? { loc: selectedForward.release_location, t: selectedForward.release_time_utc }
       : attributionResult?.top_candidates?.[0]?.release_location
         ? {
             loc: attributionResult.top_candidates[0].release_location,
@@ -1020,7 +1050,7 @@ function App() {
     const lon = Number(src.loc.lon ?? src.loc.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     return { position: [lat, lon], time: src.t };
-  }, [forwardResult, attributionResult]);
+  }, [selectedForward, attributionResult]);
 
   const scoredVessels = useMemo(
     // Vessels appear only once the hindcast pipeline has queried AIS —
@@ -1063,10 +1093,10 @@ function App() {
     (backtrackResult?.trajectory || []).forEach((p) =>
       pts.push([+p.latitude, +p.longitude])
     );
-    pushGeom(forwardResult?.trajectory);
-    pushGeom(forwardResult?.predicted_footprint);
+    pushGeom(selectedForward?.trajectory);
+    pushGeom(selectedForward?.predicted_footprint);
     return pts.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
-  }, [activeSlick, calculatedSourceRegion, backtrackResult, forwardResult, spillPolygon]);
+  }, [activeSlick, calculatedSourceRegion, backtrackResult, selectedForward, spillPolygon]);
 
   // "Scene": story + every vessel's track — spill AND ships in frame.
   const scenePoints = useMemo(() => {
@@ -1081,7 +1111,7 @@ function App() {
     return pts.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
   }, [storyPoints, scoredVessels]);
 
-  const focusStageKey = `${backtrackResult ? 1 : 0}-${backendVessels ? 1 : 0}-${forwardResult ? 1 : 0}`;
+  const focusStageKey = `${backtrackResult ? 1 : 0}-${backendVessels ? 1 : 0}-${anyForward ? 1 : 0}`;
 
   /* =======================================================
      MASTER SIMULATION CLOCK
@@ -1130,7 +1160,6 @@ function App() {
      SELECTED VESSEL
   ======================================================= */
 
-  const [selectedVesselId, setSelectedVesselId] = useState(null);
   const [queueQuery, setQueueQuery] = useState("");
 
   const selectedVessel = scoredVessels.find(
@@ -1139,14 +1168,6 @@ function App() {
 
   // The counterfactual describes exactly one vessel. Showing it under any
   // other candidate would attribute one ship's drift evidence to another.
-  const selectedCounterfactual = useMemo(() => {
-    if (!counterfactualResult) return null;
-    const cfMmsi = counterfactualResult.vessel_mmsi;
-    if (cfMmsi == null || !selectedVessel) return counterfactualResult;
-    return String(cfMmsi) === String(selectedVessel.mmsi)
-      ? counterfactualResult
-      : null;
-  }, [counterfactualResult, selectedVessel]);
 
   /* =======================================================
      MAP LAYERS
@@ -1221,7 +1242,10 @@ function App() {
     };
   }, []);
 
-  const handleDetectionResult = useCallback((geojson) => {
+  // `gen` is captured by the panel BEFORE its request starts, so a detection
+  // that lands after a Reset is discarded instead of resurrecting the stage.
+  const handleDetectionResult = useCallback((geojson, gen) => {
+    if (gen != null && gen !== runGenerationRef.current) return;
     setDetectionResult(geojson);
     // Auto-enable the detected slicks layer when results arrive
     setLayers((prev) => ({ ...prev, detectedSlicks: true }));
@@ -1303,6 +1327,9 @@ function App() {
   // to: 0.5× ≈ 120 s · 1× ≈ 60 s · 2× ≈ 30 s · 4× ≈ 15 s.
   const BASE_PLAYBACK_MS = 60000;
   const playPlanRef = useRef(null);
+  // Incremented by Reset; async work captures the value it started under and
+  // discards its results if the investigation has since been reset.
+  const runGenerationRef = useRef(0);
 
   const startPlayback = useCallback((fromMs, toMs) => {
     if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs === toMs) return;
@@ -1367,6 +1394,7 @@ function App() {
 
   // STAGE 1 — hindcast
   const handleRunHindcastStage = useCallback(async () => {
+    const gen = runGenerationRef.current;
     setActiveItem("map");
 
     let slick = null;
@@ -1392,8 +1420,12 @@ function App() {
     assertWithinForcingCoverage(slick);
     setTransposeNotice(null);
     setActiveSlick(slick);
-    setForwardResult(null);
-    setCounterfactualResult(null);
+    setForwardResults({});
+    setCounterfactualResults({});
+    setCommonTestResults({});
+    setCommonReleaseIso(null);
+    setCounterfactualNotes({});
+    setCfProgress(null);
     setAttributionResult(null);
 
     // The backend OpenDrift hindcast is the ONLY source of the backward
@@ -1402,6 +1434,7 @@ function App() {
     // error propagates to the dispatcher and is shown to the operator.
     setBacktrackStatusText("OpenDrift hindcast…");
     const hc = await runHindcast(slick, 6);
+    if (runGenerationRef.current !== gen) return; // reset while in flight
 
     const sourceRegion = sourceRegionForFrontend(hc.source_region);
     setBacktrackResult({
@@ -1437,7 +1470,7 @@ function App() {
 
     try {
       const replay = await getReplay(CANONICAL_INCIDENT_ID);
-      setReplayMeta(replay);
+      if (runGenerationRef.current === gen) setReplayMeta(replay);
     } catch {
       /* replay is optional */
     }
@@ -1445,6 +1478,7 @@ function App() {
 
   // STAGE 2 — AIS scan + attribution over the probable source region
   const handleRunAttributionStage = useCallback(async () => {
+    const gen = runGenerationRef.current;
     const hc = backtrackResult?.backend;
     const slick = activeSlick;
     if (!hc || !slick) return;
@@ -1466,6 +1500,7 @@ function App() {
     // possible moment: when the backend has actually computed nothing.
     setBacktrackStatusText("Scanning AIS traffic in the source region…");
     const vessels = await getCandidateVessels(bbox, start, end);
+    if (runGenerationRef.current !== gen) return; // reset while in flight
     if (!vessels.length) {
       setTransposeNotice(describeEmptyMediterraneanAis());
       return;
@@ -1478,14 +1513,15 @@ function App() {
       vessels,
       10
     );
+    if (runGenerationRef.current !== gen) return; // reset while in flight
     setAttributionResult(attribution);
 
-    // Present only the two most probable ships — the roster drives the
-    // candidate list, the map markers, and their AIS tracks alike.
+    // Keep EVERY eligible candidate the backend returned: the counterfactual
+    // engine must be able to test all of them, not an arbitrary top slice.
     const normalized = vesselsNearCentroid(
       normalizeVessels(vessels, attribution),
       { lat: slick.centroid.lat, lon: slick.centroid.lon }
-    ).slice(0, 2);
+    );
     if (normalized.length) {
       setBackendVessels(
         normalized.map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
@@ -1499,64 +1535,159 @@ function App() {
     );
   }, [backtrackResult, activeSlick]);
 
-  // STAGE 3 — forward (counterfactual) simulation for the top suspect
+  // STAGE 3 — counterfactual forward test across EVERY eligible candidate.
+  //
+  // Each candidate is tested under TWO hypotheses, both run through the same
+  // backend physics so the candidates stay comparable:
+  //
+  //   COMMON  — everyone released at the investigation's common release time
+  //             (the start of the backend source-region window) from their
+  //             OWN real AIS position at that instant. Same assumption for
+  //             all, so the numbers compare directly.
+  //   APPROVED— the backend attribution's own release state for that vessel
+  //             (the moment it was actually inside the source region).
+  //
+  // Both matter: the common test is the controlled comparison, the approved
+  // test is the hypothesis the attribution engine actually proposes. A
+  // candidate with no AIS coverage at the release time is reported
+  // unavailable — never given an invented position.
   const handleRunForwardStage = useCallback(async () => {
+    const gen = runGenerationRef.current;
     const slick = activeSlick;
-    const top = attributionResult?.top_candidates?.[0];
-    if (!slick || !top?.forward_request) return;
+    const hc = backtrackResult?.backend;
+    const candidates = scoredVessels;
+    if (!slick || !candidates.length) return;
 
-    // Backend forward + counterfactual only — a fabricated trajectory or a
-    // canned 91% agreement would be manufactured evidence. On failure the
-    // dispatcher's error toast tells the operator what actually happened.
-    setBacktrackStatusText("Forward simulation from estimated release…");
-    const fwd = await runForwardSimulation(top.forward_request);
-    setForwardResult(fwd);
+    const region = hc?.source_region?.candidate_regions?.[0];
+    const commonReleaseMs = Date.parse(region?.start_time_utc || "");
+    const observationIso = slick.timestamp_utc;
+    const observationMs = Date.parse(observationIso);
+    if (!Number.isFinite(observationMs)) return;
+    const commonReleaseIso = Number.isFinite(commonReleaseMs)
+      ? new Date(commonReleaseMs).toISOString()
+      : null;
 
-    setBacktrackStatusText("Counterfactual: comparing with observed slick…");
-    const cf = await runCounterfactual(
-      CANONICAL_INCIDENT_ID,
-      fwd.vessel_mmsi,
-      fwd,
-      slick
+    const approvedByMmsi = new Map(
+      (attributionResult?.top_candidates || []).map((c) => [String(c.vessel_mmsi), c])
     );
-    setCounterfactualResult(cf);
+
+    const fwdMap = {};
+    const cfMap = {};
+    const commonMap = {};
+    const notes = {};
+    let firstOk = null;
+
+    const runPair = async (mmsi, releaseLocation, releaseIso) => {
+      const fwd = await runForwardSimulation({
+        incident_id: CANONICAL_INCIDENT_ID,
+        vessel_mmsi: mmsi,
+        release_location: releaseLocation,
+        release_time_utc: releaseIso,
+        observation_time_utc: observationIso,
+      });
+      let cf = null;
+      try {
+        cf = await runCounterfactual(CANONICAL_INCIDENT_ID, mmsi, fwd, slick);
+      } catch {
+        /* comparison unavailable; the forward run still stands */
+      }
+      return { fwd, cf };
+    };
+
+    for (let i = 0; i < candidates.length; i++) {
+      if (runGenerationRef.current !== gen) return; // reset mid-experiment
+      const v = candidates[i];
+      const mmsi = String(v.mmsi);
+      setBacktrackStatusText(
+        `Counterfactual test ${i + 1} / ${candidates.length} — ${v.name || mmsi}`
+      );
+      setCfProgress({ done: i, total: candidates.length });
+
+      // 1) COMMON-TIME test from this vessel's own AIS position.
+      const commonPos = commonReleaseIso ? aisPositionAt(v, commonReleaseMs) : null;
+      if (commonPos) {
+        try {
+          const { cf } = await runPair(mmsi, commonPos, commonReleaseIso);
+          if (cf) commonMap[mmsi] = cf;
+        } catch {
+          notes[mmsi] = "Common-time forward simulation unavailable.";
+        }
+      } else {
+        notes[mmsi] = "No valid AIS release state at the common release time.";
+      }
+
+      // 2) The attribution's own approved release state, when it produced one.
+      const approved = approvedByMmsi.get(mmsi);
+      const approvedLoc = approved?.release_location;
+      const approvedTime = approved?.release_time_utc;
+      if (approvedLoc && approvedTime) {
+        try {
+          const { fwd, cf } = await runPair(mmsi, approvedLoc, approvedTime);
+          fwdMap[mmsi] = fwd;
+          if (cf) cfMap[mmsi] = cf;
+          if (!firstOk) firstOk = mmsi;
+        } catch {
+          notes[mmsi] = "Forward simulation unavailable.";
+        }
+      } else if (!commonPos) {
+        // already noted as unavailable
+      } else if (!approved) {
+        notes[mmsi] = notes[mmsi] || "No backend release state proposed for this vessel.";
+      }
+    }
+
+    if (runGenerationRef.current !== gen) return;
+    setCfProgress({ done: candidates.length, total: candidates.length });
+    setForwardResults(fwdMap);
+    setCounterfactualResults(cfMap);
+    setCommonTestResults(commonMap);
+    setCounterfactualNotes(notes);
+    setCommonReleaseIso(commonReleaseIso);
 
     setBackendVessels((prev) =>
-      (prev || []).map((v) =>
-        String(v.mmsi) === String(top.vessel_mmsi)
-          ? {
-              ...v,
-              evidence: {
-                ...v.evidence,
-                drift: {
-                  score: Math.max(0, Math.min(1, +(cf.spatial_agreement || 0))),
-                  label:
-                    cf.explanation ||
-                    `Counterfactual: ${Math.round((cf.spatial_agreement || 0) * 100)}% spatial agreement, ` +
-                      `${cf.trajectory_reaches_slick ? "trajectory reaches slick" : "trajectory misses slick"}` +
-                      (cf.centroid_distance_km != null ? `, ${Number(cf.centroid_distance_km).toFixed(2)} km.` : "."),
-                },
+      (prev || [])
+        .map((v) => {
+          const cf = cfMap[String(v.mmsi)];
+          if (!cf) return v;
+          return {
+            ...v,
+            evidence: {
+              ...v.evidence,
+              drift: {
+                score: Math.max(0, Math.min(1, +(cf.spatial_agreement || 0))),
+                label:
+                  cf.explanation ||
+                  `Counterfactual: ${Math.round((cf.spatial_agreement || 0) * 100)}% spatial agreement.`,
               },
-              scoring: undefined,
-            }
-          : v
-      ).map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
+            },
+          };
+        })
+        .map((v) => ({ ...v, scoring: buildFrontendScoring(v) }))
     );
 
-    // FORWARD playback: from the backend release time to the observation
-    // time. The forward cloud does not exist before the release moment.
-    const relT = Date.parse(fwd.release_time_utc || top.release_time_utc || "");
-    const fwdTs = (fwd.trajectory_timestamps_utc || [])
-      .map((t) => Date.parse(t))
-      .filter(Number.isFinite);
-    const endT = fwdTs.length ? Math.max(...fwdTs) : Date.parse(slick.timestamp_utc);
-    if (Number.isFinite(relT) && Number.isFinite(endT) && endT > relT) {
-      startPlayback(relT, endT);
+    const selectedOk = selectedVesselId && fwdMap[String(selectedVesselId)];
+    if (!selectedOk && firstOk) setSelectedVesselId(firstOk);
+
+    const shown = fwdMap[String(selectedOk ? selectedVesselId : firstOk)];
+    if (shown) {
+      const relT = Date.parse(shown.release_time_utc);
+      const ts = (shown.trajectory_timestamps_utc || [])
+        .map((t) => Date.parse(t))
+        .filter(Number.isFinite);
+      const endT = ts.length ? Math.max(...ts) : observationMs;
+      if (Number.isFinite(relT) && endT > relT) startPlayback(relT, endT);
     }
-  }, [activeSlick, attributionResult, startPlayback]);
+  }, [
+    activeSlick,
+    backtrackResult,
+    attributionResult,
+    scoredVessels,
+    selectedVesselId,
+    startPlayback,
+  ]);
 
   // Which stage is next, derived from what the backend has produced so far.
-  const pipelineStage = forwardResult
+  const pipelineStage = anyForward
     ? 3
     : attributionResult
       ? 2
@@ -1569,17 +1700,48 @@ function App() {
   // again from the detection. Without this the pipeline is one-shot: the
   // hindcast can never be repeated and a stage that yields nothing usable
   // leaves the case stuck with no way back short of a page reload.
+  // THE single authoritative reset for the whole investigation. It returns
+  // the app to a fresh-load state, including the DETECTION stage, and bumps
+  // a generation token so any request still in flight cannot repopulate the
+  // UI after the reset (the stale-async repopulation bug).
   const handleResetInvestigation = useCallback(() => {
+    // Bumping the generation is a deliberate event-handler side effect (not
+    // a render-phase mutation): it invalidates any request still in flight.
+    // eslint-disable-next-line react-hooks/immutability
+    runGenerationRef.current += 1;
+
+    // stop every animation / clock
     setIsPlaying(false);
+    playPlanRef.current = null;
+    setSimMs(NaN);
+    setReplayProgress(0);
+
+    // detection — this is what previously survived a reset
+    setDetectionResult(null);
+    setActiveSlick(null);
+    setActiveSeedId(null);
+    setApiSeedOverride(null);
+    setIncident(INCIDENT_SEED);
+
+    // hindcast / attribution / counterfactual
     setBacktrackResult(null);
     setAttributionResult(null);
-    setForwardResult(null);
-    setCounterfactualResult(null);
+    setForwardResults({});
+    setCounterfactualResults({});
+    setCommonTestResults({});
+    setCommonReleaseIso(null);
+    setCounterfactualNotes({});
+    setCfProgress(null);
     setBackendVessels(null);
     setSelectedVesselId(null);
+
+    // replay + status/UI
+    setReplayMeta(null);
     setBackendError(null);
     setTransposeNotice(null);
     setBacktrackStatusText("");
+    setIsBacktracking(false);
+    setActiveItem("map");
   }, []);
 
   // One dispatcher keeps every existing button working: each press advances
@@ -1593,8 +1755,8 @@ function App() {
       else if (pipelineStage === 1) await handleRunAttributionStage();
       else if (pipelineStage === 2) await handleRunForwardStage();
       else {
-        const relT = Date.parse(forwardResult?.release_time_utc || "");
-        const fwdTs = (forwardResult?.trajectory_timestamps_utc || [])
+        const relT = Date.parse(selectedForward?.release_time_utc || "");
+        const fwdTs = (selectedForward?.trajectory_timestamps_utc || [])
           .map((t) => Date.parse(t))
           .filter(Number.isFinite);
         const endT = fwdTs.length ? Math.max(...fwdTs) : NaN;
@@ -1613,7 +1775,7 @@ function App() {
   }, [
     isBacktracking,
     pipelineStage,
-    forwardResult,
+    selectedForward,
     handleRunHindcastStage,
     handleRunAttributionStage,
     handleRunForwardStage,
@@ -1680,7 +1842,7 @@ function App() {
   const replayActive = Number.isFinite(simMs);
 
   // Estimated-release position within the simulation window (0..1).
-  const releaseMs = forwardResult ? Date.parse(forwardResult.release_time_utc) : NaN;
+  const releaseMs = selectedForward ? Date.parse(selectedForward.release_time_utc) : NaN;
   const releaseFrac =
     simRange && Number.isFinite(releaseMs)
       ? Math.max(0, Math.min(1, (releaseMs - simRange.t0) / (simRange.t1 - simRange.t0)))
@@ -1818,8 +1980,13 @@ function App() {
               actionLabel={pipelineActionLabel}
               pipelineStage={pipelineStage}
               hasDetection={hasDetection}
-              counterfactualResult={counterfactualResult}
-              topVessel={topVessel}
+              counterfactualResult={selectedCounterfactual}
+              counterfactualResults={counterfactualResults}
+              commonTestResults={commonTestResults}
+              commonReleaseIso={commonReleaseIso}
+              counterfactualNotes={counterfactualNotes}
+              cfProgress={cfProgress}
+              topVessel={selectedVessel || topVessel}
               onSelectTopVessel={handleSelectVessel}
               backendOnline={backendOnline}
               backendHost={backendHost}
@@ -1888,6 +2055,7 @@ function App() {
               {activeItem === "detect" && (
                 <DetectionPanel
                   onDetectionResult={handleDetectionResult}
+                  getRunGeneration={() => runGenerationRef.current}
                   onClose={closePanel}
                   onSeedOverride={handleSeedOverride}
                   onClearSeed={handleClearSeed}
@@ -1976,7 +2144,7 @@ function App() {
             single representative backend trajectory. */}
         <DriftCloudOverlay
           hindcast={backtrackResult?.backend}
-          forward={forwardResult}
+          forward={selectedForward}
           slickGeometry={activeSlick?.geometry}
           stage={pipelineStage}
           timeMs={clockNow}
@@ -2078,10 +2246,10 @@ function App() {
                 Once the forward simulation runs, the plume needs that space,
                 so the label drops back to hover. */}
             <Tooltip
-              key={forwardResult ? "release-hover" : "release-pinned"}
+              key={selectedForward ? "release-hover" : "release-pinned"}
               direction="right"
               offset={[10, 0]}
-              permanent={!forwardResult}
+              permanent={!selectedForward}
             >
               <strong>Estimated release</strong>
               {releasePoint.time && (
@@ -2182,8 +2350,8 @@ function App() {
         {/* VESSELS + TRAJECTORIES */}
         {scoredVessels
           .filter((vessel) =>
-            pipelineStage === 3 && forwardResult?.vessel_mmsi
-              ? String(vessel.mmsi) === String(forwardResult.vessel_mmsi)
+            pipelineStage === 3 && selectedForward?.vessel_mmsi
+              ? String(vessel.mmsi) === String(selectedForward.vessel_mmsi)
               : true
           )
           .map((vessel) => {
@@ -2348,10 +2516,12 @@ function App() {
             {/* COMPACT MAP LEGEND — layer semantics only. Coordinates,
                 area, confidence and evidence live in the side panels. */}
             <div className="map-key" aria-label="Map legend">
-              <p className="map-key-line">
-                <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
-                Observed SAR slick
-              </p>
+              {hasDetection && (
+                <p className="map-key-line">
+                  <span className="map-key-swatch" style={{ background: "rgba(239,68,68,0.3)", border: "1.5px solid #ef4444" }} />
+                  Observed SAR slick
+                </p>
+              )}
               {pipelineStage >= 1 && (
                 <p className="map-key-line">
                   <span className="map-key-swatch" style={{ background: "rgba(59,130,246,0.12)", border: "1.5px dashed #3b82f6" }} />
