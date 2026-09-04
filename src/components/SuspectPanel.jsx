@@ -1020,14 +1020,14 @@ export function SuspectPanel({
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Release Time</span>
               <div style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#0369a1", marginTop: "3px" }}>
-                {releaseTime ? new Date(releaseTime).toISOString().replace("T", " ").substring(0, 16) + " UTC" : "2024-08-26 08:45 UTC"}
+                {releaseTime ? new Date(releaseTime).toISOString().replace("T", " ").substring(0, 16) + " UTC" : "—"}
               </div>
             </div>
 
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Observation Time</span>
               <div style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#0369a1", marginTop: "3px" }}>
-                {observationTime ? new Date(observationTime).toISOString().replace("T", " ").substring(0, 16) + " UTC" : "2024-08-26 12:00 UTC"}
+                {observationTime ? new Date(observationTime).toISOString().replace("T", " ").substring(0, 16) + " UTC" : "—"}
               </div>
             </div>
           </div>
@@ -1084,7 +1084,7 @@ export function SuspectPanel({
                 border: "1px solid rgba(37, 99, 235, 0.25)",
               }}
             >
-              {counterfactualResult?.evidence_strength || (candidateRank === 1 ? "Strong" : "Weak")} Evidence
+              {counterfactualResult?.evidence_strength ? `${counterfactualResult.evidence_strength} Evidence` : "Not yet validated"}
             </span>
           </div>
 
@@ -1092,21 +1092,29 @@ export function SuspectPanel({
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Spatial Agreement</span>
               <div style={{ fontSize: "14px", fontWeight: 800, color: "#1d4ed8", marginTop: "3px", fontFamily: "monospace" }}>
-                {Math.round((counterfactualResult?.spatial_agreement ?? (candidateRank === 1 ? 0.91 : 0.12)) * 100)}% Jaccard
+                {counterfactualResult?.spatial_agreement != null
+                  ? `${Math.round(counterfactualResult.spatial_agreement * 100)}% Jaccard`
+                  : "—"}
               </div>
             </div>
 
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Trajectory Intersection</span>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "#1d4ed8", marginTop: "3px" }}>
-                {(counterfactualResult?.trajectory_reaches_slick ?? (candidateRank === 1)) ? "TRUE (Reaches Slick)" : "FALSE (Diverged)"}
+                {counterfactualResult == null
+                  ? "—"
+                  : counterfactualResult.trajectory_reaches_slick
+                    ? "TRUE (Reaches Slick)"
+                    : "FALSE (Diverged)"}
               </div>
             </div>
 
             <div style={{ padding: "10px 12px", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)" }}>
               <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>Centroid Offset</span>
               <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginTop: "3px", fontFamily: "monospace" }}>
-                {(counterfactualResult?.centroid_distance_km ?? (candidateRank === 1 ? 0.84 : 14.2)).toFixed(2)} km
+                {counterfactualResult?.centroid_distance_km != null
+                  ? `${counterfactualResult.centroid_distance_km.toFixed(2)} km`
+                  : "—"}
               </div>
             </div>
 
@@ -1120,9 +1128,7 @@ export function SuspectPanel({
 
           <p style={{ fontSize: "11.5px", color: "#475569", lineHeight: 1.45, marginTop: "10px", fontStyle: "italic" }}>
             {counterfactualResult?.explanation ||
-              (candidateRank === 1
-                ? "Simulated forward particle cloud initialized at vessel crossing time drifts directly into observed SAR footprint."
-                : "Simulated trajectory fails to intersect observed slick geometry within physical limits.")}
+              "Counterfactual validation has not run yet. Run hindcast to simulate this vessel's forward drift against the observed slick."}
           </p>
         </section>
       </div>

@@ -31,6 +31,8 @@ class OilCanvasLayer {
     this._particles = [];
     this._trails = [];
     this._polygon = [];
+    this._light = false;
+    this._muted = false;
     this._canvas = null;
     this._ctx = null;
     this._map = null;
@@ -121,10 +123,12 @@ class OilCanvasLayer {
     this._trails = [];
   }
 
-  setFrame({ particles = [], trails = [], polygon = [] } = {}) {
+  setFrame({ particles = [], trails = [], polygon = [], light = false, muted = false } = {}) {
     const nextParticles = Array.isArray(particles) ? particles : [];
     const nextTrails = Array.isArray(trails) ? trails : [];
     const nextPolygon = Array.isArray(polygon) ? polygon : [];
+    const nextLight = Boolean(light);
+    const nextMuted = Boolean(muted);
 
     // Do absolutely nothing when React re-renders for an unrelated UI
     // action (for example selecting a vessel). The oil field must remain
@@ -132,7 +136,9 @@ class OilCanvasLayer {
     if (
       nextParticles === this._particles &&
       nextTrails === this._trails &&
-      nextPolygon === this._polygon
+      nextPolygon === this._polygon &&
+      nextLight === this._light &&
+      nextMuted === this._muted
     ) {
       return;
     }
@@ -140,6 +146,8 @@ class OilCanvasLayer {
     this._particles = nextParticles;
     this._trails = nextTrails;
     this._polygon = nextPolygon;
+    this._light = nextLight;
+    this._muted = nextMuted;
     this._scheduleRedraw(true);
   }
 
@@ -283,8 +291,23 @@ class OilCanvasLayer {
         const isCore = cat === "stranded" || cat === "core";
         const isSheen = cat === "initial" || cat === "sheen";
 
-        const radius = isCore ? 2.3 : isSheen ? 1.5 : 1.85;
-        const color = isCore
+        // Muted mode: after the hindcast pipeline runs, the observed slick
+        // becomes a faint reference layer so the teal/green simulation
+        // clouds own the visual foreground.
+        const radius = (isCore ? 2.3 : isSheen ? 1.5 : 1.85) * (this._muted ? 0.8 : 1);
+        // On the dark satellite basemap the petroleum-dark dots vanish, so
+        // the light mode flips the particles to white.
+        const color = this._muted
+          ? this._light
+            ? "rgba(226, 232, 240, 0.28)"
+            : "rgba(51, 65, 85, 0.22)"
+          : this._light
+          ? isCore
+            ? "rgba(255, 255, 255, 0.95)"
+            : isSheen
+            ? "rgba(226, 232, 240, 0.55)"
+            : "rgba(241, 245, 249, 0.85)"
+          : isCore
           ? "rgba(15, 23, 42, 0.92)"
           : isSheen
           ? "rgba(30, 41, 59, 0.55)"
@@ -306,6 +329,8 @@ function DeckOilOverlay({
   particles = [],
   trails = [],
   polygon = [],
+  light = false,
+  muted = false,
 }) {
   const map = useMap();
   const layerRef = useRef(null);
@@ -330,8 +355,8 @@ function DeckOilOverlay({
      every replay tick; that caused unnecessary flicker and made the
      vessel/oil stacking unreliable. */
   useEffect(() => {
-    layerRef.current?.setFrame({ particles, trails, polygon });
-  }, [particles, trails, polygon]);
+    layerRef.current?.setFrame({ particles, trails, polygon, light, muted });
+  }, [particles, trails, polygon, light, muted]);
 
   return null;
 }
@@ -344,5 +369,7 @@ export default memo(DeckOilOverlay, (prev, next) =>
   prev.enabled === next.enabled &&
   prev.particles === next.particles &&
   prev.trails === next.trails &&
-  prev.polygon === next.polygon
+  prev.polygon === next.polygon &&
+  prev.light === next.light &&
+  prev.muted === next.muted
 );

@@ -2,12 +2,14 @@ import { useState } from "react";
 import { compassLabel } from "../utils/compass";
 
 function pct(value) {
+  if (value == null) return null;
   const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n <= 1 ? Math.round(n * 100) : Math.round(n)));
 }
 
 function rankTone(value) {
+  if (value == null) return "low";
   if (value >= 70) return "high";
   if (value >= 40) return "mid";
   return "low";
@@ -87,7 +89,7 @@ export default function IntelRail({
         {sourcesOpen && (
           ranked.length ? (
             <ol className="intel-sources">
-              {ranked.slice(0, 5).map((vessel) => {
+              {ranked.slice(0, 2).map((vessel) => {
                 const score = pct(vessel.attributionConfidence);
                 return (
                   <li key={vessel.id || vessel.mmsi}>
@@ -100,17 +102,17 @@ export default function IntelRail({
                         <strong>{vessel.name || vessel.mmsi}</strong>
                         <em>{vessel.mmsi}</em>
                       </span>
-                      <b className={rankTone(score)}>{score}%</b>
+                      <b className={rankTone(score)}>{score == null ? "—" : `${score}%`}</b>
                     </button>
                     <div className="intel-bar" aria-hidden="true">
-                      <i className={rankTone(score)} style={{ width: `${score}%` }} />
+                      <i className={rankTone(score)} style={{ width: `${score ?? 0}%` }} />
                     </div>
                   </li>
                 );
               })}
             </ol>
           ) : (
-            <p className="intel-empty">No AIS candidates from the backend yet.</p>
+            <p className="intel-empty">No AIS candidates yet — run attribution to scan traffic in the probable source region.</p>
           )
         )}
       </div>
