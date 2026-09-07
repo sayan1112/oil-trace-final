@@ -11,6 +11,17 @@
 
 import { apiClient, describeBackendError, getActiveBackendUrl, isLocalBackend } from "./api";
 
+import {
+  usingCanonicalRun,
+  canonicalHindcast,
+  canonicalVessels,
+  canonicalAttribution,
+  canonicalForward,
+  canonicalCounterfactual,
+  canonicalReplay,
+  canonicalHealth,
+} from "./demoData";
+
 export { getActiveBackendUrl, isLocalBackend };
 export const BACKEND_BASE = getActiveBackendUrl();
 
@@ -33,9 +44,14 @@ async function request(path, options = {}, timeoutMs = 120000) {
 
 /* ── Health / warm-up ─────────────────────────────────────────────── */
 
-export const warmBackend = () => request("/health", {}, 60000).catch(() => null);
-export const getBackendHealth = () => request("/health", {}, 60000);
-export const getBackendPing = () => request("/ping", {}, 60000);
+export const warmBackend = () =>
+  usingCanonicalRun()
+    ? Promise.resolve(canonicalHealth())
+    : request("/health", {}, 60000).catch(() => null);
+export const getBackendHealth = () =>
+  usingCanonicalRun() ? Promise.resolve(canonicalHealth()) : request("/health", {}, 60000);
+export const getBackendPing = () =>
+  usingCanonicalRun() ? Promise.resolve({ ping: "pong" }) : request("/ping", {}, 60000);
 export const getMlHealth = () => request("/health/ml", {}, 120000);
 
 /* ── Investigation endpoints ──────────────────────────────────────── */
@@ -48,6 +64,7 @@ export function detectOilSpills(file, acquiredAtUtc) {
 }
 
 export function runHindcast(slick, durationHours = 6) {
+  if (usingCanonicalRun()) return Promise.resolve(canonicalHindcast());
   return request(
     "/hindcast",
     {
@@ -60,11 +77,13 @@ export function runHindcast(slick, durationHours = 6) {
 }
 
 export function getCandidateVessels(bbox, start, end) {
+  if (usingCanonicalRun()) return Promise.resolve(canonicalVessels());
   const q = new URLSearchParams({ bbox, start, end });
   return request(`/vessels?${q}`, {}, 120000);
 }
 
 export function runAttribution(incidentId, sourceRegion, vessels, uncertaintyRadiusKm = 10) {
+  if (usingCanonicalRun()) return Promise.resolve(canonicalAttribution());
   return request(
     "/attribute",
     {
@@ -82,6 +101,15 @@ export function runAttribution(incidentId, sourceRegion, vessels, uncertaintyRad
 }
 
 export function runForwardSimulation(forwardRequest) {
+  // Rejects for a release state the canonical run never simulated, exactly as
+  // the live endpoint would, so the caller records it as unavailable.
+  if (usingCanonicalRun()) {
+    try {
+      return Promise.resolve(canonicalForward(forwardRequest));
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
   return request(
     "/forward",
     {
@@ -94,6 +122,13 @@ export function runForwardSimulation(forwardRequest) {
 }
 
 export function runCounterfactual(incidentId, vesselMmsi, forwardResult, observedSlick) {
+  if (usingCanonicalRun()) {
+    try {
+      return Promise.resolve(canonicalCounterfactual(vesselMmsi, forwardResult));
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
   return request(
     "/counterfactual",
     {
@@ -111,6 +146,7 @@ export function runCounterfactual(incidentId, vesselMmsi, forwardResult, observe
 }
 
 export function getReplay(id) {
+  if (usingCanonicalRun()) return Promise.resolve(canonicalReplay());
   return request(`/replay/${encodeURIComponent(id)}`, {}, 120000);
 }
 
